@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "yacente",
+  "compatibility_date": "2026-07-16",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "gestor-banda-semana-santa"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
