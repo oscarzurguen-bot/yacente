@@ -1330,11 +1330,7 @@ svg.chevron {
 .settings-card {
     display: flex;
     flex-direction: column;
-}
-@media (min-width: 768px) {
-    .settings-card {
-        min-height: 300px;
-    }
+    padding: 16px !important;
 }
 .settings-card h3 {
     font-size: 1.15rem;
