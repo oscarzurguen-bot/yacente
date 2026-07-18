@@ -693,9 +693,13 @@ function startCloudSync() {
                         if (isMusicianConvocated(musicianId, sessionData)) {
                             const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
                             const formattedDate = formatDateShortSpanish(sessionDate);
-                            let body = `${sessionData.name || (sessionData.type === 'actuacion' ? 'Actuación' : 'Ensayo')} - ${formattedDate}`;
-                            if (sessionData.type === "ensayo" && sessionData.location) {
-                                body += ` (${sessionData.location})`;
+                            let body = "";
+                            if (sessionData.type === "ensayo") {
+                                const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
+                                const locationVal = sessionData.location || "Parking";
+                                body = `${subtypeText} (${locationVal}) - ${formattedDate}`;
+                            } else {
+                                body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
                             }
                             
                             // Save to local storage notifications list
@@ -2156,10 +2160,16 @@ function setupEventListeners() {
                 } else {
                     document.getElementById("quick-session-type").value = "ensayo-general";
                 }
+                if (document.getElementById("quick-session-location")) {
+                    document.getElementById("quick-session-location").value = sessionInfo.location || "Parking";
+                }
             }
         } else {
             // Default when not created
             document.getElementById("quick-session-type").value = "ensayo-general";
+            if (document.getElementById("quick-session-location")) {
+                document.getElementById("quick-session-location").value = "Parking";
+            }
         }
         
         // Trigger visibility update
@@ -2177,11 +2187,14 @@ function setupEventListeners() {
     function updateQuickSessionFieldsVisibility() {
         const type = quickSessionTypeSelect.value;
         const actuacionGroup = document.getElementById("quick-session-actuacion-group");
+        const locationGroup = document.getElementById("quick-session-location-group");
         
         if (type === "actuacion") {
             actuacionGroup.classList.remove("hidden");
+            if (locationGroup) locationGroup.classList.add("hidden");
         } else {
             actuacionGroup.classList.add("hidden");
+            if (locationGroup) locationGroup.classList.remove("hidden");
         }
     }
     
@@ -2196,26 +2209,30 @@ function setupEventListeners() {
         let newSession = null;
         let convocatedVoices = [];
         
-        if (type === "ensayo-general") {
-            newSession = { type: "ensayo", subtype: "general", name: "" };
-        } else if (type === "ensayo-trompetas1") {
-            convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
-            newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices };
-        } else if (type === "ensayo-bajos") {
-            convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
-            newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices };
-        } else if (type === "ensayo-trompetas2y3") {
-            convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
-            newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices };
-        } else if (type === "ensayo-cornetas") {
-            convocatedVoices = ["Cornetas"];
-            newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices };
-        } else if (type === "ensayo-percusion") {
-            convocatedVoices = ["Tambores", "Bombos", "Platos"];
-            newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices };
-        } else if (type === "ensayo-primeras") {
-            convocatedVoices = ["Trompetas 1ª", "Cornetas"];
-            newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices }; // Fallback
+        if (type.startsWith("ensayo-")) {
+            const locationVal = document.getElementById("quick-session-location") ? document.getElementById("quick-session-location").value : "Parking";
+            
+            if (type === "ensayo-general") {
+                newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal };
+            } else if (type === "ensayo-trompetas1") {
+                convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
+                newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices, location: locationVal };
+            } else if (type === "ensayo-bajos") {
+                convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
+                newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices, location: locationVal };
+            } else if (type === "ensayo-trompetas2y3") {
+                convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
+                newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices, location: locationVal };
+            } else if (type === "ensayo-cornetas") {
+                convocatedVoices = ["Cornetas"];
+                newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices, location: locationVal };
+            } else if (type === "ensayo-percusion") {
+                convocatedVoices = ["Tambores", "Bombos", "Platos"];
+                newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices, location: locationVal };
+            } else if (type === "ensayo-primeras") {
+                convocatedVoices = ["Trompetas 1ª", "Cornetas"];
+                newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices, location: locationVal }; // Fallback
+            }
         } else if (type === "actuacion") {
             const actuacionName = document.getElementById("quick-session-actuacion-name").value.trim();
             if (!actuacionName) {
@@ -6278,10 +6295,18 @@ function renderCalendar() {
             // Reset modal values for a fresh new session
             document.getElementById("quick-session-actuacion-name").value = "";
             document.getElementById("quick-session-type").value = "ensayo-general";
+            if (document.getElementById("quick-session-location")) {
+                document.getElementById("quick-session-location").value = "Parking";
+            }
             
             // Hide actuation name field by default
             const actuacionGroup = document.getElementById("quick-session-actuacion-group");
             actuacionGroup.classList.add("hidden");
+            
+            const locationGroup = document.getElementById("quick-session-location-group");
+            if (locationGroup) {
+                locationGroup.classList.remove("hidden");
+            }
             
             modalQuickSession.classList.add("active");
         });
@@ -10809,6 +10834,17 @@ function renderGeneralOverviewChart() {
         </div>
         <div style="height: 25px; width: 100%;"></div>
     `;
+}
+
+function getRehearsalSubtypeText(sub) {
+    if (sub === "trompetas1") return "Ensayo Trompetas 1ª";
+    if (sub === "bajos") return "Ensayo Bajos";
+    if (sub === "trompetas2y3") return "Ensayo Trompetas 2ª y 3ª";
+    if (sub === "cornetas") return "Ensayo Cornetas";
+    if (sub === "percusion") return "Ensayo Percusión";
+    if (sub === "primeras") return "Ensayo Primeras";
+    if (sub === "voces") return "Ensayo por Voces";
+    return "Ensayo General";
 }
 
 function isMusicianConvocated(musicianId, sessionInfo) {
