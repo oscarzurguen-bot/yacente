@@ -9699,28 +9699,39 @@ function renderComponentFicha() {
             notifCard.style.display = "flex";
         } else if (Notification.permission === "granted") {
             notifCard.style.display = "none";
-        } else if (Notification.permission === "denied") {
-            notifStatus.innerText = "Notificaciones bloqueadas. Por favor, habilítalas en la configuración de tu navegador para recibir avisos.";
-            btnEnableNotif.innerText = "Bloqueado";
-            btnEnableNotif.disabled = true;
-            btnEnableNotif.className = "btn btn-secondary btn-sm";
-            btnEnableNotif.style.opacity = "0.5";
-            notifCard.style.display = "flex";
         } else {
             notifCard.style.display = "flex";
-            notifStatus.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
+            
+            if (Notification.permission === "denied") {
+                notifStatus.innerText = "Notificaciones bloqueadas en tu navegador. Por favor, habilítalas en los ajustes del sitio.";
+                btnEnableNotif.innerText = "Comprobar y Activar";
+                btnEnableNotif.className = "btn btn-secondary btn-sm";
+                btnEnableNotif.disabled = false;
+                btnEnableNotif.style.opacity = "1";
+            } else {
+                notifStatus.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
+                btnEnableNotif.innerText = "Habilitar Notificaciones";
+                btnEnableNotif.className = "btn btn-primary btn-sm";
+                btnEnableNotif.disabled = false;
+                btnEnableNotif.style.opacity = "1";
+            }
+            
             if (btnEnableNotif.tagName === "BUTTON") {
                 // Avoid duplicating listeners by replacing with a clone
                 const newBtn = btnEnableNotif.cloneNode(true);
                 btnEnableNotif.parentNode.replaceChild(newBtn, btnEnableNotif);
                 newBtn.addEventListener("click", () => {
-                    Notification.requestPermission().then(permission => {
-                        renderComponentFicha();
-                        if (permission === "granted") {
-                            showToast("¡Notificaciones de escritorio habilitadas!", "success");
-                            registerDeviceToken(musicianId);
-                        }
-                    });
+                    if (Notification.permission === "denied") {
+                        showToast("Siguen bloqueadas. Haz clic en el icono del candado o configuración al lado de la barra de direcciones, cambia el permiso de Notificaciones a 'Permitir' y pulsa aquí de nuevo.", "warning");
+                    } else {
+                        Notification.requestPermission().then(permission => {
+                            renderComponentFicha();
+                            if (permission === "granted") {
+                                showToast("¡Notificaciones de escritorio habilitadas!", "success");
+                                registerDeviceToken(musicianId);
+                            }
+                        });
+                    }
                 });
             }
         }
