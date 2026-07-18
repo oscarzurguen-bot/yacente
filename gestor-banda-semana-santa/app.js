@@ -120,7 +120,14 @@ let state = {
     directorConcierto: null,
     currentPreavisoDate: "",
     compCalendarYear: undefined,
-    compCalendarMonth: undefined
+    compCalendarMonth: undefined,
+    statsOvMode: "years",
+    statsOvSelectedSeason: (() => {
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = today.getMonth() + 1;
+        return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
+    })()
 };
 
 let preavisoSelectedStatus = null;
@@ -146,6 +153,61 @@ document.addEventListener("DOMContentLoaded", () => {
     setupSimulator();
 });
 
+function parseConciertoFormacion(stored) {
+    if (!stored) return Array.from({ length: 4 }, () => []);
+    let parsed = null;
+    if (typeof stored === "string") {
+        try {
+            parsed = JSON.parse(stored);
+        } catch (e) {
+            console.error("Error parsing storedConcierto", e);
+            return Array.from({ length: 4 }, () => []);
+        }
+    } else {
+        parsed = stored;
+    }
+    if (parsed && !Array.isArray(parsed) && typeof parsed === "object") {
+        const arr = Array.from({ length: 4 }, () => []);
+        let count = 0;
+        Object.entries(parsed).forEach(([seatId, musicianId]) => {
+            if (musicianId) {
+                const targetRow = count % 4;
+                arr[targetRow].push(musicianId);
+                count++;
+            }
+        });
+        return arr;
+    } else if (Array.isArray(parsed)) {
+        if (parsed.length === 0 || !Array.isArray(parsed[0])) {
+            return Array.from({ length: 4 }, () => []);
+        }
+        return parsed;
+    }
+    return Array.from({ length: 4 }, () => []);
+}
+
+function parseDesfileFormacion(stored) {
+    if (!stored) return Array.from({ length: 8 }, () => []);
+    let parsed = null;
+    if (typeof stored === "string") {
+        try {
+            parsed = JSON.parse(stored);
+        } catch (e) {
+            console.error("Error parsing storedDesfile", e);
+            return Array.from({ length: 8 }, () => []);
+        }
+    } else {
+        parsed = stored;
+    }
+    if (Array.isArray(parsed)) {
+        if (parsed.length === 0 || !Array.isArray(parsed[0])) {
+            return Array.from({ length: 8 }, () => []);
+        }
+        return parsed;
+    }
+    return Array.from({ length: 8 }, () => []);
+}
+
 function initApp() {
     console.log("Yacente v8 inicializada correctamente");
     const storedMusicians = localStorage.getItem("harmonia_musicians");
@@ -164,32 +226,8 @@ function initApp() {
     // Cargar formaciones del simulador
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
     const storedDesfile = localStorage.getItem("yacente_formacion_desfile");
-    state.formacionDesfile = storedDesfile ? JSON.parse(storedDesfile) : {};
-    if (!Array.isArray(state.formacionDesfile)) {
-        state.formacionDesfile = Array.from({ length: 8 }, () => []);
-    }
-
-    let parsedConcierto = null;
-    try {
-        parsedConcierto = storedConcierto ? JSON.parse(storedConcierto) : null;
-    } catch (e) {
-        console.error("Error parsing storedConcierto", e);
-    }
-    if (parsedConcierto && !Array.isArray(parsedConcierto)) {
-        state.formacionConcierto = Array.from({ length: 4 }, () => []);
-        let count = 0;
-        Object.entries(parsedConcierto).forEach(([seatId, musicianId]) => {
-            if (musicianId) {
-                const targetRow = count % 4;
-                state.formacionConcierto[targetRow].push(musicianId);
-                count++;
-            }
-        });
-    } else if (Array.isArray(parsedConcierto)) {
-        state.formacionConcierto = parsedConcierto;
-    } else {
-        state.formacionConcierto = Array.from({ length: 4 }, () => []);
-    }
+    state.formacionConcierto = parseConciertoFormacion(storedConcierto);
+    state.formacionDesfile = parseDesfileFormacion(storedDesfile);
     state.directorConcierto = localStorage.getItem("yacente_director_concierto") || null;
 
     // Cargar credenciales de Firebase
@@ -245,6 +283,13 @@ function initApp() {
             const mobNav = document.getElementById("component-mobile-nav");
             if (mobNav) mobNav.classList.remove("hidden");
             renderActiveSection("section-componente-ficha");
+            
+            // Auto-request notifications on load
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission().then(() => {
+                    renderComponentFicha();
+                });
+            }
         } else {
             document.body.classList.remove("component-portal");
             renderActiveSection("section-pasar-lista");
@@ -311,29 +356,41 @@ function updateSessionBadge() {
         badge.style.backgroundColor = "rgba(46, 204, 113, 0.05)";
         badge.style.color = "var(--color-present)";
     } else if (sessionInfo.type === "ensayo") {
-        if (sessionInfo.subtype === "primeras") {
-            badge.innerText = `👥 Ensayo Primeras`;
-            badge.style.borderColor = "rgba(155, 89, 182, 0.4)";
-            badge.style.backgroundColor = "rgba(155, 89, 182, 0.05)";
-            badge.style.color = "#9b59b6";
-        } else if (sessionInfo.subtype === "bajos") {
-            badge.innerText = `👥 Ensayo Bajos`;
-            badge.style.borderColor = "rgba(155, 89, 182, 0.4)";
-            badge.style.backgroundColor = "rgba(155, 89, 182, 0.05)";
-            badge.style.color = "#9b59b6";
-        } else if (sessionInfo.subtype === "percusion") {
-            badge.innerText = `👥 Ensayo Percusión`;
-            badge.style.borderColor = "rgba(155, 89, 182, 0.4)";
-            badge.style.backgroundColor = "rgba(155, 89, 182, 0.05)";
-            badge.style.color = "#9b59b6";
-        } else if (sessionInfo.subtype === "voces") {
+        const sub = sessionInfo.subtype;
+        let badgeText = "🎺 Ensayo General";
+        let isSection = false;
+
+        if (sub === "trompetas1") {
+            badgeText = "👥 Ensayo Trompetas 1ª";
+            isSection = true;
+        } else if (sub === "bajos") {
+            badgeText = "👥 Ensayo Bajos";
+            isSection = true;
+        } else if (sub === "trompetas2y3") {
+            badgeText = "👥 Ensayo Trompetas 2ª y 3ª";
+            isSection = true;
+        } else if (sub === "cornetas") {
+            badgeText = "👥 Ensayo Cornetas";
+            isSection = true;
+        } else if (sub === "percusion") {
+            badgeText = "👥 Ensayo Percusión";
+            isSection = true;
+        } else if (sub === "voces") {
             const count = sessionInfo.convocatedVoices ? sessionInfo.convocatedVoices.length : 0;
-            badge.innerText = `👥 Ensayo Voces (${count})`;
+            badgeText = `👥 Ensayo Voces (${count})`;
+            isSection = true;
+        } else if (sub === "primeras") {
+            badgeText = "👥 Ensayo Primeras";
+            isSection = true;
+        }
+
+        badge.innerText = badgeText;
+
+        if (isSection) {
             badge.style.borderColor = "rgba(155, 89, 182, 0.4)";
             badge.style.backgroundColor = "rgba(155, 89, 182, 0.05)";
             badge.style.color = "#9b59b6";
         } else {
-            badge.innerText = "🎺 Ensayo General";
             badge.style.borderColor = "rgba(212, 175, 55, 0.4)";
             badge.style.backgroundColor = "rgba(212, 175, 55, 0.05)";
             badge.style.color = "var(--color-gold)";
@@ -367,10 +424,14 @@ function updateAttendanceSessionSelector() {
             if (sessionInfo.type === "actuacion") {
                 label = `⭐ Act: ${sessionInfo.name || 'Sin nombre'}`;
             } else if (sessionInfo.type === "ensayo") {
-                if (sessionInfo.subtype === "primeras") label = "👥 Primeras";
-                else if (sessionInfo.subtype === "bajos") label = "👥 Bajos";
-                else if (sessionInfo.subtype === "percusion") label = "👥 Percusión";
-                else if (sessionInfo.subtype === "voces") label = `👥 Voces (${sessionInfo.convocatedVoices.length})`;
+                const sub = sessionInfo.subtype;
+                if (sub === "trompetas1") label = "👥 Trompetas 1ª";
+                else if (sub === "bajos") label = "👥 Bajos";
+                else if (sub === "trompetas2y3") label = "👥 Trompetas 2ª y 3ª";
+                else if (sub === "cornetas") label = "👥 Cornetas";
+                else if (sub === "percusion") label = "👥 Percusión";
+                else if (sub === "voces") label = `👥 Voces (${sessionInfo.convocatedVoices.length})`;
+                else if (sub === "primeras") label = "👥 Primeras";
             }
         }
         
@@ -385,8 +446,9 @@ function updateAttendanceSessionSelector() {
 }
 
 function isSectionRehearsal(sessionInfo) {
-    return sessionInfo && sessionInfo.type === "ensayo" && 
-        (sessionInfo.subtype === "voces" || sessionInfo.subtype === "primeras" || sessionInfo.subtype === "bajos" || sessionInfo.subtype === "percusion");
+    if (!sessionInfo || sessionInfo.type !== "ensayo") return false;
+    const sub = sessionInfo.subtype;
+    return sub === "voces" || sub === "trompetas1" || sub === "bajos" || sub === "trompetas2y3" || sub === "cornetas" || sub === "percusion" || sub === "primeras";
 }
 
 function saveStateToLocalStorage() {
@@ -430,6 +492,8 @@ let unsubMarchas = null;
 let unsubPlayedMarchas = null;
 let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
+let unsubFormacionConcierto = null;
+let unsubFormacionDesfile = null;
 
 // Inicializa Firebase
 function initFirebase() {
@@ -454,6 +518,24 @@ function initFirebase() {
         // Si no estamos autenticados en esta sesión, bloquear pantalla
         if (!getAuthToken()) {
             showLockScreen();
+            
+            // Jalar músicos en segundo plano para poblar el dropdown de login con la base de datos real
+            const db = firebase.firestore();
+            db.collection("musicians").get()
+                .then(snapshot => {
+                    const musicians = [];
+                    snapshot.forEach(doc => {
+                        musicians.push(doc.data());
+                    });
+                    if (musicians.length > 0) {
+                        state.musicians = musicians;
+                        localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+                        populateLoginMusicians();
+                    }
+                })
+                .catch(err => {
+                    console.error("Error al jalar músicos para el login:", err);
+                });
         } else {
             startCloudSync();
         }
@@ -589,12 +671,56 @@ function startCloudSync() {
     });
 
     // Escucha de metadatos de sesión
+    let isInitialSessionTypesLoad = true;
     unsubSessionTypes = db.collection("sessionTypes").onSnapshot(snapshot => {
+        const changes = snapshot.docChanges();
+        
         state.sessionTypes = {}; // Limpiar caché local para evitar datos huérfanos/demo
         snapshot.forEach(doc => {
             state.sessionTypes[doc.id] = doc.data();
         });
         localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
+        
+        // Dispatch notifications if this is not the initial load and role is component
+        if (!isInitialSessionTypesLoad && getAuthRole() === "component") {
+            const musicianId = getAuthMusicianId();
+            if (musicianId) {
+                changes.forEach(change => {
+                    if (change.type === "added") {
+                        const sessionData = change.doc.data();
+                        const sessionDate = change.doc.id;
+                        
+                        if (isMusicianConvocated(musicianId, sessionData)) {
+                            const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
+                            const formattedDate = formatDateShortSpanish(sessionDate);
+                            let body = `${sessionData.name || (sessionData.type === 'actuacion' ? 'Actuación' : 'Ensayo')} - ${formattedDate}`;
+                            if (sessionData.type === "ensayo" && sessionData.location) {
+                                body += ` (${sessionData.location})`;
+                            }
+                            
+                            // Save to local storage notifications list
+                            const notifId = `${sessionDate}-${sessionData.type}`;
+                            const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+                            if (!notifs.some(n => n.id === notifId)) {
+                                notifs.unshift({
+                                    id: notifId,
+                                    title: title,
+                                    body: body,
+                                    date: new Date().toISOString(),
+                                    seen: false
+                                });
+                                localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                                updateNotificationsBadge();
+                                sendBrowserNotification(title, body);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        isInitialSessionTypesLoad = false;
+        
         if (document.getElementById("section-ensayos").classList.contains("active")) {
             renderEnsayosList();
         }
@@ -681,6 +807,72 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync estados marchas músicos:", err);
     });
+
+    // Escucha de formación de concierto
+    unsubFormacionConcierto = db.collection("config").doc("formacion_concierto").onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            let parsedMap = null;
+            if (data.mapStr) {
+                try {
+                    parsedMap = JSON.parse(data.mapStr);
+                } catch(e) {
+                    console.error("Error parsing concert mapStr:", e);
+                }
+            } else if (data.map) {
+                parsedMap = data.map;
+            }
+            if (parsedMap) {
+                state.formacionConcierto = parsedMap;
+                localStorage.setItem("yacente_formacion_concierto", JSON.stringify(parsedMap));
+            }
+            state.directorConcierto = data.director || null;
+            if (state.directorConcierto) {
+                localStorage.setItem("yacente_director_concierto", state.directorConcierto);
+            } else {
+                localStorage.removeItem("yacente_director_concierto");
+            }
+            // Repintar simulador si está abierto
+            const modal = document.getElementById("modal-simulator");
+            if (modal && modal.classList.contains("active") && simActiveMode === "concierto") {
+                renderSimulatorSeats();
+                renderSimulatorRoster();
+                updateSimulatorOccupancy();
+            }
+        }
+    }, err => {
+        console.error("Error sync formación concierto:", err);
+    });
+
+    // Escucha de formación de desfile
+    unsubFormacionDesfile = db.collection("config").doc("formacion_desfile").onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            let parsedMap = null;
+            if (data.mapStr) {
+                try {
+                    parsedMap = JSON.parse(data.mapStr);
+                } catch(e) {
+                    console.error("Error parsing parade mapStr:", e);
+                }
+            } else if (data.map) {
+                parsedMap = data.map;
+            }
+            if (parsedMap) {
+                state.formacionDesfile = parsedMap;
+                localStorage.setItem("yacente_formacion_desfile", JSON.stringify(parsedMap));
+            }
+            // Repintar simulador si está abierto
+            const modal = document.getElementById("modal-simulator");
+            if (modal && modal.classList.contains("active") && simActiveMode === "desfile") {
+                renderSimulatorSeats();
+                renderSimulatorRoster();
+                updateSimulatorOccupancy();
+            }
+        }
+    }, err => {
+        console.error("Error sync formación desfile:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -692,6 +884,8 @@ function stopCloudSync() {
     if (unsubPlayedMarchas) { unsubPlayedMarchas(); unsubPlayedMarchas = null; }
     if (unsubWeeklyGoals) { unsubWeeklyGoals(); unsubWeeklyGoals = null; }
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
+    if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
+    if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -734,6 +928,18 @@ function syncLocalToCloud() {
         batch.set(ref, { marchas: state.playedMarchas[date] });
     });
     
+    // Subir configuraciones del simulador
+    const refConcierto = db.collection("config").doc("formacion_concierto");
+    batch.set(refConcierto, {
+        mapStr: JSON.stringify(state.formacionConcierto),
+        director: state.directorConcierto || null
+    });
+
+    const refDesfile = db.collection("config").doc("formacion_desfile");
+    batch.set(refDesfile, {
+        mapStr: JSON.stringify(state.formacionDesfile)
+    });
+    
     batch.commit()
         .then(() => {
             showToast("Datos locales subidos a la nube con éxito", "success");
@@ -773,6 +979,19 @@ function disconnectFirebase() {
     state.sessionTypes = storedSessionTypes ? JSON.parse(storedSessionTypes) : {};
     state.marchas = storedMarchas ? JSON.parse(storedMarchas) : [];
     state.playedMarchas = storedPlayedMarchas ? JSON.parse(storedPlayedMarchas) : {};
+    
+    // Recargar formaciones de simulador locales
+    const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
+    const storedDesfile = localStorage.getItem("yacente_formacion_desfile");
+    state.formacionDesfile = storedDesfile ? JSON.parse(storedDesfile) : [];
+    if (!Array.isArray(state.formacionDesfile)) {
+        state.formacionDesfile = Array.from({ length: 8 }, () => []);
+    }
+    state.formacionConcierto = storedConcierto ? JSON.parse(storedConcierto) : [];
+    if (!Array.isArray(state.formacionConcierto)) {
+        state.formacionConcierto = Array.from({ length: 4 }, () => []);
+    }
+    state.directorConcierto = localStorage.getItem("yacente_director_concierto") || null;
     
     updateFirebaseStatusUI(false);
     showToast("Nube desactivada. Volviendo al modo local.", "success");
@@ -905,14 +1124,17 @@ function setupEventListeners() {
             }
         });
     }
-    const btnLogoutSettingsAdmin = document.getElementById("btn-logout-settings-admin");
-    if (btnLogoutSettingsAdmin) {
-        btnLogoutSettingsAdmin.addEventListener("click", () => {
+
+    const btnLogoutNavAdmin = document.getElementById("btn-logout-nav-admin");
+    if (btnLogoutNavAdmin) {
+        btnLogoutNavAdmin.addEventListener("click", (e) => {
+            e.preventDefault();
             if (confirm("¿Estás seguro de que deseas cerrar la sesión de administración?")) {
                 logoutAdmin();
             }
         });
     }
+
 
     // --- Eventos del Portal de Componentes (Músicos) ---
     
@@ -993,6 +1215,14 @@ function setupEventListeners() {
         });
     }
 
+    // Descargar repertorio en PDF
+    const btnDownloadRepertoirePDF = document.getElementById("btn-download-repertoire-pdf");
+    if (btnDownloadRepertoirePDF) {
+        btnDownloadRepertoirePDF.addEventListener("click", () => {
+            downloadRepertoirePDFReport();
+        });
+    }
+
     // Colapsables de estadísticas y otros
     document.querySelectorAll(".card-collapsible-header").forEach(header => {
         header.addEventListener("click", () => {
@@ -1021,6 +1251,7 @@ function setupEventListeners() {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             const targetId = item.getAttribute("data-target");
+            if (!targetId) return;
             
             document.querySelectorAll(".nav-item").forEach(nav => nav.classList.remove("active"));
             item.classList.add("active");
@@ -1099,6 +1330,52 @@ function setupEventListeners() {
         renderStatistics();
     });
 
+    // Alternancia en Visión General (Estadísticas)
+    const btnOvYears = document.getElementById("btn-stats-ov-years");
+    const btnOvMonths = document.getElementById("btn-stats-ov-months");
+    const ovYearSelect = document.getElementById("stats-ov-year-select");
+
+    if (btnOvYears && btnOvMonths) {
+        btnOvYears.addEventListener("click", () => {
+            state.statsOvMode = "years";
+            btnOvYears.classList.remove("btn-secondary");
+            btnOvYears.classList.add("btn-primary");
+            btnOvYears.style.background = "";
+            btnOvYears.style.color = "";
+            
+            btnOvMonths.classList.remove("btn-primary");
+            btnOvMonths.classList.add("btn-secondary");
+            btnOvMonths.style.background = "transparent";
+            btnOvMonths.style.color = "var(--text-secondary)";
+            
+            document.getElementById("stats-ov-month-filter-container").classList.add("hidden");
+            renderGeneralOverviewChart();
+        });
+        
+        btnOvMonths.addEventListener("click", () => {
+            state.statsOvMode = "months";
+            btnOvMonths.classList.remove("btn-secondary");
+            btnOvMonths.classList.add("btn-primary");
+            btnOvMonths.style.background = "";
+            btnOvMonths.style.color = "";
+            
+            btnOvYears.classList.remove("btn-primary");
+            btnOvYears.classList.add("btn-secondary");
+            btnOvYears.style.background = "transparent";
+            btnOvYears.style.color = "var(--text-secondary)";
+            
+            document.getElementById("stats-ov-month-filter-container").classList.remove("hidden");
+            renderGeneralOverviewChart();
+        });
+    }
+
+    if (ovYearSelect) {
+        ovYearSelect.addEventListener("change", (e) => {
+            state.statsOvSelectedSeason = e.target.value;
+            renderGeneralOverviewChart();
+        });
+    }
+
     // Filtros de Historial de Ensayos
     document.getElementById("rehearsals-filter-year").addEventListener("change", () => {
         renderEnsayosList();
@@ -1144,8 +1421,8 @@ function setupEventListeners() {
         { id: "corazon", field: "badgeCorazonYacente" },
         { id: "raices", field: "badgeRaicesProfundas" },
         { id: "leyenda", field: "badgeLeyendaViva" },
-        { id: "ruta", field: "badgeRuta" },
-        { id: "agonia", field: "badgeAgonia" }
+        { id: "agonia", field: "badgeAgonia" },
+        { id: "hasta_final", field: "badgeHastaElFinal" }
     ];
     manualBadges.forEach(badge => {
         const el = document.getElementById(`detail-badge-${badge.id}-check`);
@@ -1184,6 +1461,86 @@ function setupEventListeners() {
             });
         }
     });
+
+
+
+    const rutaInputListener = document.getElementById("detail-badge-ruta-trips");
+    if (rutaInputListener) {
+        rutaInputListener.addEventListener("change", (e) => {
+            if (getAuthRole() !== "admin") {
+                e.preventDefault();
+                const musicianId = currentDetailMusicianId;
+                const musician = state.musicians.find(m => m.id === musicianId);
+                rutaInputListener.value = musician ? (musician.badgeRutaTrips || 0) : 0;
+                showToast("Solo la dirección puede asignar estas insignias", "error");
+                return;
+            }
+            const musicianId = currentDetailMusicianId;
+            if (!musicianId) return;
+            
+            const musician = state.musicians.find(m => m.id === musicianId);
+            if (!musician) return;
+            
+            const val = parseInt(e.target.value, 10);
+            musician.badgeRutaTrips = isNaN(val) ? 0 : val;
+            
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("musicians").doc(musicianId).set(musician)
+                    .then(() => {
+                        showToast("Insignia actualizada en la nube", "success");
+                    })
+                    .catch(err => {
+                        console.error("Error al actualizar insignia:", err);
+                        showToast("Error al guardar en la nube", "error");
+                    });
+            } else {
+                localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+                showToast("Insignia actualizada localmente", "success");
+            }
+            
+            renderMusicianDetailContent();
+        });
+    }
+
+    const hermandadInputListener = document.getElementById("detail-badge-hermandad-events");
+    if (hermandadInputListener) {
+        hermandadInputListener.addEventListener("change", (e) => {
+            if (getAuthRole() !== "admin") {
+                e.preventDefault();
+                const musicianId = currentDetailMusicianId;
+                const musician = state.musicians.find(m => m.id === musicianId);
+                hermandadInputListener.value = musician ? (musician.badgeHermandadEvents || 0) : 0;
+                showToast("Solo la dirección puede asignar estas insignias", "error");
+                return;
+            }
+            const musicianId = currentDetailMusicianId;
+            if (!musicianId) return;
+            
+            const musician = state.musicians.find(m => m.id === musicianId);
+            if (!musician) return;
+            
+            const val = parseInt(e.target.value, 10);
+            musician.badgeHermandadEvents = isNaN(val) ? 0 : val;
+            
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("musicians").doc(musicianId).set(musician)
+                    .then(() => {
+                        showToast("Insignia actualizada en la nube", "success");
+                    })
+                    .catch(err => {
+                        console.error("Error al actualizar insignia:", err);
+                        showToast("Error al guardar en la nube", "error");
+                    });
+            } else {
+                localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+                showToast("Insignia actualizada localmente", "success");
+            }
+            
+            renderMusicianDetailContent();
+        });
+    }
 
     // Modal de estadísticas detalladas de la sección / voz
     document.getElementById("btn-close-voice-stats").addEventListener("click", () => {
@@ -1274,8 +1631,11 @@ function setupEventListeners() {
                 badgeCorazonYacente: false,
                 badgeRaicesProfundas: false,
                 badgeLeyendaViva: false,
-                badgeRuta: false,
-                badgeAgonia: false
+                badgeRutaTrips: 0,
+                badgeAgonia: false,
+                badgeHastaElFinal: false,
+                badgeTrotamundosTrips: 0,
+                badgeHermandadEvents: 0
             };
             state.musicians.push(newMusician);
             dbSaveMusician(newMusician);
@@ -1311,6 +1671,9 @@ function setupEventListeners() {
     document.getElementById("btn-add-rehearsal").addEventListener("click", () => {
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
+        if (document.getElementById("rehearsal-location-input")) {
+            document.getElementById("rehearsal-location-input").value = "Parking";
+        }
         modalRehearsal.classList.add("active");
     });
 
@@ -1339,19 +1702,27 @@ function setupEventListeners() {
         }
 
         let convocatedVoices = [];
-        if (subtype === "primeras") {
-            convocatedVoices = ["Trompetas 1ª", "Cornetas"];
+        if (subtype === "trompetas1") {
+            convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
         } else if (subtype === "bajos") {
-            convocatedVoices = ["Bombardinos", "Tubas", "Trompas", "Trompetas 2ª", "Trompetas 3ª", "Trombones"];
+            convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
+        } else if (subtype === "trompetas2y3") {
+            convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
+        } else if (subtype === "cornetas") {
+            convocatedVoices = ["Cornetas"];
         } else if (subtype === "percusion") {
             convocatedVoices = ["Tambores", "Bombos", "Platos"];
+        } else if (subtype === "primeras") {
+            convocatedVoices = ["Trompetas 1ª", "Cornetas"]; // Fallback histórico
         }
 
+        const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
         state.sessionTypes[sessionKey] = { 
             type: "ensayo", 
             subtype: subtype, 
             name: "", 
-            convocatedVoices: convocatedVoices 
+            convocatedVoices: convocatedVoices,
+            location: locationVal
         };
         initializeAttendanceForDate(sessionKey, convocatedVoices);
         
@@ -1723,6 +2094,31 @@ function setupEventListeners() {
     document.getElementById("btn-edit-rehearsal-from-detail").addEventListener("click", handleEditFromDetail);
     document.getElementById("btn-edit-actuacion-from-detail").addEventListener("click", handleEditFromDetail);
 
+    document.getElementById("btn-delete-rehearsal-from-detail").addEventListener("click", () => {
+        const date = state.activeDetailDate;
+        if (!date) return;
+        
+        const rawDate = date.split("_")[0];
+        const today = new Date().toISOString().split("T")[0];
+        if (rawDate < today) {
+            showToast("No puedes eliminar ensayos pasados desde el calendario", "warning");
+            return;
+        }
+        
+        if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
+            delete state.attendance[date];
+            delete state.sessionTypes[date];
+            dbDeleteSession(date);
+            
+            closeRehearsalDetailModal();
+            
+            renderEnsayosList();
+            renderStatistics();
+            renderCalendar();
+            showToast(`Ensayo del ${formatDateSpanish(date)} eliminado`, "error");
+        }
+    });
+
     // ==========================================
     // MODAL DE CONFIGURACIÓN RÁPIDA DE SESIÓN
     // ==========================================
@@ -1744,12 +2140,19 @@ function setupEventListeners() {
                 document.getElementById("quick-session-type").value = "actuacion";
                 document.getElementById("quick-session-actuacion-name").value = sessionInfo.name || "";
             } else if (sessionInfo.type === "ensayo") {
-                if (sessionInfo.subtype === "primeras") {
-                    document.getElementById("quick-session-type").value = "ensayo-primeras";
-                } else if (sessionInfo.subtype === "bajos") {
+                const sub = sessionInfo.subtype;
+                if (sub === "trompetas1") {
+                    document.getElementById("quick-session-type").value = "ensayo-trompetas1";
+                } else if (sub === "bajos") {
                     document.getElementById("quick-session-type").value = "ensayo-bajos";
-                } else if (sessionInfo.subtype === "percusion") {
+                } else if (sub === "trompetas2y3") {
+                    document.getElementById("quick-session-type").value = "ensayo-trompetas2y3";
+                } else if (sub === "cornetas") {
+                    document.getElementById("quick-session-type").value = "ensayo-cornetas";
+                } else if (sub === "percusion") {
                     document.getElementById("quick-session-type").value = "ensayo-percusion";
+                } else if (sub === "primeras") {
+                    document.getElementById("quick-session-type").value = "ensayo-primeras";
                 } else {
                     document.getElementById("quick-session-type").value = "ensayo-general";
                 }
@@ -1795,15 +2198,24 @@ function setupEventListeners() {
         
         if (type === "ensayo-general") {
             newSession = { type: "ensayo", subtype: "general", name: "" };
-        } else if (type === "ensayo-primeras") {
-            convocatedVoices = ["Trompetas 1ª", "Cornetas"];
-            newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices };
+        } else if (type === "ensayo-trompetas1") {
+            convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
+            newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices };
         } else if (type === "ensayo-bajos") {
-            convocatedVoices = ["Bombardinos", "Tubas", "Trompas", "Trompetas 2ª", "Trompetas 3ª", "Trombones"];
+            convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
             newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices };
+        } else if (type === "ensayo-trompetas2y3") {
+            convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
+            newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices };
+        } else if (type === "ensayo-cornetas") {
+            convocatedVoices = ["Cornetas"];
+            newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices };
         } else if (type === "ensayo-percusion") {
             convocatedVoices = ["Tambores", "Bombos", "Platos"];
             newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices };
+        } else if (type === "ensayo-primeras") {
+            convocatedVoices = ["Trompetas 1ª", "Cornetas"];
+            newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices }; // Fallback
         } else if (type === "actuacion") {
             const actuacionName = document.getElementById("quick-session-actuacion-name").value.trim();
             if (!actuacionName) {
@@ -1998,6 +2410,35 @@ function setupMarchasDragAndDrop() {
     
     // Inicializar eventos de preaviso
     setupPreavisoEvents();
+
+    // Notificaciones de Músicos
+    const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
+    if (btnNotifBell) {
+        btnNotifBell.addEventListener("click", () => {
+            renderActiveSection("section-componente-notificaciones");
+        });
+    }
+
+    const btnBackNotif = document.getElementById("btn-back-from-notif");
+    if (btnBackNotif) {
+        btnBackNotif.addEventListener("click", () => {
+            renderActiveSection("section-componente-ficha");
+        });
+    }
+
+    const btnMarkAllRead = document.getElementById("btn-comp-notif-mark-all-read");
+    if (btnMarkAllRead) {
+        btnMarkAllRead.addEventListener("click", () => {
+            const musicianId = getAuthMusicianId();
+            if (!musicianId) return;
+            const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+            notifs.forEach(n => n.seen = true);
+            localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+            renderComponentNotificationsList();
+            updateNotificationsBadge();
+            showToast("Todas las notificaciones marcadas como leídas.", "success");
+        });
+    }
 }
 
 function renderActiveSection(sectionId) {
@@ -2106,6 +2547,12 @@ function renderActiveSection(sectionId) {
             pageSubtitle.innerText = "Mi nivel de dominio de las marchas";
             dateContainer.classList.add("hidden");
             renderComponentRepertorio();
+            break;
+        case "section-componente-notificaciones":
+            pageTitle.innerText = "Centro de Notificaciones";
+            pageSubtitle.innerText = "Avisos de nuevos ensayos y actuaciones";
+            dateContainer.classList.add("hidden");
+            renderComponentNotificationsList();
             break;
     }
 
@@ -2573,7 +3020,7 @@ function renderEnsayosList() {
             currentMonthStr = ""; // reset month when year changes
             const yearHeaderTr = document.createElement("tr");
             yearHeaderTr.innerHTML = `
-                <td colspan="6" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
+                <td colspan="7" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
                     Año ${yyyy}
                 </td>
             `;
@@ -2585,7 +3032,7 @@ function renderEnsayosList() {
             currentMonthStr = monthName;
             const monthHeaderTr = document.createElement("tr");
             monthHeaderTr.innerHTML = `
-                <td colspan="6" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
+                <td colspan="7" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
                     ${monthName}
                 </td>
             `;
@@ -2622,14 +3069,21 @@ function renderEnsayosList() {
 
         let typeLabel = "";
         if (sessionInfo) {
-            if (sessionInfo.subtype === "primeras") {
-                typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Primeras</span>`;
-            } else if (sessionInfo.subtype === "bajos") {
+            const sub = sessionInfo.subtype;
+            if (sub === "trompetas1") {
+                typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Trompetas 1ª</span>`;
+            } else if (sub === "bajos") {
                 typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Bajos</span>`;
-            } else if (sessionInfo.subtype === "percusion") {
+            } else if (sub === "trompetas2y3") {
+                typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Trompetas 2ª y 3ª</span>`;
+            } else if (sub === "cornetas") {
+                typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Cornetas</span>`;
+            } else if (sub === "percusion") {
                 typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Percusión</span>`;
-            } else if (sessionInfo.subtype === "voces") {
+            } else if (sub === "voces") {
                 typeLabel = `<span class="musician-count-badge" style="background-color: var(--bg-primary); border-color: var(--border-color); font-size: 0.8rem; cursor: help; display: inline-block; max-width: 130px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="Voces convocadas: ${convocated.join(', ')}">Voces (${convocated.length})</span>`;
+            } else if (sub === "primeras") {
+                typeLabel = `<span class="musician-count-badge" style="background-color: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.35); color: #9b59b6; font-size: 0.8rem; display: inline-block;">Primeras</span>`;
             } else {
                 typeLabel = `<span class="musician-count-badge" style="background-color: var(--bg-primary); border-color: var(--border-color); font-size: 0.8rem; display: inline-block;">General</span>`;
             }
@@ -2637,10 +3091,15 @@ function renderEnsayosList() {
             typeLabel = `<span class="musician-count-badge" style="background-color: var(--bg-primary); border-color: var(--border-color); font-size: 0.8rem; display: inline-block;">General</span>`;
         }
 
+        const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
         const tr = document.createElement("tr");
+        tr.classList.add("clickable-row");
         tr.innerHTML = `
             <td style="white-space: nowrap;">
-                <strong>${formatDateSpanish(date)}</strong>
+                <strong>${formatDateShortSpanish(date)}</strong>
+            </td>
+            <td>
+                <span>${locationVal}</span>
             </td>
             <td style="white-space: nowrap;">
                 ${typeLabel}
@@ -2659,19 +3118,11 @@ function renderEnsayosList() {
             </td>
             <td>
                 <div style="display: flex; gap: 6px; align-items: center;">
-                    <button class="btn btn-primary btn-sm view-rehearsal-detail-btn" data-date="${date}" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                        Ver
-                    </button>
-                    <button class="btn btn-secondary btn-sm edit-rehearsal-btn" data-date="${date}" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">
+                    <button class="btn btn-secondary btn-sm edit-rehearsal-btn" data-date="${date}" title="Editar Ensayo" style="padding: 6px; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
-                        Editar
                     </button>
                     <button class="btn-action delete delete-rehearsal-btn" data-date="${date}" title="Eliminar Ensayo" style="padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
@@ -2683,13 +3134,12 @@ function renderEnsayosList() {
             </td>
         `;
 
-        tr.querySelector(".view-rehearsal-detail-btn").addEventListener("click", () => {
+        tr.addEventListener("click", () => {
             openRehearsalDetailModal(date);
         });
 
-
-
-        tr.querySelector(".edit-rehearsal-btn").addEventListener("click", () => {
+        tr.querySelector(".edit-rehearsal-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
             const rawDate = date.split("_")[0];
             state.currentDate = date;
             document.getElementById("attendance-date").value = rawDate;
@@ -2706,7 +3156,8 @@ function renderEnsayosList() {
             renderActiveSection("section-pasar-lista");
         });
 
-        tr.querySelector(".delete-rehearsal-btn").addEventListener("click", () => {
+        tr.querySelector(".delete-rehearsal-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
             if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
                 delete state.attendance[date];
                 delete state.sessionTypes[date];
@@ -2728,6 +3179,17 @@ function openRehearsalDetailModal(date) {
 
     state.activeDetailDate = date;
 
+    const btnDelete = document.getElementById("btn-delete-rehearsal-from-detail");
+    if (btnDelete) {
+        const rawDate = date.split("_")[0];
+        const today = new Date().toISOString().split("T")[0];
+        if (rawDate >= today) {
+            btnDelete.classList.remove("hidden");
+        } else {
+            btnDelete.classList.add("hidden");
+        }
+    }
+
     // Safety guards on global state objects
     const dayRecord = (state && state.attendance) ? state.attendance[date] : null;
     const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
@@ -2743,7 +3205,8 @@ function openRehearsalDetailModal(date) {
     if (isSpecialRehearsal) {
         subtypeText = `Ensayo por Voces (Convocadas: ${convocated.join(", ")})`;
     }
-    document.getElementById("rehearsal-detail-subtitle").innerText = subtypeText;
+    const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
+    document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}`;
 
     // Marchas
     const marchasContainer = document.getElementById("rehearsal-detail-marchas");
@@ -3015,9 +3478,10 @@ function renderActuacionesList() {
         const ratio = total > 0 ? Math.round((present / total) * 100) : 0;
 
         const tr = document.createElement("tr");
+        tr.classList.add("clickable-row");
         tr.innerHTML = `
             <td style="white-space: nowrap;">
-                <strong>${formatDateSpanish(date)}</strong>
+                <strong>${formatDateShortSpanish(date)}</strong>
             </td>
             <td>
                 <span style="font-weight: 600; color: var(--color-gold);">${sessionInfo.name || "Sin nombre"}</span>
@@ -3036,19 +3500,11 @@ function renderActuacionesList() {
             </td>
             <td>
                 <div style="display: flex; gap: 6px; align-items: center;">
-                    <button class="btn btn-primary btn-sm view-actuacion-detail-btn" data-date="${date}" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                        Ver
-                    </button>
-                    <button class="btn btn-secondary btn-sm edit-actuacion-btn" data-date="${date}" style="padding: 4px 8px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; border-radius: 4px;">
+                    <button class="btn btn-secondary btn-sm edit-actuacion-btn" data-date="${date}" title="Editar Actuación" style="padding: 6px; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
-                        Editar
                     </button>
                     <button class="btn-action delete delete-actuacion-btn" data-date="${date}" title="Eliminar Actuación" style="padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
@@ -3060,13 +3516,12 @@ function renderActuacionesList() {
             </td>
         `;
 
-        tr.querySelector(".view-actuacion-detail-btn").addEventListener("click", () => {
+        tr.addEventListener("click", () => {
             openActuacionDetailModal(date);
         });
 
-
-
-        tr.querySelector(".edit-actuacion-btn").addEventListener("click", () => {
+        tr.querySelector(".edit-actuacion-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
             const rawDate = date.split("_")[0];
             state.currentDate = date;
             document.getElementById("attendance-date").value = rawDate;
@@ -3083,7 +3538,8 @@ function renderActuacionesList() {
             renderActiveSection("section-pasar-lista");
         });
 
-        tr.querySelector(".delete-actuacion-btn").addEventListener("click", () => {
+        tr.querySelector(".delete-actuacion-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
             const actuacionName = sessionInfo.name || formatDateSpanish(date);
             if (confirm(`¿Estás seguro de que quieres eliminar la actuación "${actuacionName}" del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
                 delete state.attendance[date];
@@ -3481,6 +3937,7 @@ function renderStatistics() {
         renderStatsMarchasTop10([]);
         renderStatsStreaks([]);
         renderStatsMarchasOlvidadas();
+        renderGeneralOverviewChart();
         return;
     }
 
@@ -3633,6 +4090,7 @@ function renderStatistics() {
     renderStatsMarchasTop10(filteredDates);
     renderStatsStreaks(filteredDates);
     renderStatsMarchasOlvidadas();
+    renderGeneralOverviewChart();
 }
 
 function renderStatsMarchasTop10(filteredDates) {
@@ -4050,7 +4508,19 @@ function renderMusicianDetailContent() {
     if (!musician) return;
 
     const currentStreak = calculateMusicianStreak(musicianId);
-    document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(230, 126, 34, 0.12); color: #e67e22; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600;"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span>`;
+    const detailMedals = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = detailMedals.some(m => m.id === "volver_ensayar" && m.unlocked);
+    const detailUnlockedCount = hasVolverEnsayar ? 0 : detailMedals.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+
+    const badgeBg = hasVolverEnsayar ? "rgba(231, 76, 60, 0.12)" : "rgba(212, 175, 55, 0.12)";
+    const badgeColor = hasVolverEnsayar ? "var(--color-absent)" : "var(--color-gold)";
+    const badgeBorder = hasVolverEnsayar ? "1px solid rgba(231, 76, 60, 0.35)" : "1px solid rgba(212, 175, 55, 0.25)";
+    const badgeIcon = hasVolverEnsayar ? "⚠️" : "🏅";
+
+    document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(230, 126, 34, 0.12); color: #e67e22; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600;"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>`;
     document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role || "Músico"}`;
 
     const detailChecks = [
@@ -4060,8 +4530,8 @@ function renderMusicianDetailContent() {
         { id: "detail-badge-corazon-check", val: !!musician.badgeCorazonYacente },
         { id: "detail-badge-raices-check", val: !!musician.badgeRaicesProfundas },
         { id: "detail-badge-leyenda-check", val: !!musician.badgeLeyendaViva },
-        { id: "detail-badge-ruta-check", val: !!musician.badgeRuta },
-        { id: "detail-badge-agonia-check", val: !!musician.badgeAgonia }
+        { id: "detail-badge-agonia-check", val: !!musician.badgeAgonia },
+        { id: "detail-badge-hasta_final-check", val: !!musician.badgeHastaElFinal }
     ];
     const isAdmin = getAuthRole() === "admin";
     detailChecks.forEach(item => {
@@ -4071,6 +4541,20 @@ function renderMusicianDetailContent() {
             el.disabled = !isAdmin;
         }
     });
+
+
+
+    const rutaTripsInput = document.getElementById("detail-badge-ruta-trips");
+    if (rutaTripsInput) {
+        rutaTripsInput.value = musician.badgeRutaTrips || 0;
+        rutaTripsInput.disabled = !isAdmin;
+    }
+
+    const hermandadEventsInput = document.getElementById("detail-badge-hermandad-events");
+    if (hermandadEventsInput) {
+        hermandadEventsInput.value = musician.badgeHermandadEvents || 0;
+        hermandadEventsInput.disabled = !isAdmin;
+    }
 
     const yearFilter = document.getElementById("detail-filter-year").value;
     const monthFilter = document.getElementById("detail-filter-month").value;
@@ -4109,9 +4593,32 @@ function renderMusicianDetailContent() {
             presents++;
         } else {
             const sessionInfo = state.sessionTypes[date];
-            const sessionLabel = sessionInfo && sessionInfo.type === "actuacion"
-                ? (sessionInfo.name || "Actuación")
-                : "Ensayo";
+            let sessionLabel = "General";
+            if (sessionInfo) {
+                if (sessionInfo.type === "actuacion") {
+                    sessionLabel = sessionInfo.name || "Actuación";
+                } else if (sessionInfo.type === "ensayo") {
+                    const sub = sessionInfo.subtype;
+                    if (sub === "trompetas1") {
+                        sessionLabel = "Trompetas 1ª";
+                    } else if (sub === "bajos") {
+                        sessionLabel = "Bajos";
+                    } else if (sub === "trompetas2y3") {
+                        sessionLabel = "Trompetas 2ª y 3ª";
+                    } else if (sub === "cornetas") {
+                        sessionLabel = "Cornetas";
+                    } else if (sub === "percusion") {
+                        sessionLabel = "Percusión";
+                    } else if (sub === "primeras") {
+                        sessionLabel = "Primeras";
+                    } else if (sub === "voces") {
+                        const count = sessionInfo.convocatedVoices ? sessionInfo.convocatedVoices.length : 0;
+                        sessionLabel = `Voces (${count})`;
+                    } else {
+                        sessionLabel = "General";
+                    }
+                }
+            }
             const sessionTypeName = sessionInfo ? sessionInfo.type : "ensayo";
 
             if (record.justified) {
@@ -4241,10 +4748,9 @@ function renderMusicianDetailContent() {
 
         recordsToRender.forEach(rec => {
             const tr = document.createElement("tr");
-            const typeIcon = rec.sessionType === "actuacion" ? "⭐" : "📋";
             tr.innerHTML = `
                 <td><strong>${formatDateSpanish(rec.date)}</strong></td>
-                <td>${typeIcon} ${rec.sessionLabel}</td>
+                <td>${rec.sessionLabel}</td>
                 <td>
                     <span style="color: ${rec.justified ? 'var(--color-justified)' : 'var(--color-absent)'}; font-weight: 600;">
                         ${rec.justified ? 'Sí' : 'No'}
@@ -4260,15 +4766,89 @@ function renderMusicianDetailContent() {
     const medalsGrid = document.getElementById("detail-medals-grid");
     if (medalsGrid) {
         const medals = getMusicianMedalsData(musicianId);
-        medalsGrid.innerHTML = medals.map(medal => `
-            <div class="medal-card ${medal.unlocked ? 'unlocked' : 'locked'}" style="padding: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; border-radius: 6px;">
-                <div class="medal-icon-wrapper" style="width: 32px; height: 32px; font-size: 1.1rem; flex-shrink: 0;">${medal.icon}</div>
-                <div style="flex: 1; min-width: 0; text-align: left;">
-                    <div style="font-weight: 700; color: #FFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.title}">${medal.title}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.desc}">${medal.desc}</div>
+        const hasVolverEnsayar = medals.some(m => m.id === "volver_ensayar" && m.unlocked);
+        
+        // Contabilizar insignias positivas desbloqueadas, donde cada estrella cuenta como una insignia
+        const unlockedCount = hasVolverEnsayar ? 0 : medals.reduce((acc, m) => {
+            if (!m.unlocked || m.isNegative) return acc;
+            return acc + (m.stars || 1);
+        }, 0);
+        const detailInsigniasVal = document.getElementById("detail-insignias-val");
+        if (detailInsigniasVal) {
+            detailInsigniasVal.innerText = unlockedCount;
+        }
+        const detailInsigniasBadge = document.getElementById("detail-insignias-badge");
+        if (detailInsigniasBadge) {
+            const iconEl = detailInsigniasBadge.querySelector(".insignias-badge-icon");
+            if (hasVolverEnsayar) {
+                detailInsigniasBadge.classList.add("alarm-red");
+                if (iconEl) iconEl.innerText = "⚠️";
+            } else {
+                detailInsigniasBadge.classList.remove("alarm-red");
+                if (iconEl) iconEl.innerText = "🏅";
+            }
+        }
+
+        const categories = [
+            {
+                title: "📅 Asistencia",
+                ids: ["asistencia", "comprometido", "veterano", "racha", "god", "titular", "capitan", "volver_ensayar"]
+            },
+            {
+                title: "📜 Legado",
+                ids: ["sangre_nueva", "fiel_atril", "corazon_yacente", "raices_profundas", "leyenda_viva"]
+            },
+            {
+                title: "✨ Especiales",
+                ids: ["estudio", "agonia", "ruta", "hermandad", "hasta_final", "trotamundos", "doblete", "marea"]
+            }
+        ];
+
+        medalsGrid.innerHTML = categories.map(cat => {
+            const catMedals = medals.filter(m => cat.ids.includes(m.id));
+            catMedals.sort((a, b) => cat.ids.indexOf(a.id) - cat.ids.indexOf(b.id));
+
+            return `
+                <div style="grid-column: 1 / -1; margin-top: 15px; margin-bottom: 5px;">
+                    <h4 style="margin: 0; font-family: 'Cinzel', serif; font-size: 0.95rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 4px; text-align: left;">
+                        ${cat.title}
+                    </h4>
                 </div>
-            </div>
-        `).join("");
+                ${catMedals.map(medal => {
+                    let cardClass = medal.unlocked ? 'unlocked' : 'locked';
+                    if (medal.isNegative && medal.unlocked) {
+                        cardClass = 'negative-unlocked';
+                    } else if (medal.unlocked && medal.stars > 0) {
+                        cardClass += ` unlocked-${medal.stars}star`;
+                    }
+                    
+                    let starsHTML = "";
+                    if (medal.stars !== undefined && medal.stars > 0) {
+                        let starsSpanHTML = "";
+                        for (let i = 1; i <= 3; i++) {
+                            if (i <= medal.stars) {
+                                starsSpanHTML += '<span class="medal-star-icon filled">★</span>';
+                            } else {
+                                starsSpanHTML += '<span class="medal-star-icon">★</span>';
+                            }
+                        }
+                        starsHTML = `<div class="medal-stars" style="display: flex;">${starsSpanHTML}</div>`;
+                    }
+                    return `
+                        <div class="medal-card ${cardClass}" style="padding: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; border-radius: 6px;">
+                            <div class="medal-icon-wrapper" style="position: relative; width: 32px; height: 32px; font-size: 1.1rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                                ${medal.icon}
+                                ${starsHTML}
+                            </div>
+                            <div style="flex: 1; min-width: 0; text-align: left;">
+                                <div style="font-weight: 700; color: #FFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.title}">${medal.title}</div>
+                                <div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.desc}">${medal.desc}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join("")}
+            `;
+        }).join("");
     }
 }
 
@@ -4310,9 +4890,31 @@ function downloadMusicianPDFReport() {
         totalSessions++;
 
         const sessionInfo = state.sessionTypes[date];
-        const sessionLabel = sessionInfo && sessionInfo.type === "actuacion"
-            ? (sessionInfo.name || "Actuación")
-            : "Ensayo";
+        let sessionLabel = "General";
+        if (sessionInfo) {
+            if (sessionInfo.type === "actuacion") {
+                sessionLabel = sessionInfo.name || "Actuación";
+            } else {
+                const sub = sessionInfo.subtype;
+                if (sub === "trompetas1") {
+                    sessionLabel = "Trompetas 1ª";
+                } else if (sub === "bajos") {
+                    sessionLabel = "Bajos";
+                } else if (sub === "trompetas2y3") {
+                    sessionLabel = "Trompetas 2ª y 3ª";
+                } else if (sub === "cornetas") {
+                    sessionLabel = "Cornetas";
+                } else if (sub === "percusion") {
+                    sessionLabel = "Percusión";
+                } else if (sub === "primeras") {
+                    sessionLabel = "Primeras";
+                } else if (sub === "voces") {
+                    sessionLabel = "Voces";
+                } else {
+                    sessionLabel = "General";
+                }
+            }
+        }
         const sessionTypeName = sessionInfo ? sessionInfo.type : "ensayo";
 
         if (record.status === "present") {
@@ -4381,12 +4983,10 @@ function downloadMusicianPDFReport() {
                     statusText = "Falta";
                 }
             }
-            const typeIcon = s.sessionType === "actuacion" ? "⭐" : "📋";
-
             tableRowsHTML += `
                 <tr>
                     <td style="white-space: nowrap;"><strong>${formatDateSpanish(s.date)}</strong></td>
-                    <td>${typeIcon} ${s.sessionLabel}</td>
+                    <td>${s.sessionLabel}</td>
                     <td><span class="print-badge ${badgeClass}">${statusText}</span></td>
                     <td>${s.reason || "-"}</td>
                 </tr>
@@ -4467,7 +5067,123 @@ function downloadMusicianPDFReport() {
     
     setTimeout(() => {
         printArea.innerHTML = "";
-    }, 1000);
+    }, 10000);
+}
+
+function downloadRepertoirePDFReport() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const musician = state.musicians.find(m => m.id === musicianId);
+    if (!musician) return;
+
+    if (!state.marchas || state.marchas.length === 0) {
+        showToast("No hay marchas en el repertorio para exportar", "warning");
+        return;
+    }
+
+    if (!state.musicianMarchaStatuses) {
+        state.musicianMarchaStatuses = {};
+    }
+
+    // Count statistics
+    const stats = { green: 0, yellow: 0, red: 0, none: 0 };
+    state.marchas.forEach(marcha => {
+        const key = `${musicianId}_${marcha.id}`;
+        const status = state.musicianMarchaStatuses[key] || "none";
+        if (status === "green") stats.green++;
+        else if (status === "yellow") stats.yellow++;
+        else if (status === "red") stats.red++;
+        else stats.none++;
+    });
+
+    const sorted = [...(state.marchas || [])].sort((a, b) => a.title.localeCompare(b.title));
+    
+    // Determine dynamic column count to make it fit on exactly ONE page
+    let columnCount = 2;
+    if (sorted.length <= 15) {
+        columnCount = 1;
+    } else if (sorted.length > 40) {
+        columnCount = 3;
+    }
+    
+    const itemsPerColumn = Math.ceil(sorted.length / columnCount);
+    let columnsHTML = "";
+    
+    for (let c = 0; c < columnCount; c++) {
+        const columnItems = sorted.slice(c * itemsPerColumn, (c + 1) * itemsPerColumn);
+        let itemsHTML = "";
+        
+        columnItems.forEach(marcha => {
+            const key = `${musicianId}_${marcha.id}`;
+            const status = state.musicianMarchaStatuses[key] || "none";
+            
+            itemsHTML += `
+                <div class="print-repertoire-item">
+                    <div class="print-repertoire-meta">
+                        <span class="print-repertoire-title">${marcha.title}</span>
+                    </div>
+                    <div>
+                        <span class="print-status-dot ${status}"></span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        columnsHTML += `
+            <div class="print-repertoire-column">
+                ${itemsHTML}
+            </div>
+        `;
+    }
+
+    const printArea = document.getElementById("print-report-area");
+    
+    printArea.innerHTML = `
+        <div class="print-header">
+            <div>
+                <h1 class="print-title">YACENTE</h1>
+                <div class="print-subtitle">Repertorio General y Nivel de Dominio</div>
+            </div>
+            <div class="print-meta">
+                <strong>Músico:</strong> ${musician.name}<br>
+                <strong>Voz/Sección:</strong> ${musician.instrument}<br>
+                <strong>Fecha:</strong> ${new Date().toLocaleDateString("es-ES")}
+            </div>
+        </div>
+        
+        <div class="print-repertoire-legend">
+            <div class="print-legend-item">
+                <span class="print-status-dot green"></span>
+                <span>Dominada (${stats.green})</span>
+            </div>
+            <div class="print-legend-item">
+                <span class="print-status-dot yellow"></span>
+                <span>En proceso (${stats.yellow})</span>
+            </div>
+            <div class="print-legend-item">
+                <span class="print-status-dot red"></span>
+                <span>Por trabajar (${stats.red})</span>
+            </div>
+            <div class="print-legend-item">
+                <span class="print-status-dot none"></span>
+                <span>Sin marcar (${stats.none})</span>
+            </div>
+            <div style="margin-left: auto; font-weight: 600;">
+                Total: ${state.marchas.length} marchas
+            </div>
+        </div>
+        
+        <div class="print-repertoire-grid">
+            ${columnsHTML}
+        </div>
+    `;
+
+    window.print();
+    
+    setTimeout(() => {
+        printArea.innerHTML = "";
+    }, 10000);
 }
 
 // ==========================================================================
@@ -4603,6 +5319,17 @@ function formatDateSpanish(dateStr) {
     });
 }
 
+function formatDateShortSpanish(dateStr) {
+    const cleanDateStr = dateStr.split("_")[0];
+    const parts = cleanDateStr.split("-");
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    const formatted = date.toLocaleDateString("es-ES", {
+        weekday: 'long', 
+        day: 'numeric'
+    });
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
 function showToast(message, type = "success") {
     const container = document.getElementById("toast-container");
     const toast = document.createElement("div");
@@ -4662,8 +5389,12 @@ function setupFirebaseListeners() {
             
             // Guardar configuración en estado
             state.firebaseConfig = configObj;
-            state.firebasePasswordHash = hashString(password);
-            sessionStorage.setItem("yacente_authenticated", "true"); // El administrador que lo configura queda autenticado de inmediato
+            
+            const isConfiguringAsAdmin = password.length > 0;
+            if (isConfiguringAsAdmin) {
+                state.firebasePasswordHash = hashString(password);
+                sessionStorage.setItem("yacente_authenticated", "true"); // El administrador que lo configura queda autenticado de inmediato
+            }
             saveStateToLocalStorage();
             
             closeFirebaseModal();
@@ -4672,20 +5403,26 @@ function setupFirebaseListeners() {
             // Inicializar Firebase
             initFirebase();
             
-            // Crear el registro de seguridad en Firestore para validar a los demás dispositivos
-            const db = firebase.firestore();
-            db.collection("config").doc("security").set({
-                passwordHash: state.firebasePasswordHash
-            })
-            .then(() => {
-                showToast("Contraseña de seguridad configurada en la nube", "success");
-                // Ofrecer migración de datos
-                syncLocalToCloud();
-            })
-            .catch(err => {
-                console.error("Error al guardar hash en Firestore:", err);
-            });
-            
+            if (isConfiguringAsAdmin) {
+                // Crear el registro de seguridad en Firestore para validar a los demás dispositivos
+                const db = firebase.firestore();
+                db.collection("config").doc("security").set({
+                    passwordHash: state.firebasePasswordHash
+                })
+                .then(() => {
+                    showToast("Contraseña de seguridad configurada en la nube", "success");
+                    // Ofrecer migración de datos
+                    syncLocalToCloud();
+                })
+                .catch(err => {
+                    console.error("Error al guardar hash en Firestore:", err);
+                });
+            } else {
+                showToast("Conectado con éxito. Cargando base de datos...", "success");
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
         } catch (err) {
             console.error(err);
             showToast("JSON inválido. Por favor, introduce la configuración correcta de Firebase", "error");
@@ -4731,6 +5468,14 @@ function setupFirebaseListeners() {
             musicianPin.required = true;
             errorMsg.classList.add("hidden");
             populateLoginMusicians();
+        });
+    }
+
+    const btnLockConfigureCloud = document.getElementById("btn-lock-configure-cloud");
+    if (btnLockConfigureCloud) {
+        btnLockConfigureCloud.addEventListener("click", (e) => {
+            e.preventDefault();
+            document.getElementById("modal-firebase-config").classList.add("active");
         });
     }
 
@@ -4854,6 +5599,10 @@ function setupFirebaseListeners() {
                 
                 // Conectar en segundo plano a la nube
                 startCloudSync();
+                
+                if ("Notification" in window && Notification.permission === "default") {
+                    Notification.requestPermission();
+                }
                 
                 renderActiveSection("section-componente-ficha");
                 showToast(`Bienvenido/a, ${musician.name}`, "success");
@@ -5236,9 +5985,9 @@ function renderRehearsalMarchasWidget() {
     if (card) {
         const date = state.currentDate;
         const sessionInfo = state.sessionTypes[date];
-        const isRehearsal = sessionInfo && sessionInfo.type === "ensayo";
+        const isGeneralRehearsal = sessionInfo && sessionInfo.type === "ensayo" && !isSectionRehearsal(sessionInfo);
         
-        if (!isRehearsal) {
+        if (!isGeneralRehearsal) {
             card.classList.add("hidden");
             return;
         } else {
@@ -5352,10 +6101,14 @@ function openMarchaHistoryModal(marchId) {
             
             let labelText = "General";
             if (sessionInfo) {
-                if (sessionInfo.subtype === "primeras") labelText = "Primeras";
-                else if (sessionInfo.subtype === "bajos") labelText = "Bajos";
-                else if (sessionInfo.subtype === "percusion") labelText = "Percusión";
-                else if (sessionInfo.subtype === "voces") labelText = "Voces";
+                const sub = sessionInfo.subtype;
+                if (sub === "trompetas1") labelText = "Trompetas 1ª";
+                else if (sub === "bajos") labelText = "Bajos";
+                else if (sub === "trompetas2y3") labelText = "Trompetas 2ª y 3ª";
+                else if (sub === "cornetas") labelText = "Cornetas";
+                else if (sub === "percusion") labelText = "Percusión";
+                else if (sub === "voces") labelText = "Voces";
+                else if (sub === "primeras") labelText = "Primeras";
             }
             
             const tr = document.createElement("tr");
@@ -5482,19 +6235,29 @@ function renderCalendar() {
                 tag.classList.add("calendar-session-actuacion");
                 tag.innerText = `⭐ ${session.name || 'Actuación'}`;
             } else if (session.type === "ensayo") {
-                if (session.subtype === "primeras") {
+                const sub = session.subtype;
+                if (sub === "trompetas1") {
                     tag.classList.add("calendar-session-ensayo-voces");
-                    tag.innerText = `👥 Primeras`;
-                } else if (session.subtype === "bajos") {
+                    tag.innerText = `👥 Trompetas 1ª`;
+                } else if (sub === "bajos") {
                     tag.classList.add("calendar-session-ensayo-voces");
                     tag.innerText = `👥 Bajos`;
-                } else if (session.subtype === "percusion") {
+                } else if (sub === "trompetas2y3") {
+                    tag.classList.add("calendar-session-ensayo-voces");
+                    tag.innerText = `👥 Trompetas 2ª y 3ª`;
+                } else if (sub === "cornetas") {
+                    tag.classList.add("calendar-session-ensayo-voces");
+                    tag.innerText = `👥 Cornetas`;
+                } else if (sub === "percusion") {
                     tag.classList.add("calendar-session-ensayo-voces");
                     tag.innerText = `👥 Percusión`;
-                } else if (session.subtype === "voces") {
+                } else if (sub === "voces") {
                     const count = session.convocatedVoices ? session.convocatedVoices.length : 0;
                     tag.classList.add("calendar-session-ensayo-voces");
                     tag.innerText = `👥 Voces (${count})`;
+                } else if (sub === "primeras") {
+                    tag.classList.add("calendar-session-ensayo-voces");
+                    tag.innerText = `👥 Primeras`;
                 } else {
                     tag.classList.add("calendar-session-ensayo-general");
                     tag.innerText = `🎺 General`;
@@ -5984,14 +6747,20 @@ function openWeeklyReportModal(startDate, endDate, weekNumber) {
             let typeLabel = "Ensayo General";
             if (s.type === "actuacion") {
                 typeLabel = "⭐ Actuación";
-            } else if (s.subtype === "primeras") {
-                typeLabel = "👥 Ensayo Voz (Primeras)";
+            } else if (s.subtype === "trompetas1") {
+                typeLabel = "👥 Ensayo Voz (Trompetas 1ª)";
             } else if (s.subtype === "bajos") {
                 typeLabel = "👥 Ensayo Voz (Bajos)";
+            } else if (s.subtype === "trompetas2y3") {
+                typeLabel = "👥 Ensayo Voz (Trompetas 2ª y 3ª)";
+            } else if (s.subtype === "cornetas") {
+                typeLabel = "👥 Ensayo Voz (Cornetas)";
             } else if (s.subtype === "percusion") {
                 typeLabel = "👥 Ensayo Voz (Percusión)";
             } else if (s.subtype === "voces") {
                 typeLabel = "👥 Ensayo Voces";
+            } else if (s.subtype === "primeras") {
+                typeLabel = "👥 Ensayo Voz (Primeras)";
             }
 
             const labelText = s.name ? `${s.name} (${typeLabel})` : typeLabel;
@@ -6262,14 +7031,20 @@ function drawWeeklySummaryCanvas(startDate, endDate, weekNumber, attendancePct, 
                 let typeLabel = "Ensayo General";
                 if (s.type === "actuacion") {
                     typeLabel = "⭐ Actuación";
-                } else if (s.subtype === "primeras") {
-                    typeLabel = "Ensayo Primeras";
+                } else if (s.subtype === "trompetas1") {
+                    typeLabel = "Ensayo Trompetas 1ª";
                 } else if (s.subtype === "bajos") {
                     typeLabel = "Ensayo Bajos";
+                } else if (s.subtype === "trompetas2y3") {
+                    typeLabel = "Ensayo Trompetas 2ª y 3ª";
+                } else if (s.subtype === "cornetas") {
+                    typeLabel = "Ensayo Cornetas";
                 } else if (s.subtype === "percusion") {
                     typeLabel = "Ensayo Percusión";
                 } else if (s.subtype === "voces") {
                     typeLabel = "Ensayo Voces";
+                } else if (s.subtype === "primeras") {
+                    typeLabel = "Ensayo Primeras";
                 }
                 const labelText = s.name ? s.name : typeLabel;
                 
@@ -7714,6 +8489,26 @@ function saveSimulator() {
         }
     }
     
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        if (simActiveMode === "concierto") {
+            db.collection("config").doc("formacion_concierto").set({
+                mapStr: JSON.stringify(map),
+                director: state.directorConcierto || null
+            }).catch(err => {
+                console.error("Error al guardar formación de concierto en Firebase:", err);
+                showToast("Error al guardar en la nube", "danger");
+            });
+        } else {
+            db.collection("config").doc("formacion_desfile").set({
+                mapStr: JSON.stringify(map)
+            }).catch(err => {
+                console.error("Error al guardar formación de desfile en Firebase:", err);
+                showToast("Error al guardar en la nube", "danger");
+            });
+        }
+    }
+    
     showToast("Formación guardada correctamente", "success");
 }
 
@@ -7842,7 +8637,7 @@ function downloadSimulatorImage() {
     
     ctx.font = "bold 34px 'Cinzel', serif";
     ctx.fillStyle = "#D4AF37";
-    ctx.fillText("BANDA EL SANTO YACENTE", canvasWidth / 2, 70);
+    ctx.fillText("AGRUPACIÓN MUSICAL CRISTO YACENTE", canvasWidth / 2, 70);
     
     ctx.font = "bold 20px 'Cinzel', serif";
     ctx.fillStyle = "#FFFFFF";
@@ -8204,6 +8999,32 @@ function getMusicianMedalsData(musicianId) {
             }
         });
     }
+    const totalMarchas = state.marchas.length || 75;
+    let starsEstudio = 0;
+    let descEstudio = "";
+    let unlockedEstudio = false;
+    let nextGoalEstudio = 50;
+    if (greenMarchas >= totalMarchas && totalMarchas > 0) {
+        starsEstudio = 3;
+        descEstudio = `Oro conseguido: Domina las ${totalMarchas} marchas del repertorio.`;
+        unlockedEstudio = true;
+        nextGoalEstudio = totalMarchas;
+    } else if (greenMarchas >= 70) {
+        starsEstudio = 2;
+        descEstudio = `Plata conseguido: Domina 70 marchas del repertorio. Domina todas (${totalMarchas}) para Oro.`;
+        unlockedEstudio = true;
+        nextGoalEstudio = totalMarchas;
+    } else if (greenMarchas >= 50) {
+        starsEstudio = 1;
+        descEstudio = "Bronce conseguido: Domina 50 marchas del repertorio. Domina 70 para Plata.";
+        unlockedEstudio = true;
+        nextGoalEstudio = 70;
+    } else {
+        starsEstudio = 0;
+        descEstudio = "Domina (verde) 50 marchas del repertorio para desbloquear Bronce.";
+        unlockedEstudio = false;
+        nextGoalEstudio = 50;
+    }
 
     // 7. El clavo, Hasta en la sopa, God (Cálculo de asistencia perfecta mensual/consecutiva)
     const rehearsalDates = Object.keys(state.attendance)
@@ -8293,16 +9114,96 @@ function getMusicianMedalsData(musicianId) {
     });
     const dobleteUnlocked = Object.values(performanceDateCounts).some(count => count >= 2);
 
-    // Trotamundos
+    // Trotamundos (calculado automáticamente en base a actuaciones asistidas marcadas como viaje)
     let tripCount = 0;
     Object.keys(state.attendance).forEach(dateKey => {
         const record = state.attendance[dateKey][musicianId];
         const session = state.sessionTypes[dateKey];
-        if (record && record.status === "present" && session && session.type === "actuacion" && session.isTrip) {
+        if (record && record.status === "present" && session && session.type === "actuacion" && session.isTrip === true) {
             tripCount++;
         }
     });
-    const trotamundosUnlocked = tripCount >= 1;
+    let starsTrotamundos = 0;
+    let descTrotamundos = "";
+    let unlockedTrotamundos = false;
+    let nextGoalTrotamundos = 10;
+    if (tripCount >= 50) {
+        starsTrotamundos = 3;
+        descTrotamundos = "Oro conseguido: Completa 50 viajes fuera de la comunidad con la banda.";
+        unlockedTrotamundos = true;
+        nextGoalTrotamundos = 50;
+    } else if (tripCount >= 25) {
+        starsTrotamundos = 2;
+        descTrotamundos = "Plata conseguido: Completa 25 viajes fuera de la ciudad con la banda. Consigue 50 para Oro.";
+        unlockedTrotamundos = true;
+        nextGoalTrotamundos = 50;
+    } else if (tripCount >= 10) {
+        starsTrotamundos = 1;
+        descTrotamundos = "Bronce conseguido: Completa 10 viajes fuera de la ciudad con la banda. Consigue 25 para Plata.";
+        unlockedTrotamundos = true;
+        nextGoalTrotamundos = 25;
+    } else {
+        starsTrotamundos = 0;
+        descTrotamundos = "Completa 10 viajes fuera de la ciudad con la banda para desbloquear Bronce.";
+        unlockedTrotamundos = false;
+        nextGoalTrotamundos = 10;
+    }
+
+    // Compañero de Ruta
+    const rutaTrips = musician.badgeRutaTrips || 0;
+    let starsRuta = 0;
+    let descRuta = "";
+    let unlockedRuta = false;
+    let nextGoalRuta = 5;
+    if (rutaTrips >= 20) {
+        starsRuta = 3;
+        descRuta = "Oro conseguido: Completa 20 viajes en bus con tus compañeros.";
+        unlockedRuta = true;
+        nextGoalRuta = 20;
+    } else if (rutaTrips >= 10) {
+        starsRuta = 2;
+        descRuta = "Plata conseguido: Completa 10 viajes en bus con tus compañeros. Consigue 20 para Oro.";
+        unlockedRuta = true;
+        nextGoalRuta = 20;
+    } else if (rutaTrips >= 5) {
+        starsRuta = 1;
+        descRuta = "Bronce conseguido: Completa 5 viajes en bus con tus compañeros. Consigue 10 para Plata.";
+        unlockedRuta = true;
+        nextGoalRuta = 10;
+    } else {
+        starsRuta = 0;
+        descRuta = "Completa un 5 viajes en bus con tus compañeros para desbloquear Bronce.";
+        unlockedRuta = false;
+        nextGoalRuta = 5;
+    }
+
+    // Hermandad
+    const hermandadEvents = musician.badgeHermandadEvents || 0;
+    let starsHermandad = 0;
+    let descHermandad = "";
+    let unlockedHermandad = false;
+    let nextGoalHermandad = 1;
+    if (hermandadEvents >= 10) {
+        starsHermandad = 3;
+        descHermandad = "Oro conseguido: Acude a 10 convivencias o actividades extramusicales de la banda/cofradía.";
+        unlockedHermandad = true;
+        nextGoalHermandad = 10;
+    } else if (hermandadEvents >= 5) {
+        starsHermandad = 2;
+        descHermandad = "Plata conseguido: Acude a 5 convivencias o actividades extramusicales. Acude a 10 para Oro.";
+        unlockedHermandad = true;
+        nextGoalHermandad = 10;
+    } else if (hermandadEvents >= 1) {
+        starsHermandad = 1;
+        descHermandad = "Bronce conseguido: Acude a 1 convivencia o actividad extramusical. Acude a 5 para Plata.";
+        unlockedHermandad = true;
+        nextGoalHermandad = 5;
+    } else {
+        starsHermandad = 0;
+        descHermandad = "Acude a una convivencia o actividad extramusical de la banda/cofradía para desbloquear Bronce.";
+        unlockedHermandad = false;
+        nextGoalHermandad = 1;
+    }
 
     // Titular indiscutible
     const performancesByYear = {};
@@ -8321,20 +9222,50 @@ function getMusicianMedalsData(musicianId) {
         }
     });
     
-    let titularUnlocked = false;
+    let starsTitular = 0;
+    let descTitular = "";
+    let unlockedTitular = false;
     let maxTitularPct = 0;
+    let hasPerformances = false;
+    let hasPerfectYear = false;
+
     Object.keys(performancesByYear).forEach(y => {
         const stats = performancesByYear[y];
         if (stats.total > 0) {
+            hasPerformances = true;
             const pct = (stats.attended / stats.total) * 100;
             if (pct > maxTitularPct) {
                 maxTitularPct = pct;
             }
             if (stats.attended === stats.total) {
-                titularUnlocked = true;
+                hasPerfectYear = true;
             }
         }
     });
+
+    if (hasPerformances) {
+        if (hasPerfectYear) {
+            starsTitular = 3;
+            descTitular = "Oro conseguido: Asiste al 100% de actuaciones en un año.";
+            unlockedTitular = true;
+        } else if (maxTitularPct > 95) {
+            starsTitular = 2;
+            descTitular = "Plata conseguido: Asiste a >95% de las actuaciones en un año. Necesitas el 100% para conseguir Oro.";
+            unlockedTitular = true;
+        } else if (maxTitularPct > 90) {
+            starsTitular = 1;
+            descTitular = "Bronce conseguido: Asiste a >90% de las actuaciones en un año. Necesitas >95% para conseguir Plata.";
+            unlockedTitular = true;
+        } else {
+            starsTitular = 0;
+            descTitular = "Asiste a >90% de las actuaciones en un año para desbloquear Bronce.";
+            unlockedTitular = false;
+        }
+    } else {
+        starsTitular = 0;
+        descTitular = "Asiste a >90% de las actuaciones en un año para desbloquear Bronce.";
+        unlockedTitular = false;
+    }
 
     // Capitán: Mayor asistencia entre tus compañeros de voz
     let capitanUnlocked = false;
@@ -8371,28 +9302,101 @@ function getMusicianMedalsData(musicianId) {
         }
     }
 
+    let starsRacha = 0;
+    let descRacha = "";
+    let unlockedRacha = false;
+    if (currentStreak >= 20) {
+        starsRacha = 3;
+        descRacha = "Oro conseguido: Asiste a 20 ensayos consecutivos.";
+        unlockedRacha = true;
+    } else if (currentStreak >= 10) {
+        starsRacha = 2;
+        descRacha = "Plata conseguido: Asiste a 10 ensayos consecutivos. Consigue 20 para Oro.";
+        unlockedRacha = true;
+    } else if (currentStreak >= 5) {
+        starsRacha = 1;
+        descRacha = "Bronce conseguido: Asiste a 5 ensayos consecutivos. Consigue 10 para Plata.";
+        unlockedRacha = true;
+    } else {
+        starsRacha = 0;
+        descRacha = "Asiste a 5 ensayos consecutivos para desbloquear Bronce.";
+        unlockedRacha = false;
+    }
+
+    let starsAsistencia = 0;
+    let descAsistencia = "";
+    let unlockedAsistencia = false;
+    if (totalConvocated >= 5) {
+        if (attendancePct >= 95) {
+            starsAsistencia = 3;
+            descAsistencia = "Oro conseguido: Asistencia superior al 95%. ¡Máximo compromiso!";
+            unlockedAsistencia = true;
+        } else if (attendancePct >= 90) {
+            starsAsistencia = 2;
+            descAsistencia = "Plata conseguido: Asistencia superior al 90%. Necesitas un 95% para conseguir Oro.";
+            unlockedAsistencia = true;
+        } else if (attendancePct >= 80) {
+            starsAsistencia = 1;
+            descAsistencia = "Bronce conseguido: Asistencia superior al 80%. Necesitas un 90% para conseguir Plata.";
+            unlockedAsistencia = true;
+        } else {
+            starsAsistencia = 0;
+            descAsistencia = "Consigue al menos un 80% de asistencia para desbloquear Bronce.";
+            unlockedAsistencia = false;
+        }
+    } else {
+        starsAsistencia = 0;
+        descAsistencia = "Consigue al menos un 80% de asistencia para desbloquear Bronce (mín. 5 conv.).";
+        unlockedAsistencia = false;
+    }
+
+    let starsVeterano = 0;
+    let descVeterano = "";
+    let unlockedVeterano = false;
+    let nextGoalVeterano = 15;
+    if (attended >= 100) {
+        starsVeterano = 3;
+        descVeterano = "Oro conseguido: Alcanza un total de 100 asistencias.";
+        unlockedVeterano = true;
+        nextGoalVeterano = 100;
+    } else if (attended >= 50) {
+        starsVeterano = 2;
+        descVeterano = "Plata conseguido: Alcanza un total de 50 asistencias. Consigue 100 para Oro.";
+        unlockedVeterano = true;
+        nextGoalVeterano = 100;
+    } else if (attended >= 15) {
+        starsVeterano = 1;
+        descVeterano = "Bronce conseguido: Alcanza un total de 15 asistencias. Consigue 50 para Plata.";
+        unlockedVeterano = true;
+        nextGoalVeterano = 50;
+    } else {
+        starsVeterano = 0;
+        descVeterano = "Alcanza un total de 15 asistencias para desbloquear Bronce.";
+        unlockedVeterano = false;
+        nextGoalVeterano = 15;
+    }
+
     return [
-        { id: "racha", title: "Racha de Fuego", icon: "🔥", desc: "Asiste a 5 ensayos consecutivos.", unlocked: currentStreak >= 5, progressPct: Math.min((currentStreak / 5) * 100, 100), progressText: `${currentStreak}/5` },
-        { id: "asistencia", title: "Asistencia Ejemplar", icon: "🏆", desc: "Mantén un 90% o más de asistencia general.", unlocked: attendancePct >= 90 && totalConvocated >= 5, progressPct: Math.min(attendancePct, 100), progressText: `${Math.round(attendancePct)}% (mín. 5 conv.)` },
-        { id: "veterano", title: "Sigue así", icon: "🌟", desc: "Alcanza un total de 15 asistencias.", unlocked: attended >= 15, progressPct: Math.min((attended / 15) * 100, 100), progressText: `${attended}/15` },
+        { id: "racha", title: "Racha de Fuego", icon: "🔥", desc: descRacha, unlocked: unlockedRacha, stars: starsRacha, progressPct: Math.min((currentStreak / 20) * 100, 100), progressText: `${currentStreak}/20` },
+        { id: "asistencia", title: "Asistencia Ejemplar", icon: "🏆", desc: descAsistencia, unlocked: unlockedAsistencia, stars: starsAsistencia, progressPct: Math.min(attendancePct, 100), progressText: `${Math.round(attendancePct)}% (mín. 5 conv.)` },
+        { id: "veterano", title: "Paso firme", icon: "👣", desc: descVeterano, unlocked: unlockedVeterano, stars: starsVeterano, progressPct: Math.min((attended / nextGoalVeterano) * 100, 100), progressText: `${attended}/${nextGoalVeterano}` },
         { id: "comprometido", title: "Comprometido", icon: "📝", desc: "Cero ausencias injustificadas.", unlocked: absent === 0 && totalConvocated > 0, progressPct: (absent === 0 && totalConvocated > 0) ? 100 : 0, progressText: (absent === 0 && totalConvocated > 0) ? 'Sin faltas injustificadas' : `Faltas: ${absent}` },
-        { id: "estudio", title: "Estudio musical", icon: "📚", desc: "Domina (verde) 50 marchas del repertorio.", unlocked: greenMarchas >= 50, progressPct: Math.min((greenMarchas / 50) * 100, 100), progressText: `${greenMarchas}/50 dominadas` },
-        { id: "clavo", title: "Pleno", icon: "📌", desc: "Asiste a todos los ensayos de un mes completo.", unlocked: clavoUnlocked, progressPct: clavoUnlocked ? 100 : 0, progressText: clavoUnlocked ? "¡Conseguido!" : "0/1 mes perfecto" },
-        { id: "sopa", title: "Hasta en la sopa", icon: "🥣", desc: "Asiste a todos los ensayos durante 6 meses.", unlocked: sopaUnlocked, progressPct: sopaUnlocked ? 100 : Math.min((maxConsecutiveMonths / 6) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, 6)}/6 meses` },
-        { id: "god", title: "God", icon: "👑", desc: "Asiste a todos los ensayos durante 1 año.", unlocked: godUnlocked, progressPct: godUnlocked ? 100 : Math.min((maxConsecutiveMonths / 12) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, 12)}/12 meses` },
+        { id: "estudio", title: "Estudio musical", icon: "📚", desc: descEstudio, unlocked: unlockedEstudio, stars: starsEstudio, progressPct: Math.min((greenMarchas / nextGoalEstudio) * 100, 100), progressText: `${greenMarchas}/${nextGoalEstudio} dominada${greenMarchas === 1 ? '' : 's'}` },
+        { id: "god", title: "Alma de la banda", icon: "👑", desc: "Asiste a todos los ensayos durante 1 año.", unlocked: godUnlocked, progressPct: godUnlocked ? 100 : Math.min((maxConsecutiveMonths / 12) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, 12)}/12 meses` },
         { id: "marea", title: "Contra viento y marea", icon: "⛈️", desc: "Ensaya bajo condiciones climáticas extremas.", unlocked: !!musician.badgeWeather, progressPct: !!musician.badgeWeather ? 100 : 0, progressText: !!musician.badgeWeather ? "¡Otorgado!" : "No otorgada" },
         { id: "doblete", title: "Doblete", icon: "👥", desc: "Toca en dos actuaciones el mismo día.", unlocked: dobleteUnlocked, progressPct: dobleteUnlocked ? 100 : 0, progressText: dobleteUnlocked ? "¡Conseguido!" : "0/2 salidas" },
-        { id: "trotamundos", title: "Catador de paellas", icon: "✈️", desc: "Actuaciones fuera de la ciudad.", unlocked: trotamundosUnlocked, progressPct: Math.min((tripCount / 5) * 100, 100), progressText: `${tripCount} viaje${tripCount === 1 ? '' : 's'}` },
-        { id: "titular", title: "Titular indiscutible", icon: "🛡️", desc: "Asiste al 100% de actuaciones en un año.", unlocked: titularUnlocked, progressPct: maxTitularPct, progressText: titularUnlocked ? "¡100% anual conseguido!" : `${Math.round(maxTitularPct)}% anual` },
+        { id: "trotamundos", title: "Catador de paellas", icon: "✈️", desc: descTrotamundos, unlocked: unlockedTrotamundos, stars: starsTrotamundos, progressPct: Math.min((tripCount / nextGoalTrotamundos) * 100, 100), progressText: `${tripCount}/${nextGoalTrotamundos} viaje${tripCount === 1 ? '' : 's'}` },
+        { id: "titular", title: "Titular indiscutible", icon: "🛡️", desc: descTitular, unlocked: unlockedTitular, stars: starsTitular, progressPct: maxTitularPct, progressText: unlockedTitular ? `${Math.round(maxTitularPct)}% anual conseguido` : `${Math.round(maxTitularPct)}% anual` },
         { id: "sangre_nueva", title: "Sangre nueva", icon: "🌱", desc: "Completado tu primer año en Yacente, bienvenido a esta familia.", unlocked: !!musician.badgeSangreNueva, progressPct: !!musician.badgeSangreNueva ? 100 : 0, progressText: !!musician.badgeSangreNueva ? "¡Otorgado!" : "No otorgada" },
         { id: "fiel_atril", title: "Fiel al atril", icon: "🎼", desc: "Cinco años de constancia que demuestran que la música y el grupo ya son parte de tu vida.", unlocked: !!musician.badgeFielAtril, progressPct: !!musician.badgeFielAtril ? 100 : 0, progressText: !!musician.badgeFielAtril ? "¡Otorgado!" : "No otorgada" },
         { id: "corazon_yacente", title: "Corazón de Yacente", icon: "❤️", desc: "Un hito de auténtica devoción. Diez años de ensayos, viajes y escenarios que te convierten en un pilar fundamental.", unlocked: !!musician.badgeCorazonYacente, progressPct: !!musician.badgeCorazonYacente ? 100 : 0, progressText: !!musician.badgeCorazonYacente ? "¡Otorgado!" : "No otorgada" },
         { id: "raices_profundas", title: "Raíces profundas", icon: "🌳", desc: "15 años en la agrupación. Toda una vida musical dedicada al proyecto. Un referente indiscutible al que los músicos más jóvenes pueden admirar.", unlocked: !!musician.badgeRaicesProfundas, progressPct: !!musician.badgeRaicesProfundas ? 100 : 0, progressText: !!musician.badgeRaicesProfundas ? "¡Otorgado!" : "No otorgada" },
         { id: "leyenda_viva", title: "Leyenda viva", icon: "👑", desc: "20 años en las filas. Tu lealtad representa la historia y el alma de Yacente.", unlocked: !!musician.badgeLeyendaViva, progressPct: !!musician.badgeLeyendaViva ? 100 : 0, progressText: !!musician.badgeLeyendaViva ? "¡Otorgado!" : "No otorgada" },
-        { id: "ruta", title: "Compañero de Ruta", icon: "🚌", desc: "Viaja en el bus con tus compañeros en al menos un viaje en Semana Santa.", unlocked: !!musician.badgeRuta, progressPct: !!musician.badgeRuta ? 100 : 0, progressText: !!musician.badgeRuta ? "¡Otorgado!" : "No otorgada" },
+        { id: "ruta", title: "Compañero de Ruta", icon: "🚌", desc: descRuta, unlocked: unlockedRuta, stars: starsRuta, progressPct: Math.min((rutaTrips / nextGoalRuta) * 100, 100), progressText: `${rutaTrips}/${nextGoalRuta} viaje${rutaTrips === 1 ? '' : 's'}` },
+        { id: "hermandad", title: "Hermandad", icon: "🤝", desc: descHermandad, unlocked: unlockedHermandad, stars: starsHermandad, progressPct: Math.min((hermandadEvents / nextGoalHermandad) * 100, 100), progressText: `${hermandadEvents}/${nextGoalHermandad} actividad${hermandadEvents === 1 ? '' : 'es'}` },
         { id: "agonia", title: "Agonía", icon: "🌹", desc: "Completa tu primer estación de penitencia con la banda.", unlocked: !!musician.badgeAgonia, progressPct: !!musician.badgeAgonia ? 100 : 0, progressText: !!musician.badgeAgonia ? "¡Otorgado!" : "No otorgada" },
+        { id: "hasta_final", title: "Hasta el final", icon: "🏁", desc: "Completa todas las actuaciones de gloria de un año.", unlocked: !!musician.badgeHastaElFinal, progressPct: !!musician.badgeHastaElFinal ? 100 : 0, progressText: !!musician.badgeHastaElFinal ? "¡Otorgado!" : "No otorgada" },
         { id: "capitan", title: "Capitán", icon: "👨‍✈️", desc: "Mayor asistencia entre tus compañeros de voz.", unlocked: capitanUnlocked, progressPct: capitanUnlocked ? 100 : 0, progressText: capitanUnlocked ? "¡Líder de la sección!" : "Mayor asistencia requerida" },
-        { id: "implacable", title: "Implacable", icon: "⚡", desc: "Asiste a 20 ensayos consecutivos.", unlocked: currentStreak >= 20, progressPct: Math.min((currentStreak / 20) * 100, 100), progressText: `${currentStreak}/20` },
         { id: "volver_ensayar", title: "Volver...a ensayar", icon: "⚠️", desc: "Tienes menos de un 50% de asistencia.", unlocked: attendancePct < 50 && totalConvocated > 0, progressPct: Math.min(attendancePct, 100), progressText: `${Math.round(attendancePct)}% de asistencia`, isNegative: true }
     ];
 }
@@ -8522,21 +9526,214 @@ function renderComponentFicha() {
             if (medal.isNegative) {
                 medalCard.className = `medal-card ${medal.unlocked ? 'negative-unlocked' : 'locked'}`;
             } else {
-                medalCard.className = `medal-card ${medal.unlocked ? 'unlocked' : 'locked'}`;
+                let activeClasses = `medal-card ${medal.unlocked ? 'unlocked' : 'locked'}`;
+                if (medal.unlocked && medal.stars > 0) {
+                    activeClasses += ` unlocked-${medal.stars}star`;
+                }
+                medalCard.className = activeClasses;
+            }
+            const descEl = medalCard.querySelector(".medal-desc");
+            if (descEl && medal.desc) {
+                descEl.innerText = medal.desc;
             }
             const progressEl = medalCard.querySelector(".progress");
             if (progressEl) progressEl.style.width = `${medal.progressPct}%`;
             const textEl = medalCard.querySelector(".medal-progress-text");
             if (textEl) textEl.innerText = medal.progressText;
+
+            // Render stars if the medal supports them
+            let starsContainer = medalCard.querySelector(".medal-stars");
+            if (medal.stars !== undefined) {
+                if (!starsContainer) {
+                    const iconWrapper = medalCard.querySelector(".medal-icon-wrapper");
+                    if (iconWrapper) {
+                        iconWrapper.style.position = "relative";
+                        starsContainer = document.createElement("div");
+                        starsContainer.className = "medal-stars";
+                        iconWrapper.appendChild(starsContainer);
+                    }
+                }
+                if (starsContainer) {
+                    if (medal.stars > 0) {
+                        let starsHTML = "";
+                        for (let i = 1; i <= 3; i++) {
+                            if (i <= medal.stars) {
+                                starsHTML += '<span class="medal-star-icon filled">★</span>';
+                            } else {
+                                starsHTML += '<span class="medal-star-icon">★</span>';
+                            }
+                        }
+                        starsContainer.innerHTML = starsHTML;
+                        starsContainer.style.display = "flex";
+                    } else {
+                        starsContainer.style.display = "none";
+                    }
+                }
+            } else {
+                if (starsContainer) {
+                    starsContainer.remove();
+                }
+            }
         }
     });
 
-    // Contabilizar insignias positivas desbloqueadas
-    const unlockedInsigniasCount = medalsData.filter(m => m.unlocked && !m.isNegative).length;
+    // Contabilizar insignias positivas desbloqueadas, donde cada estrella cuenta como una insignia
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+    const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
     const insigniasValEl = document.getElementById("comp-insignias-val");
     if (insigniasValEl) {
         insigniasValEl.innerText = unlockedInsigniasCount;
     }
+    const compInsigniasBadge = document.getElementById("comp-insignias-badge");
+    if (compInsigniasBadge) {
+        const iconEl = compInsigniasBadge.querySelector(".insignias-badge-icon");
+        if (hasVolverEnsayar) {
+            compInsigniasBadge.classList.add("alarm-red");
+            if (iconEl) iconEl.innerText = "⚠️";
+        } else {
+            compInsigniasBadge.classList.remove("alarm-red");
+            if (iconEl) iconEl.innerText = "🏅";
+        }
+    }
+
+    // Notificaciones Card State Handling
+    const notifCard = document.getElementById("comp-notifications-card");
+    const notifStatus = document.getElementById("comp-notifications-status");
+    const btnEnableNotif = document.getElementById("btn-comp-enable-notifications");
+    
+    if (notifCard && notifStatus && btnEnableNotif) {
+        if (!("Notification" in window)) {
+            notifStatus.innerText = "No soportado en este navegador.";
+            btnEnableNotif.style.display = "none";
+            notifCard.style.display = "flex";
+        } else if (Notification.permission === "granted") {
+            notifCard.style.display = "none";
+        } else if (Notification.permission === "denied") {
+            notifStatus.innerText = "Notificaciones bloqueadas. Por favor, habilítalas en la configuración de tu navegador para recibir avisos.";
+            btnEnableNotif.innerText = "Bloqueado";
+            btnEnableNotif.disabled = true;
+            btnEnableNotif.className = "btn btn-secondary btn-sm";
+            btnEnableNotif.style.opacity = "0.5";
+            notifCard.style.display = "flex";
+        } else {
+            notifCard.style.display = "flex";
+            notifStatus.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
+            if (btnEnableNotif.tagName === "BUTTON") {
+                // Avoid duplicating listeners by replacing with a clone
+                const newBtn = btnEnableNotif.cloneNode(true);
+                btnEnableNotif.parentNode.replaceChild(newBtn, btnEnableNotif);
+                newBtn.addEventListener("click", () => {
+                    Notification.requestPermission().then(permission => {
+                        renderComponentFicha();
+                        if (permission === "granted") {
+                            showToast("¡Notificaciones de escritorio habilitadas!", "success");
+                        }
+                    });
+                });
+            }
+        }
+    }
+
+    // Actualizar badge de notificaciones
+    updateNotificationsBadge();
+
+    // Renderizar ranking de los 10 mejores
+    renderComponenteRanking();
+}
+
+function renderComponenteRanking() {
+    const container = document.getElementById("comp-ranking-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+    // Calcular estadísticas para todos los músicos
+    const rankingData = state.musicians.map(musician => {
+        const musicianId = musician.id;
+        
+        let totalConvocated = 0;
+        let attended = 0;
+        
+        Object.keys(state.attendance).forEach(date => {
+            if (date > todayStr) return;
+            const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
+            if (!record) return;
+            
+            totalConvocated++;
+            if (record.status === "present") {
+                attended++;
+            }
+        });
+        
+        const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+        const currentStreak = calculateMusicianStreak(musicianId);
+        
+        const medalsData = getMusicianMedalsData(musicianId);
+        const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+        const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
+            if (!m.unlocked || m.isNegative) return acc;
+            return acc + (m.stars || 1);
+        }, 0);
+        
+        return {
+            name: musician.name,
+            attendancePct,
+            streak: currentStreak,
+            badgesCount: unlockedInsigniasCount
+        };
+    });
+
+    // Ordenar de mayor a menor porcentaje de asistencia, y luego por insignias/racha como criterio de desempate
+    rankingData.sort((a, b) => {
+        if (Math.round(b.attendancePct) !== Math.round(a.attendancePct)) {
+            return b.attendancePct - a.attendancePct;
+        }
+        if (b.badgesCount !== a.badgesCount) {
+            return b.badgesCount - a.badgesCount;
+        }
+        return b.streak - a.streak;
+    });
+
+    // Quedarse con los 10 mejores
+    const top10 = rankingData.slice(0, 10);
+
+    top10.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "comp-ranking-card";
+        
+        // Estilo especial para el top 3
+        let rankBadgeClass = "rank-badge";
+        if (index === 0) rankBadgeClass += " rank-gold";
+        else if (index === 1) rankBadgeClass += " rank-silver";
+        else if (index === 2) rankBadgeClass += " rank-bronze";
+        
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+                <div class="${rankBadgeClass}">${index + 1}</div>
+                <div style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); flex: 1;">
+                    ${item.name}
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-shrink: 0; font-weight: 500; font-size: 0.9rem;">
+                <div style="color: var(--color-gold); font-family: 'Cinzel', serif; font-weight: bold;">
+                    ${Math.round(item.attendancePct)}%
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: var(--text-secondary);" title="Racha de asistencia">
+                    🔥 <span>${item.streak}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: var(--text-secondary);" title="Insignias obtenidas">
+                    🏅 <span>${item.badgesCount}</span>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(card);
+    });
 }
 
 function populateHistoryFilters(dates) {
@@ -8663,15 +9860,21 @@ function renderComponentHistorial() {
         if (session.type === "ensayo") {
             const subtype = session.subtype || "general";
             if (subtype === "general") {
-                typeLabel = "Ensayo General";
-            } else if (subtype === "primeras") {
-                typeLabel = "Ensayo de Primeras";
-            } else if (subtype === "percusion") {
-                typeLabel = "Ensayo de Percusión";
+                typeLabel = "General";
+            } else if (subtype === "trompetas1") {
+                typeLabel = "Trompetas 1ª";
             } else if (subtype === "bajos") {
-                typeLabel = "Ensayo de Bajos";
+                typeLabel = "Bajos";
+            } else if (subtype === "trompetas2y3") {
+                typeLabel = "Trompetas 2ª y 3ª";
+            } else if (subtype === "cornetas") {
+                typeLabel = "Cornetas";
+            } else if (subtype === "percusion") {
+                typeLabel = "Percusión";
             } else if (subtype === "voces") {
-                typeLabel = "Ensayo de Voces";
+                typeLabel = "Voces";
+            } else if (subtype === "primeras") {
+                typeLabel = "Primeras";
             } else {
                 typeLabel = "Ensayo";
             }
@@ -8681,22 +9884,40 @@ function renderComponentHistorial() {
         
         const sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         
-        const card = document.createElement("div");
-        card.className = "comp-session-card";
-        card.innerHTML = `
-            <div class="comp-session-meta">
-                <h4 class="comp-session-title">${sessionTitle}</h4>
-                <div class="comp-session-details">
-                    ${session.type !== "ensayo" ? `<span class="comp-session-type ${typeClass}">${typeLabel}</span>` : ""}
-                    <span>${formatDateSpanish(date)}</span>
-                </div>
+        const row = document.createElement("div");
+        row.className = "comp-session-row";
+        row.style.display = "flex";
+        row.style.alignItems = "stretch";
+        row.style.gap = "10px";
+        row.style.width = "100%";
+        
+        const dateParts = date.split("-");
+        const yr = dateParts[0];
+        const moNum = parseInt(dateParts[1], 10);
+        const dy = parseInt(dateParts[2], 10);
+        const monthsAbbr = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+        const moAbbr = monthsAbbr[moNum - 1] || "";
+        
+        row.innerHTML = `
+            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
+                <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--color-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+                <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
-            <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
-                <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
+            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                <div class="comp-session-meta">
+                    <h4 class="comp-session-title">${sessionTitle}</h4>
+                    <div class="comp-session-details">
+                        ${session.type === "ensayo" ? `<span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${session.location || "Parking"}</span>` : `<span class="comp-session-type ${typeClass}">${typeLabel}</span>`}
+                    </div>
+                </div>
+                <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
+                    <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
+                </div>
             </div>
         `;
         
-        container.appendChild(card);
+        container.appendChild(row);
     });
 }
 
@@ -8751,16 +9972,14 @@ function renderComponentEventos() {
         let badgeText = "Pendiente";
 
         if (record) {
+            badgeText = "Preaviso";
             if (record.status === "present") {
                 badgeClass = "present clickable-badge";
-                badgeText = "Preaviso: Asistiré";
             } else if (record.status === "absent") {
                 if (record.justified) {
                     badgeClass = "justified clickable-badge";
-                    badgeText = "Preaviso: No asistiré";
                 } else {
                     badgeClass = "absent clickable-badge";
-                    badgeText = "Preaviso: No asistiré";
                 }
             }
         }
@@ -8771,15 +9990,21 @@ function renderComponentEventos() {
         if (session.type === "ensayo") {
             const subtype = session.subtype || "general";
             if (subtype === "general") {
-                typeLabel = "Ensayo General";
-            } else if (subtype === "primeras") {
-                typeLabel = "Ensayo de Primeras";
-            } else if (subtype === "percusion") {
-                typeLabel = "Ensayo de Percusión";
+                typeLabel = "General";
+            } else if (subtype === "trompetas1") {
+                typeLabel = "Trompetas 1ª";
             } else if (subtype === "bajos") {
-                typeLabel = "Ensayo de Bajos";
+                typeLabel = "Bajos";
+            } else if (subtype === "trompetas2y3") {
+                typeLabel = "Trompetas 2ª y 3ª";
+            } else if (subtype === "cornetas") {
+                typeLabel = "Cornetas";
+            } else if (subtype === "percusion") {
+                typeLabel = "Percusión";
             } else if (subtype === "voces") {
-                typeLabel = "Ensayo de Voces";
+                typeLabel = "Voces";
+            } else if (subtype === "primeras") {
+                typeLabel = "Primeras";
             } else {
                 typeLabel = "Ensayo";
             }
@@ -8789,29 +10014,47 @@ function renderComponentEventos() {
         
         const sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         
-        const card = document.createElement("div");
-        card.className = "comp-session-card";
-        card.innerHTML = `
-            <div class="comp-session-meta">
-                <h4 class="comp-session-title">${sessionTitle}</h4>
-                <div class="comp-session-details">
-                    ${session.type !== "ensayo" ? `<span class="comp-session-type ${typeClass}">${typeLabel}</span>` : ""}
-                    <span>${formatDateSpanish(date)}</span>
-                </div>
+        const row = document.createElement("div");
+        row.className = "comp-session-row";
+        row.style.display = "flex";
+        row.style.alignItems = "stretch";
+        row.style.gap = "10px";
+        row.style.width = "100%";
+        
+        const dateParts = date.split("-");
+        const yr = dateParts[0];
+        const moNum = parseInt(dateParts[1], 10);
+        const dy = parseInt(dateParts[2], 10);
+        const monthsAbbr = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+        const moAbbr = monthsAbbr[moNum - 1] || "";
+        
+        row.innerHTML = `
+            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
+                <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--color-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+                <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
-            <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
-                <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
+            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                <div class="comp-session-meta">
+                    <h4 class="comp-session-title">${sessionTitle}</h4>
+                    <div class="comp-session-details">
+                        ${session.type === "ensayo" ? `<span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${session.location || "Parking"}</span>` : `<span class="comp-session-type ${typeClass}">${typeLabel}</span>`}
+                    </div>
+                </div>
+                <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
+                    <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
+                </div>
             </div>
         `;
         
-        const badge = card.querySelector(".comp-attendance-badge");
+        const badge = row.querySelector(".comp-attendance-badge");
         if (badge) {
             badge.addEventListener("click", () => {
                 openPreavisoModal(date);
             });
         }
         
-        container.appendChild(card);
+        container.appendChild(row);
     });
 }
 
@@ -8995,6 +10238,12 @@ function renderComponentRepertorio() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
+    const totalCount = state.marchas ? state.marchas.length : 0;
+    const titleEl = document.querySelector("#section-componente-repertorio h3");
+    if (titleEl) {
+        titleEl.textContent = `Mi Repertorio (${totalCount})`;
+    }
+    
     const searchVal = document.getElementById("search-comp-marcha").value.toLowerCase().trim();
     const container = document.getElementById("componente-repertorio-lista");
     container.innerHTML = "";
@@ -9031,14 +10280,14 @@ function renderComponentRepertorio() {
     filtered.forEach(marcha => {
         const key = `${musicianId}_${marcha.id}`;
         const currentStatus = state.musicianMarchaStatuses[key] || "";
-        const composerName = marcha.composer || marcha.author || "Autor desconocido";
+        const composerName = marcha.composer || marcha.author || "";
         
         const card = document.createElement("div");
         card.className = "comp-marcha-card";
         card.innerHTML = `
             <div class="comp-marcha-info">
                 <h4 class="comp-marcha-title">${marcha.title}</h4>
-                <span class="comp-marcha-composer">${composerName}</span>
+                ${composerName ? `<span class="comp-marcha-composer">${composerName}</span>` : ""}
             </div>
             <button class="comp-status-btn-single status-${currentStatus || 'none'}" title="Cambiar dominio (Toca para alternar)"></button>
         `;
@@ -9091,6 +10340,7 @@ function updateMusicianMarchaStatus(musicianId, marchaId, status) {
 }
 
 function logoutComponent() {
+    stopCloudSync();
     sessionStorage.removeItem("yacente_authenticated");
     sessionStorage.removeItem("yacente_role");
     sessionStorage.removeItem("yacente_musician_id");
@@ -9112,6 +10362,7 @@ function logoutComponent() {
 }
 
 function logoutAdmin() {
+    stopCloudSync();
     sessionStorage.removeItem("yacente_authenticated");
     sessionStorage.removeItem("yacente_role");
     localStorage.removeItem("yacente_authenticated");
@@ -9142,7 +10393,7 @@ function openPreavisoModal(date) {
     const diffTime = eventDateObj.getTime() - todayDateObj.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffDays < 2) {
+    if (diffDays < 1) {
         showToast("Es demasiado tarde para avisar. Por favor, póngase en contacto con la dirección.", "error");
         return;
     }
@@ -9294,6 +10545,10 @@ function setupPreavisoEvents() {
             if (reasonInput) {
                 reasonInput.value = pill.getAttribute("data-value");
             }
+            const justifiedCheckbox = document.getElementById("preaviso-justified-checkbox");
+            if (justifiedCheckbox) {
+                justifiedCheckbox.checked = true;
+            }
             pills.forEach(p => {
                 p.style.backgroundColor = "rgba(255,255,255,0.02)";
                 p.style.borderColor = "rgba(255,255,255,0.1)";
@@ -9302,6 +10557,17 @@ function setupPreavisoEvents() {
             pill.style.borderColor = "var(--color-gold)";
         });
     });
+
+    if (reasonInput) {
+        reasonInput.addEventListener("input", () => {
+            if (reasonInput.value.trim() !== "") {
+                const justifiedCheckbox = document.getElementById("preaviso-justified-checkbox");
+                if (justifiedCheckbox) {
+                    justifiedCheckbox.checked = true;
+                }
+            }
+        });
+    }
     
     if (btnSave) {
         btnSave.addEventListener("click", () => {
@@ -9357,6 +10623,304 @@ function setupPreavisoEvents() {
             renderComponentHistorial();
         });
     }
+}
+
+function renderGeneralOverviewChart() {
+    const container = document.getElementById("stats-ov-chart-container");
+    if (!container) return;
+
+    // 1. Gather all rehearsal sessions (only past ones, matching other stats)
+    const rehearsalDates = Object.keys(state.attendance).filter(dateKey => {
+        const session = state.sessionTypes[dateKey];
+        const d = new Date();
+        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const isPast = dateKey <= todayStr;
+        return isPast && (!session || session.type === "ensayo");
+    });
+
+    // 2. Dynamic Season Dropdown Population
+    const uniqueSeasons = Array.from(new Set(rehearsalDates.map(date => {
+        const parts = date.split("-");
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
+    }))).sort((a,b) => b.localeCompare(a));
+
+    const ovYearSelect = document.getElementById("stats-ov-year-select");
+    if (ovYearSelect) {
+        const currentOptions = Array.from(ovYearSelect.options).map(o => o.value);
+        const optionsMatch = currentOptions.length === uniqueSeasons.length && currentOptions.every((val, index) => val === uniqueSeasons[index]);
+        if (!optionsMatch) {
+            ovYearSelect.innerHTML = "";
+            uniqueSeasons.forEach(season => {
+                const opt = document.createElement("option");
+                opt.value = season;
+                opt.innerText = season;
+                ovYearSelect.appendChild(opt);
+            });
+            if (uniqueSeasons.length > 0) {
+                if (!uniqueSeasons.includes(state.statsOvSelectedSeason)) {
+                    state.statsOvSelectedSeason = uniqueSeasons[0];
+                }
+                ovYearSelect.value = state.statsOvSelectedSeason;
+            }
+        }
+    }
+
+    if (rehearsalDates.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 30px 10px; text-align: center; border-left: 2px solid var(--border-color); border-bottom: 2px solid var(--border-color); box-sizing: border-box; min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                <p class="text-muted" style="margin: 0; font-size: 0.88rem;">No hay ensayos registrados de forma histórica para generar gráficos.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let chartData = []; // Array of { label: string, pct: number, count: number }
+
+    if (state.statsOvMode === "years") {
+        const yearsData = {};
+        rehearsalDates.forEach(date => {
+            const year = date.split("-")[0];
+            if (!yearsData[year]) {
+                yearsData[year] = { presents: 0, total: 0, count: 0 };
+            }
+            
+            const dayRecord = state.attendance[date];
+            state.musicians.forEach(m => {
+                const r = dayRecord[m.id];
+                if (r) {
+                    yearsData[year].total++;
+                    if (r.status === "present") {
+                        yearsData[year].presents++;
+                    }
+                }
+            });
+            yearsData[year].count++;
+        });
+
+        const sortedYears = Object.keys(yearsData).sort((a,b) => a.localeCompare(b));
+        sortedYears.forEach(year => {
+            const data = yearsData[year];
+            const pct = data.total > 0 ? Math.round((data.presents / data.total) * 100) : 0;
+            chartData.push({ label: year, pct: pct, count: data.count });
+        });
+    } else {
+        const selectedSeason = state.statsOvSelectedSeason || (() => {
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = today.getMonth() + 1;
+            return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
+        })();
+        
+        const seasonParts = selectedSeason.split("-");
+        const year1 = seasonParts[0];
+        const year2 = seasonParts[1];
+
+        const seasonMonths = [
+            { label: "Sep", monthNum: 9, year: year1 },
+            { label: "Oct", monthNum: 10, year: year1 },
+            { label: "Nov", monthNum: 11, year: year1 },
+            { label: "Dic", monthNum: 12, year: year1 },
+            { label: "Ene", monthNum: 1, year: year2 },
+            { label: "Feb", monthNum: 2, year: year2 },
+            { label: "Mar", monthNum: 3, year: year2 },
+            { label: "Abr", monthNum: 4, year: year2 },
+            { label: "May", monthNum: 5, year: year2 },
+            { label: "Jun", monthNum: 6, year: year2 },
+            { label: "Jul", monthNum: 7, year: year2 },
+            { label: "Ago", monthNum: 8, year: year2 }
+        ];
+
+        const monthsData = Array.from({ length: 12 }, () => ({ presents: 0, total: 0, count: 0 }));
+        
+        rehearsalDates.forEach(date => {
+            const dateParts = date.split("-");
+            const y = dateParts[0];
+            const m = parseInt(dateParts[1], 10);
+            
+            const idx = seasonMonths.findIndex(sm => sm.year === y && sm.monthNum === m);
+            if (idx !== -1) {
+                const dayRecord = state.attendance[date];
+                state.musicians.forEach(m => {
+                    const r = dayRecord[m.id];
+                    if (r) {
+                        monthsData[idx].total++;
+                        if (r.status === "present") {
+                            monthsData[idx].presents++;
+                        }
+                    }
+                });
+                monthsData[idx].count++;
+            }
+        });
+
+        seasonMonths.forEach((sm, idx) => {
+            const data = monthsData[idx];
+            const pct = data.total > 0 ? Math.round((data.presents / data.total) * 100) : 0;
+            chartData.push({ label: sm.label, pct: pct, count: data.count });
+        });
+    }
+
+    let barsHTML = "";
+    chartData.forEach(item => {
+        const heightPct = item.pct;
+        const tooltip = `${item.label}: ${item.pct}% asistencia (${item.count} ensayo${item.count !== 1 ? 's' : ''})`;
+        const displayValue = item.count > 0 ? `${item.pct}%` : "-";
+        
+        barsHTML += `
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: 60px; height: 100%; justify-content: flex-end; position: relative;">
+                <span class="bar-value" style="font-size: 0.72rem; font-weight: 700; color: var(--color-gold); margin-bottom: 6px; z-index: 2; transition: opacity 0.2s;">
+                    ${displayValue}
+                </span>
+                <div class="bar-fill" style="width: 60%; height: ${heightPct}%; background: linear-gradient(180deg, var(--color-gold) 0%, rgba(212, 175, 55, 0.4) 100%); border-radius: 4px 4px 0 0; transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: help; min-height: ${item.count > 0 ? '4px' : '0px'}" title="${tooltip}"></div>
+                <span class="bar-label" style="position: absolute; bottom: -24px; font-size: 0.72rem; color: var(--text-color); font-weight: 600; white-space: nowrap; text-transform: capitalize;">
+                    ${item.label}
+                </span>
+            </div>
+        `;
+    });
+
+    const justifyStyle = state.statsOvMode === "years" ? "flex-start" : "space-around";
+    const gapStyle = state.statsOvMode === "years" ? "24px" : "8px";
+    const paddingLeftStyle = state.statsOvMode === "years" ? "16px" : "0px";
+
+    container.innerHTML = `
+        <div class="custom-vertical-chart" style="display: flex; height: 300px; width: 100%; border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); position: relative; padding: 20px 10px 0 45px; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+            <div class="y-axis" style="position: absolute; left: 0; top: 0; bottom: 30px; width: 35px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 0.72rem; color: var(--text-muted); padding-right: 6px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+            
+            <div class="grid-lines" style="position: absolute; left: 35px; right: 0; top: 0; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px solid var(--border-color); width: 100%;"></div>
+            </div>
+
+            <div class="bars-container" style="display: flex; flex: 1; justify-content: ${justifyStyle}; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 30px; padding-left: ${paddingLeftStyle}; box-sizing: border-box; gap: ${gapStyle};">
+                ${barsHTML}
+            </div>
+        </div>
+        <div style="height: 25px; width: 100%;"></div>
+    `;
+}
+
+function isMusicianConvocated(musicianId, sessionInfo) {
+    if (!sessionInfo) return false;
+    const musician = state.musicians.find(m => m.id === musicianId);
+    if (!musician) return false;
+
+    // Check if it is a section rehearsal
+    const isSpecialRehearsal = sessionInfo.subtype && sessionInfo.subtype !== "general" && sessionInfo.convocatedVoices && sessionInfo.convocatedVoices.length > 0;
+    if (isSpecialRehearsal) {
+        return sessionInfo.convocatedVoices.includes(musician.instrument);
+    }
+    // General rehearsal or events are convocated for everyone
+    return true;
+}
+
+function sendBrowserNotification(title, body) {
+    if ("Notification" in window && Notification.permission === "granted") {
+        try {
+            new Notification(title, {
+                body: body,
+                icon: "assets/logo.png"
+            });
+        } catch (e) {
+            console.error("Error showing browser notification:", e);
+        }
+    }
+}
+
+function updateNotificationsBadge() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+    
+    const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    const unseenCount = notifs.filter(n => !n.seen).length;
+    
+    const badge = document.getElementById("comp-notifications-badge-count");
+    if (badge) {
+        if (unseenCount > 0) {
+            badge.innerText = unseenCount;
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
+    }
+}
+
+function renderComponentNotificationsList() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    const container = document.getElementById("comp-notif-list-container");
+    const countLabel = document.getElementById("comp-notif-count-label");
+    
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (notifs.length === 0) {
+        if (countLabel) countLabel.innerText = "No tienes notificaciones.";
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 10px;" class="text-muted">
+                <span style="font-size: 2rem; display: block; margin-bottom: 10px;">📭</span>
+                No hay notificaciones históricas.
+            </div>
+        `;
+        return;
+    }
+
+    const unseenCount = notifs.filter(n => !n.seen).length;
+    if (countLabel) {
+        countLabel.innerText = unseenCount > 0 
+            ? `Tienes ${unseenCount} notificación${unseenCount !== 1 ? 'es' : ''} sin leer.`
+            : "No tienes notificaciones pendientes.";
+    }
+
+    notifs.forEach(notif => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = `card-item ${notif.seen ? '' : 'unseen-item'}`;
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: ${notif.seen ? 'rgba(255,255,255,0.02)' : 'rgba(212, 175, 55, 0.05)'};
+            border: 1px solid ${notif.seen ? 'var(--border-color)' : 'rgba(212, 175, 55, 0.35)'};
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: all 0.2s;
+            position: relative;
+        `;
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: ${notif.seen ? 'var(--text-primary)' : 'var(--color-gold)'};">${notif.title}</h4>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(notif.date).toLocaleDateString('es-ES', {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-color);">${notif.body}</p>
+        `;
+
+        if (!notif.seen) {
+            itemDiv.addEventListener("click", () => {
+                notif.seen = true;
+                localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                renderComponentNotificationsList();
+                updateNotificationsBadge();
+            });
+            itemDiv.style.cursor = "pointer";
+            itemDiv.title = "Hacer clic para marcar como leída";
+        }
+
+        container.appendChild(itemDiv);
+    });
 }
 
 

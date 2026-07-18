@@ -3,7 +3,7 @@
  * Gestiona el cacheo de recursos para funcionamiento offline.
  */
 
-const CACHE_NAME = "yacente-v211";
+const CACHE_NAME = "yacente-v230";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -16,7 +16,8 @@ const ASSETS_TO_CACHE = [
     "./icons/escudo.png",
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js",
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js",
-    "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"
+    "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
 ];
 
 // Instalar: cachear recursos estáticos

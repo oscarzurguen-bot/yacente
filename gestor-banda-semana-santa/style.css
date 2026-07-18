@@ -232,6 +232,10 @@ h1, h2, h3, h4, .logo-text h1 {
     transform: scale(1.05);
 }
 
+#btn-logout-nav-admin {
+    display: none !important;
+}
+
 .sidebar-footer {
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
@@ -305,6 +309,7 @@ input:checked + .slider:before {
     padding: 32px 40px;
     min-height: 100vh;
     transition: margin var(--transition-normal);
+    min-width: 0;
 }
 
 /* Header Area */
@@ -372,7 +377,7 @@ input:checked + .slider:before {
 
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    to { opacity: 1; transform: none; }
 }
 
 /* Cards & Containers */
@@ -1132,12 +1137,25 @@ svg.chevron {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    animation: slideDown 0.25s ease forwards;
+    max-height: 250px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease,
+                padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.3s ease;
 }
 
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-5px); max-height: 0; overflow: hidden; }
-    to { opacity: 1; transform: translateY(0); max-height: 200px; }
+.absence-details-container.hidden {
+    display: flex !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    padding-top: 0 !important;
+    border-top-color: transparent !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
 }
 
 .justified-checkbox-row {
@@ -1160,6 +1178,23 @@ svg.chevron {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    max-height: 180px;
+    opacity: 1;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease,
+                margin 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                gap 0.3s ease;
+}
+
+.reason-input-group.hidden {
+    display: flex !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
 }
 .reason-input-group label {
     font-size: 0.75rem;
@@ -1247,7 +1282,18 @@ svg.chevron {
     transition: background-color var(--transition-fast);
 }
 .data-table tbody tr:hover {
-    background-color: rgba(212, 175, 55, 0.01);
+    background-color: rgba(255, 255, 255, 0.01);
+}
+.data-table tbody tr.clickable-row {
+    transition: background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+    cursor: pointer;
+}
+.data-table tbody tr.clickable-row:hover {
+    background-color: rgba(212, 175, 55, 0.06);
+    transform: scale(1.008);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    position: relative;
+    z-index: 2;
 }
 
 .data-table tbody tr:last-child td {
@@ -1306,7 +1352,7 @@ svg.chevron {
     top: 0; left: 0; right: 0; bottom: 0;
     background-color: rgba(12, 3, 6, 0.8);
     backdrop-filter: blur(8px);
-    z-index: 200;
+    z-index: 10005;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1509,6 +1555,9 @@ svg.chevron {
     }
     .sidebar-header, .sidebar-footer {
         display: none;
+    }
+    #btn-logout-nav-admin {
+        display: flex !important;
     }
     .sidebar-nav {
         flex-direction: row;
@@ -1792,6 +1841,10 @@ svg.chevron {
    ESTILOS DE IMPRESIÓN PARA INFORMES PDF (COMPACTO Y PROFESIONAL)
    ========================================================================== */
 @media print {
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
     body {
         background: #ffffff !important;
         color: #000000 !important;
@@ -1799,15 +1852,17 @@ svg.chevron {
         font-family: 'Outfit', sans-serif !important;
     }
     
-    body * {
+    /* Ocultar contenedores principales de la app en la impresión */
+    .app-container,
+    .lock-screen-overlay,
+    .modal-overlay,
+    .toast-container,
+    .component-mobile-nav {
         display: none !important;
     }
     
-    #print-report-area, #print-report-area * {
-        display: block !important;
-    }
-    
     #print-report-area {
+        display: block !important;
         position: absolute;
         left: 0;
         top: 0;
@@ -1943,6 +1998,78 @@ svg.chevron {
     .print-badge-present { background-color: #e2fbe8 !important; border: 1px solid #a3e9b5 !important; color: #155724 !important; }
     .print-badge-absent { background-color: #fde8e8 !important; border: 1px solid #f8b4b4 !important; color: #721c24 !important; }
     .print-badge-justified { background-color: #fdf5e2 !important; border: 1px solid #fce1a6 !important; color: #856404 !important; }
+
+    /* Estilos específicos para impresión del repertorio */
+    .print-repertoire-grid {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 20px !important;
+        margin-top: 10px !important;
+        width: 100% !important;
+    }
+    .print-repertoire-column {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px !important;
+        flex: 1;
+        min-width: 0;
+    }
+    .print-repertoire-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 4px 6px !important;
+        border-bottom: 1px solid #e9ecef !important;
+        font-size: 8.5pt !important;
+        page-break-inside: avoid;
+        gap: 8px;
+    }
+    .print-repertoire-meta {
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 85%;
+    }
+    .print-repertoire-title {
+        font-weight: 600 !important;
+        color: #2b2b2b !important;
+        font-size: 8.5pt !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .print-repertoire-author {
+        font-size: 7.2pt !important;
+        color: #777 !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .print-status-dot {
+        width: 10px !important;
+        height: 10px !important;
+        border-radius: 50% !important;
+        display: inline-block !important;
+        border: 1px solid rgba(0,0,0,0.15) !important;
+    }
+    .print-status-dot.green { background-color: #2ecc71 !important; }
+    .print-status-dot.yellow { background-color: #f1c40f !important; }
+    .print-status-dot.red { background-color: #e74c3c !important; }
+    .print-status-dot.none { background-color: #bdc3c7 !important; }
+    .print-repertoire-legend {
+        display: flex !important;
+        gap: 15px !important;
+        margin-bottom: 10px !important;
+        font-size: 8pt !important;
+        background: #f8f9fa !important;
+        padding: 6px 12px !important;
+        border-radius: 6px !important;
+        border: 1px solid #dee2e6 !important;
+        font-family: 'Outfit', sans-serif !important;
+        align-items: center !important;
+    }
 }
 
 #print-report-area {
@@ -2000,7 +2127,7 @@ svg.chevron {
 }
 
 .lock-logo {
-    width: 55px;
+    width: 75px;
     height: auto;
 }
 
@@ -2900,6 +3027,10 @@ body.component-portal #candle-tribute-container {
     border-radius: 12px;
     padding: 20px;
     box-shadow: var(--shadow-lg);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
 }
 .profile-header-layout {
     display: flex;
@@ -2950,12 +3081,49 @@ body.component-portal #candle-tribute-container {
     font-size: 0.88rem;
     box-shadow: 0 4px 10px rgba(230, 126, 34, 0.1);
 }
+.profile-insignias-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    padding: 5px 10px;
+    border-radius: 20px;
+    color: var(--color-gold);
+    font-weight: 700;
+    font-size: 0.82rem;
+    box-shadow: 0 4px 10px rgba(212, 175, 55, 0.1);
+}
+.profile-insignias-badge.alarm-red {
+    background: var(--color-absent-transparent) !important;
+    border-color: rgba(231, 76, 60, 0.5) !important;
+    color: var(--color-absent) !important;
+    box-shadow: 0 4px 10px rgba(231, 76, 60, 0.2) !important;
+    animation: badge-alarm-pulse 2s infinite;
+}
+
+@keyframes badge-alarm-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(231, 76, 60, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+    }
+}
+
 
 /* Grilla Estadísticas Personales */
 .stats-cards-grid {
     display: grid;
     grid-template-columns: 1fr 1.5fr;
     gap: 20px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
 }
 @media (max-width: 768px) {
     .stats-cards-grid {
@@ -3162,6 +3330,73 @@ body.component-portal #candle-tribute-container {
 .medal-card.locked .medal-icon-wrapper {
     filter: grayscale(1);
     opacity: 0.4;
+}
+
+/* Estilos para el sistema de estrellas progresivo en insignias */
+.unlocked-1star {
+    background: rgba(205, 127, 50, 0.02) !important;
+    border-color: rgba(205, 127, 50, 0.2) !important;
+}
+.unlocked-1star .medal-icon-wrapper {
+    background-color: rgba(205, 127, 50, 0.1) !important;
+    border-color: #cd7f32 !important;
+}
+.unlocked-1star .progress {
+    background-color: #cd7f32 !important;
+}
+
+.unlocked-2star {
+    background: rgba(192, 192, 192, 0.02) !important;
+    border-color: rgba(192, 192, 192, 0.2) !important;
+}
+.unlocked-2star .medal-icon-wrapper {
+    background-color: rgba(192, 192, 192, 0.1) !important;
+    border-color: #c0c0c0 !important;
+}
+.unlocked-2star .progress {
+    background-color: #c0c0c0 !important;
+}
+
+.unlocked-3star {
+    background: rgba(212, 175, 55, 0.04) !important;
+    border-color: rgba(212, 175, 55, 0.3) !important;
+    box-shadow: 0 4px 25px rgba(212, 175, 55, 0.08) !important;
+}
+.unlocked-3star .medal-icon-wrapper {
+    background-color: rgba(212, 175, 55, 0.15) !important;
+    border-color: var(--color-gold) !important;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.25) !important;
+}
+.unlocked-3star .progress {
+    background-color: var(--color-gold) !important;
+}
+
+.medal-stars {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 1px;
+    background: #0f172a;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 1px 4px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
+}
+.unlocked-1star .medal-stars { border-color: rgba(205, 127, 50, 0.4); }
+.unlocked-2star .medal-stars { border-color: rgba(192, 192, 192, 0.4); }
+.unlocked-3star .medal-stars { border-color: rgba(212, 175, 55, 0.5); }
+
+.medal-star-icon {
+    font-size: 8px;
+    color: #475569;
+    line-height: 1;
+}
+.medal-star-icon.filled {
+    color: var(--color-gold);
+    text-shadow: 0 0 3px rgba(212, 175, 55, 0.5);
 }
 
 /* Tarjetas Verticales para Historial y Repertorio */
@@ -3502,3 +3737,102 @@ body.component-portal #candle-tribute-container {
     background-color: var(--color-justified);
     box-shadow: 0 0 4px var(--color-justified);
 }
+
+/* Ranking Cards styles */
+.comp-ranking-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    gap: 15px;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+.comp-ranking-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+}
+.rank-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.rank-badge.rank-gold {
+    background: linear-gradient(135deg, #FFD700, #DAA520);
+    color: #1a0a0a;
+}
+.rank-badge.rank-silver {
+    background: linear-gradient(135deg, #C0C0C0, #A9A9A9);
+    color: #1a0a0a;
+}
+.rank-badge.rank-bronze {
+    background: linear-gradient(135deg, #CD7F32, #8B5A2B);
+    color: #fff;
+}
+
+.btn-detail-trash {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 38px;
+    padding: 0;
+    background-color: var(--color-purple-dark);
+    border: 1px solid var(--color-purple-mid);
+    color: #FFFFFF;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.btn-detail-trash:hover {
+    background-color: var(--color-purple-light);
+    border-color: var(--color-purple-light);
+    color: #FFFFFF;
+    transform: translateY(-1px);
+}
+
+[data-theme="light"] .btn-detail-trash {
+    color: var(--color-purple-mid);
+}
+
+[data-theme="light"] .btn-detail-trash:hover {
+    color: #FFFFFF;
+}
+
+/* Campana de Notificaciones */
+.btn-notifications-bell {
+    position: relative;
+    background: rgba(212, 175, 55, 0.1);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    cursor: pointer;
+    color: var(--color-gold) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    z-index: 10;
+    transition: all 0.2s ease;
+}
+.btn-notifications-bell:hover {
+    background: rgba(212, 175, 55, 0.2);
+    border-color: rgba(212, 175, 55, 0.6);
+    transform: scale(1.05);
+}
+.btn-notifications-bell:active {
+    transform: scale(0.95);
+}
+

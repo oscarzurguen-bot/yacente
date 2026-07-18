@@ -41,57 +41,73 @@ try {
     Write-Host ""
 
     # Abrir automáticamente en el navegador
-    Start-Process "http://localhost:$port"
+    # Start-Process "http://localhost:$port"
 
     while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $request = $context.Request
-        $response = $context.Response
+        try {
+            $context = $listener.GetContext()
+            $request = $context.Request
+            $response = $context.Response
 
-        $urlPath = $request.Url.LocalPath
-        if ($urlPath -eq "/log-error") {
-            $reader = New-Object System.IO.StreamReader($request.InputStream)
-            $body = $reader.ReadToEnd()
-            [System.IO.File]::AppendAllText((Join-Path $root "browser_errors.txt"), "$body`r`n")
-            $response.StatusCode = 200
-            $msg = [System.Text.Encoding]::UTF8.GetBytes("OK")
-            $response.ContentLength64 = $msg.Length
-            $response.OutputStream.Write($msg, 0, $msg.Length)
+            $urlPath = $request.Url.LocalPath
+            if ($urlPath -eq "/log-error") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream)
+                $body = $reader.ReadToEnd()
+                [System.IO.File]::AppendAllText((Join-Path $root "browser_errors.txt"), "$body`r`n")
+                $response.StatusCode = 200
+                $msg = [System.Text.Encoding]::UTF8.GetBytes("OK")
+                $response.ContentLength64 = $msg.Length
+                $response.OutputStream.Write($msg, 0, $msg.Length)
+                $response.OutputStream.Close()
+                continue
+            }
+
+            if ($request.HttpMethod -eq "OPTIONS") {
+                $response.StatusCode = 200
+                $response.Headers.Add("Access-Control-Allow-Origin", "*")
+                $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
+                $response.OutputStream.Close()
+                continue
+            }
+            if ($urlPath -eq "/" -or $urlPath -eq "") {
+                $urlPath = "/index.html"
+            }
+
+            $filePath = Join-Path $root ($urlPath.TrimStart("/").Replace("/", "\"))
+
+            if (Test-Path $filePath -PathType Leaf) {
+                $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
+                $contentType = $mimeTypes[$ext]
+                if (-not $contentType) { $contentType = "application/octet-stream" }
+
+                $response.ContentType = $contentType
+                $response.StatusCode = 200
+
+                # Headers para PWA y caché
+                $response.Headers.Add("Cache-Control", "no-cache")
+                $response.Headers.Add("Access-Control-Allow-Origin", "*")
+
+                $fileBytes = [System.IO.File]::ReadAllBytes($filePath)
+                $response.ContentLength64 = $fileBytes.Length
+                $response.OutputStream.Write($fileBytes, 0, $fileBytes.Length)
+            } else {
+                $response.StatusCode = 404
+                $msg = [System.Text.Encoding]::UTF8.GetBytes("404 - No encontrado")
+                $response.ContentLength64 = $msg.Length
+                $response.OutputStream.Write($msg, 0, $msg.Length)
+            }
+
             $response.OutputStream.Close()
-            continue
+            
+            $status = $response.StatusCode
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $status $($request.HttpMethod) $($request.Url.LocalPath)" -ForegroundColor $(if ($status -eq 200) { "DarkGray" } else { "Red" })
+        } catch {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Error al procesar solicitud: $($_.Exception.Message)" -ForegroundColor Red
+            if ($null -ne $response) {
+                try { $response.Close() } catch {}
+            }
         }
-        if ($urlPath -eq "/" -or $urlPath -eq "") {
-            $urlPath = "/index.html"
-        }
-
-        $filePath = Join-Path $root ($urlPath.TrimStart("/").Replace("/", "\"))
-
-        if (Test-Path $filePath -PathType Leaf) {
-            $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
-            $contentType = $mimeTypes[$ext]
-            if (-not $contentType) { $contentType = "application/octet-stream" }
-
-            $response.ContentType = $contentType
-            $response.StatusCode = 200
-
-            # Headers para PWA y caché
-            $response.Headers.Add("Cache-Control", "no-cache")
-            $response.Headers.Add("Access-Control-Allow-Origin", "*")
-
-            $fileBytes = [System.IO.File]::ReadAllBytes($filePath)
-            $response.ContentLength64 = $fileBytes.Length
-            $response.OutputStream.Write($fileBytes, 0, $fileBytes.Length)
-        } else {
-            $response.StatusCode = 404
-            $msg = [System.Text.Encoding]::UTF8.GetBytes("404 - No encontrado")
-            $response.ContentLength64 = $msg.Length
-            $response.OutputStream.Write($msg, 0, $msg.Length)
-        }
-
-        $response.OutputStream.Close()
-        
-        $status = $response.StatusCode
-        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] $status $($request.HttpMethod) $($request.Url.LocalPath)" -ForegroundColor $(if ($status -eq 200) { "DarkGray" } else { "Red" })
     }
 } catch {
     if ($_.Exception.Message -match "acceso|access|denied") {

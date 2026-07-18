@@ -101,6 +101,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
 </head>
 <body class="mobile-simplified-active">
     <!-- Pantalla de Bloqueo: Contraseña de Directiva -->
@@ -149,6 +150,14 @@
                     Desbloquear
                 </button>
             </form>
+            <div style="margin-top: 18px; text-align: center; border-top: 1px solid rgba(212,175,55,0.15); padding-top: 12px;">
+                <a href="#" id="btn-lock-configure-cloud" style="color: var(--color-gold); font-size: 0.85rem; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: color 0.2s ease;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
+                        <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                    </svg>
+                    <span>Configurar Conexión Nube</span>
+                </a>
+            </div>
         </div>
     </div>
     <!-- App Container -->
@@ -226,6 +235,14 @@
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                     <span>Ajustes</span>
+                </a>
+                <a href="#" class="nav-item" id="btn-logout-nav-admin" style="color: var(--color-absent);">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Salir</span>
                 </a>
             </nav>
 
@@ -485,7 +502,8 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th style="white-space: nowrap;">Fecha del Ensayo</th>
+                                    <th style="white-space: nowrap;">Fecha</th>
+                                    <th style="white-space: nowrap;">Lugar</th>
                                     <th style="white-space: nowrap;">Tipo</th>
                                     <th>Músicos Presentes</th>
                                     <th>Ausencias</th>
@@ -934,6 +952,36 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Visión General (Gráfico de barras) -->
+                <div class="card-collapsible" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <h3>Visión General</h3>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <!-- Chart controls -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <button id="btn-stats-ov-years" class="btn btn-primary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; cursor: pointer;">Años</button>
+                                <button id="btn-stats-ov-months" class="btn btn-secondary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Meses</button>
+                            </div>
+                            <div id="stats-ov-month-filter-container" class="hidden" style="display: flex; align-items: center; gap: 8px;">
+                                <label for="stats-ov-year-select" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; margin: 0;">Seleccionar Temporada:</label>
+                                <select id="stats-ov-year-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; width: auto; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Bar Chart Container -->
+                        <div id="stats-ov-chart-container" style="position: relative; width: 100%; min-height: 280px; margin-top: 10px; display: flex; flex-direction: column;">
+                            <!-- Dynamic chart output -->
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Section: Calendario -->
@@ -1075,23 +1123,6 @@
                             </button>
                         </div>
                     </div>
-
-                    <!-- Cerrar Sesión Directiva -->
-                    <div class="card settings-card" style="border-color: rgba(231, 76, 60, 0.25);">
-                        <h3 style="color: var(--color-absent);">Cerrar Sesión Directiva</h3>
-                        <p class="text-muted" style="margin-bottom: 20px;">Cierra la sesión actual de administración en este dispositivo y vuelve a la pantalla de bloqueo principal.</p>
-                        
-                        <div class="settings-buttons">
-                            <button id="btn-logout-settings-admin" class="btn btn-danger" style="background: linear-gradient(135deg, var(--color-absent), #c0392b); border: none; font-weight: 600;">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; vertical-align: middle;">
-                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                    <polyline points="16 17 21 12 16 7"></polyline>
-                                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                                </svg>
-                                Cerrar Sesión
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </section>
             <!-- =============================================================== -->
@@ -1112,11 +1143,32 @@
                             <h3 id="comp-profile-name">Cargando nombre...</h3>
                             <p id="comp-profile-details" class="text-muted">Cargando instrumento...</p>
                         </div>
+                        <!-- Campana de Notificaciones (dentro de botón circular a color) -->
+                        <button id="btn-comp-notifications-bell" class="btn-notifications-bell" title="Ver Notificaciones">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            <!-- Badge -->
+                            <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
+                        </button>
                         <div class="profile-streak-badge" id="comp-streak-badge" title="Racha de ensayos consecutivos">
                             <span class="streak-icon">🔥</span>
                             <span class="streak-count" id="comp-streak-val">0</span>
                         </div>
                     </div>
+                </div>
+
+                <!-- Notificaciones Push Setting -->
+                <div class="card" id="comp-notifications-card" style="margin-top: 15px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.15);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.5rem; line-height: 1;">🔔</span>
+                        <div>
+                            <h4 style="margin: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-primary);">Notificaciones Push</h4>
+                            <p id="comp-notifications-status" style="margin: 2px 0 0 0; font-size: 0.76rem; color: var(--text-muted); line-height: 1.3;">Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.</p>
+                        </div>
+                    </div>
+                    <button id="btn-comp-enable-notifications" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">Habilitar</button>
                 </div>
 
                 <!-- Estadísticas Resumen Grid -->
@@ -1154,232 +1206,258 @@
                 <div class="card" style="margin-top: 20px; padding: 20px;">
                     <div class="insignias-header-row" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
                         <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Mis Insignias</h3>
-                        <div class="profile-insignias-badge" id="comp-insignias-badge" title="Insignias desbloqueadas" style="display: flex; align-items: center; gap: 6px; background: rgba(212, 175, 55, 0.12); border: 1px solid rgba(212, 175, 55, 0.35); padding: 5px 10px; border-radius: 20px; color: var(--color-gold); font-weight: 700; font-size: 0.82rem; box-shadow: 0 4px 10px rgba(212, 175, 55, 0.1);">
+                        <div class="profile-insignias-badge" id="comp-insignias-badge" title="Insignias desbloqueadas">
                             <span class="insignias-badge-icon">🏅</span>
                             <span class="insignias-badge-count" id="comp-insignias-val">0</span>
                         </div>
                     </div>
-                    <div class="medals-grid" id="component-medals-grid">
-                        <!-- Racha de Fuego -->
-                        <div class="medal-card locked" id="medal-racha">
-                            <div class="medal-icon-wrapper">🔥</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Racha de Fuego</div>
-                                <div class="medal-desc">Asiste a 5 ensayos consecutivos.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/5</div>
+                    <!-- Categorías de Insignias -->
+                    <div style="display: flex; flex-direction: column; gap: 25px;">
+                        <!-- Categoría: Asistencia -->
+                        <div>
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                📅 Asistencia
+                            </h4>
+                            <div class="medals-grid">
+
+                                <!-- Asistencia Ejemplar -->
+                                <div class="medal-card locked" id="medal-asistencia">
+                                    <div class="medal-icon-wrapper">🏆</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Asistencia Ejemplar</div>
+                                        <div class="medal-desc">Mantén un 90% o más de asistencia general.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0%</div>
+                                    </div>
+                                </div>
+                                <!-- Comprometido -->
+                                <div class="medal-card locked" id="medal-comprometido">
+                                    <div class="medal-icon-wrapper">📝</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Comprometido</div>
+                                        <div class="medal-desc">Cero ausencias injustificadas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/0</div>
+                                    </div>
+                                </div>
+                                <!-- Paso firme -->
+                                <div class="medal-card locked" id="medal-veterano">
+                                    <div class="medal-icon-wrapper">👣</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Paso firme</div>
+                                        <div class="medal-desc">Alcanza 15, 50 o 100 asistencias totales para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/15</div>
+                                    </div>
+                                </div>
+                                <!-- Racha de Fuego -->
+                                <div class="medal-card locked" id="medal-racha">
+                                    <div class="medal-icon-wrapper">🔥</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Racha de Fuego</div>
+                                        <div class="medal-desc">Asiste a 5, 10 o 20 ensayos consecutivos para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/20</div>
+                                    </div>
+                                </div>
+                                <div class="medal-card locked" id="medal-god">
+                                    <div class="medal-icon-wrapper">👑</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Alma de la banda</div>
+                                        <div class="medal-desc">Asiste a todos los ensayos durante 1 año.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">Progreso</div>
+                                    </div>
+                                </div>
+                                <!-- Titular indiscutible -->
+                                <div class="medal-card locked" id="medal-titular">
+                                    <div class="medal-icon-wrapper">🛡️</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Titular indiscutible</div>
+                                        <div class="medal-desc">Asiste a actuaciones en un año: >90% (1⭐), >95% (2⭐) o 100% (3⭐).</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">Progreso</div>
+                                    </div>
+                                </div>
+                                <!-- Capitán -->
+                                <div class="medal-card locked" id="medal-capitan">
+                                    <div class="medal-icon-wrapper">👨‍✈️</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Capitán</div>
+                                        <div class="medal-desc">Mayor asistencia entre tus compañeros de voz.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">No conseguido</div>
+                                    </div>
+                                </div>
+                                <!-- Volver...a ensayar -->
+                                <div class="medal-card locked" id="medal-volver_ensayar">
+                                    <div class="medal-icon-wrapper">⚠️</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Volver...a ensayar</div>
+                                        <div class="medal-desc">Tienes menos de un 50% de asistencia.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">100% de asistencia</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- Asistencia Ejemplar -->
-                        <div class="medal-card locked" id="medal-asistencia">
-                            <div class="medal-icon-wrapper">🏆</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Asistencia Ejemplar</div>
-                                <div class="medal-desc">Mantén un 90% o más de asistencia general.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0%</div>
+
+                        <!-- Categoría: Legado -->
+                        <div>
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                📜 Legado
+                            </h4>
+                            <div class="medals-grid">
+                                <!-- Sangre nueva -->
+                                <div class="medal-card locked" id="medal-sangre_nueva">
+                                    <div class="medal-icon-wrapper">🌱</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Sangre nueva</div>
+                                        <div class="medal-desc">Completado tu primer año en Yacente, bienvenido a esta familia.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/1 año</div>
+                                    </div>
+                                </div>
+                                <!-- Fiel al atril -->
+                                <div class="medal-card locked" id="medal-fiel_atril">
+                                    <div class="medal-icon-wrapper">🎼</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Fiel al atril</div>
+                                        <div class="medal-desc">Cinco años de constancia que demuestran que la música y el grupo ya son parte de tu vida.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/5 años</div>
+                                    </div>
+                                </div>
+                                <!-- Corazón de Yacente -->
+                                <div class="medal-card locked" id="medal-corazon_yacente">
+                                    <div class="medal-icon-wrapper">❤️</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Corazón de Yacente</div>
+                                        <div class="medal-desc">Un hito de auténtica devoción. Diez años de ensayos, viajes y escenarios que te convierten en un pilar fundamental.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/10 años</div>
+                                    </div>
+                                </div>
+                                <!-- Raíces profundas -->
+                                <div class="medal-card locked" id="medal-raices_profundas">
+                                    <div class="medal-icon-wrapper">🌳</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Raíces profundas</div>
+                                        <div class="medal-desc">15 años en la agrupación. Toda una vida musical dedicada al proyecto. Un referente indiscutible al que los músicos más jóvenes pueden admirar.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/15 años</div>
+                                    </div>
+                                </div>
+                                <!-- Leyenda viva -->
+                                <div class="medal-card locked" id="medal-leyenda_viva">
+                                    <div class="medal-icon-wrapper">👑</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Leyenda viva</div>
+                                        <div class="medal-desc">20 años en las filas. Tu lealtad representa la historia y el alma de Yacente.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/20 años</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- Veterano -->
-                        <div class="medal-card locked" id="medal-veterano">
-                            <div class="medal-icon-wrapper">🌟</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Sigue así</div>
-                                <div class="medal-desc">Alcanza un total de 15 asistencias.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/15</div>
+
+                        <!-- Categoría: Especiales -->
+                        <div>
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                                ✨ Especiales
+                            </h4>
+                            <div class="medals-grid">
+                                <!-- Estudio musical -->
+                                <div class="medal-card locked" id="medal-estudio">
+                                    <div class="medal-icon-wrapper">📚</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Estudio musical</div>
+                                        <div class="medal-desc">Domina 50, 70 o todas las marchas del repertorio para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/50</div>
+                                    </div>
+                                </div>
+                                <!-- Agonía -->
+                                <div class="medal-card locked" id="medal-agonia">
+                                    <div class="medal-icon-wrapper">🌹</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Agonía</div>
+                                        <div class="medal-desc">Completa tu primer estación de penitencia con la banda.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">No otorgada</div>
+                                    </div>
+                                </div>
+                                <!-- Compañero de Ruta -->
+                                <div class="medal-card locked" id="medal-ruta">
+                                    <div class="medal-icon-wrapper">🚌</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Compañero de Ruta</div>
+                                        <div class="medal-desc">Completa 5, 10 o 20 viajes en bus con tus compañeros para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/5 viajes</div>
+                                    </div>
+                                </div>
+                                <!-- Hasta el final -->
+                                <div class="medal-card locked" id="medal-hasta_final">
+                                    <div class="medal-icon-wrapper">🏁</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Hasta el final</div>
+                                        <div class="medal-desc">Completa todas las actuaciones de gloria de un año.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">No otorgada</div>
+                                    </div>
+                                </div>
+                                <!-- Hermandad -->
+                                <div class="medal-card locked" id="medal-hermandad">
+                                    <div class="medal-icon-wrapper">🤝</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Hermandad</div>
+                                        <div class="medal-desc">Acude a 1, 5 o 10 convivencias o actividades extramusicales de la banda/cofradía para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/1 actividades</div>
+                                    </div>
+                                </div>
+                                <!-- Catador de paellas -->
+                                <div class="medal-card locked" id="medal-trotamundos">
+                                    <div class="medal-icon-wrapper">✈️</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Catador de paellas</div>
+                                        <div class="medal-desc">Completa 10, 25 o 50 viajes fuera de la ciudad/comunidad para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">0/10 viajes</div>
+                                    </div>
+                                </div>
+                                <!-- Doblete -->
+                                <div class="medal-card locked" id="medal-doblete">
+                                    <div class="medal-icon-wrapper">👥</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Doblete</div>
+                                        <div class="medal-desc">Toca en dos actuaciones el mismo día.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">No realizado</div>
+                                    </div>
+                                </div>
+                                <!-- Contra viento y marea -->
+                                <div class="medal-card locked" id="medal-marea">
+                                    <div class="medal-icon-wrapper">⛈️</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Contra viento y marea</div>
+                                        <div class="medal-desc">Ensaya bajo condiciones climáticas extremas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">No otorgada</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <!-- Comprometido -->
-                        <div class="medal-card locked" id="medal-comprometido">
-                            <div class="medal-icon-wrapper">📝</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Comprometido</div>
-                                <div class="medal-desc">Cero ausencias injustificadas.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/0</div>
-                            </div>
-                        </div>
-                        <!-- Estudio musical -->
-                        <div class="medal-card locked" id="medal-estudio">
-                            <div class="medal-icon-wrapper">📚</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Estudio musical</div>
-                                <div class="medal-desc">Domina (verde) 50 marchas del repertorio.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/50</div>
-                            </div>
-                        </div>
-                        <!-- El clavo -->
-                        <div class="medal-card locked" id="medal-clavo">
-                            <div class="medal-icon-wrapper">📌</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Pleno</div>
-                                <div class="medal-desc">Asiste a todos los ensayos de un mes completo.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">Progreso</div>
-                            </div>
-                        </div>
-                        <!-- Hasta en la sopa -->
-                        <div class="medal-card locked" id="medal-sopa">
-                            <div class="medal-icon-wrapper">🥣</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Hasta en la sopa</div>
-                                <div class="medal-desc">Asiste a todos los ensayos durante 6 meses.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">Progreso</div>
-                            </div>
-                        </div>
-                        <!-- God -->
-                        <div class="medal-card locked" id="medal-god">
-                            <div class="medal-icon-wrapper">👑</div>
-                            <div class="medal-info">
-                                <div class="medal-title">God</div>
-                                <div class="medal-desc">Asiste a todos los ensayos durante 1 año.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">Progreso</div>
-                            </div>
-                        </div>
-                        <!-- Contra viento y marea -->
-                        <div class="medal-card locked" id="medal-marea">
-                            <div class="medal-icon-wrapper">⛈️</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Contra viento y marea</div>
-                                <div class="medal-desc">Ensaya bajo condiciones climáticas extremas.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">No otorgada</div>
-                            </div>
-                        </div>
-                        <!-- Doblete -->
-                        <div class="medal-card locked" id="medal-doblete">
-                            <div class="medal-icon-wrapper">👥</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Doblete</div>
-                                <div class="medal-desc">Toca en dos actuaciones el mismo día.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">No realizado</div>
-                            </div>
-                        </div>
-                        <!-- El trotamundos -->
-                        <div class="medal-card locked" id="medal-trotamundos">
-                            <div class="medal-icon-wrapper">✈️</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Catador de paellas</div>
-                                <div class="medal-desc">Actuaciones con desplazamiento fuera de la ciudad.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0 viajes</div>
-                            </div>
-                        </div>
-                        <!-- Titular indiscutible -->
-                        <div class="medal-card locked" id="medal-titular">
-                            <div class="medal-icon-wrapper">🛡️</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Titular indiscutible</div>
-                                <div class="medal-desc">Asiste al 100% de actuaciones en un año completo.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">Progreso</div>
-                            </div>
-                        </div>
-                        <!-- Sangre nueva -->
-                        <div class="medal-card locked" id="medal-sangre_nueva">
-                            <div class="medal-icon-wrapper">🌱</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Sangre nueva</div>
-                                <div class="medal-desc">Completado tu primer año en Yacente, bienvenido a esta familia.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/1 año</div>
-                            </div>
-                        </div>
-                        <!-- Fiel al atril -->
-                        <div class="medal-card locked" id="medal-fiel_atril">
-                            <div class="medal-icon-wrapper">🎼</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Fiel al atril</div>
-                                <div class="medal-desc">Cinco años de constancia que demuestran que la música y el grupo ya son parte de tu vida.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/5 años</div>
-                            </div>
-                        </div>
-                        <!-- Corazón de Yacente -->
-                        <div class="medal-card locked" id="medal-corazon_yacente">
-                            <div class="medal-icon-wrapper">❤️</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Corazón de Yacente</div>
-                                <div class="medal-desc">Un hito de auténtica devoción. Diez años de ensayos, viajes y escenarios que te convierten en un pilar fundamental.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/10 años</div>
-                            </div>
-                        </div>
-                        <!-- Raíces profundas -->
-                        <div class="medal-card locked" id="medal-raices_profundas">
-                            <div class="medal-icon-wrapper">🌳</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Raíces profundas</div>
-                                <div class="medal-desc">15 años en la agrupación. Toda una vida musical dedicada al proyecto. Un referente indiscutible al que los músicos más jóvenes pueden admirar.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/15 años</div>
-                            </div>
-                        </div>
-                        <!-- Leyenda viva -->
-                        <div class="medal-card locked" id="medal-leyenda_viva">
-                            <div class="medal-icon-wrapper">👑</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Leyenda viva</div>
-                                <div class="medal-desc">20 años en las filas. Tu lealtad representa la historia y el alma de Yacente.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/20 años</div>
-                            </div>
-                        </div>
-                        <!-- Compañero de Ruta -->
-                        <div class="medal-card locked" id="medal-ruta">
-                            <div class="medal-icon-wrapper">🚌</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Compañero de Ruta</div>
-                                <div class="medal-desc">Viaja en el bus con tus compañeros en al menos un viaje en Semana Santa.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">No otorgada</div>
-                            </div>
-                        </div>
-                        <!-- Agonía -->
-                        <div class="medal-card locked" id="medal-agonia">
-                            <div class="medal-icon-wrapper">🌹</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Agonía</div>
-                                <div class="medal-desc">Completa tu primer estación de penitencia con la banda.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">No otorgada</div>
-                            </div>
-                        </div>
-                        <!-- Capitán -->
-                        <div class="medal-card locked" id="medal-capitan">
-                            <div class="medal-icon-wrapper">👨‍✈️</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Capitán</div>
-                                <div class="medal-desc">Mayor asistencia entre tus compañeros de voz.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">No conseguido</div>
-                            </div>
-                        </div>
-                        <!-- Implacable -->
-                        <div class="medal-card locked" id="medal-implacable">
-                            <div class="medal-icon-wrapper">⚡</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Implacable</div>
-                                <div class="medal-desc">Asiste a 20 ensayos consecutivos.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">0/20</div>
-                            </div>
-                        </div>
-                        <!-- Volver...a ensayar -->
-                        <div class="medal-card locked" id="medal-volver_ensayar">
-                            <div class="medal-icon-wrapper">⚠️</div>
-                            <div class="medal-info">
-                                <div class="medal-title">Volver...a ensayar</div>
-                                <div class="medal-desc">Tienes menos de un 50% de asistencia.</div>
-                                <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
-                                <div class="medal-progress-text">100% de asistencia</div>
-                            </div>
-                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Ranking de Asistencia -->
+                <div class="card" style="margin-top: 20px; padding: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Top 10 Asistencia</h3>
+                    <div id="comp-ranking-container" style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Populate dynamically -->
                     </div>
                 </div>
 
@@ -1397,14 +1475,32 @@
                 </div>
             </section>
 
-            <!-- Sección: Eventos Programados (Futuros) -->
-            <section id="section-componente-eventos" class="app-section">
-                <!-- Search & Filters -->
-                <div class="card" style="padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
-                    <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.1rem; color: #D4AF37;">Eventos Programados</h3>
-                    <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Próximos ensayos y actuaciones convocadas. Pulsa sobre el estado o en el calendario para enviar o modificar tu preaviso de asistencia.</p>
+            <!-- Sección: Notificaciones de Componente -->
+            <section id="section-componente-notificaciones" class="app-section">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                    <button id="btn-back-from-notif" class="btn-action" style="background: transparent; border: none; padding: 4px; color: var(--text-color); cursor: pointer;" title="Volver al Perfil">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                    </button>
+                    <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Notificaciones</h2>
                 </div>
 
+                <div class="card" style="padding: 20px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <span class="text-muted" style="font-size: 0.88rem;" id="comp-notif-count-label">No tienes notificaciones pendientes.</span>
+                        <button id="btn-comp-notif-mark-all-read" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 4px 8px;">Marcar todas como leídas</button>
+                    </div>
+
+                    <div id="comp-notif-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Dynamic notifications list -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Eventos Programados (Futuros) -->
+            <section id="section-componente-eventos" class="app-section">
                 <!-- Calendario Mensual Músicos -->
                 <div class="card" style="padding: 16px; margin-bottom: 20px; box-sizing: border-box;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
@@ -1442,7 +1538,7 @@
             <section id="section-componente-historial" class="app-section">
                 <!-- Search & Filters -->
                 <div class="card" style="padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
-                    <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.1rem; color: #D4AF37;">Mi Historial de Asistencia</h3>
+                    <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.1rem; color: #D4AF37;">Filtros</h3>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <select id="filter-history-type" style="flex: 1; min-width: 100px; background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px; border-radius: 4px;">
                             <option value="all">Tipos</option>
@@ -1480,7 +1576,17 @@
             <section id="section-componente-repertorio" class="app-section">
                 <!-- Search & Header -->
                 <div class="card" style="padding: 16px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
-                    <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.1rem; color: #D4AF37;">Mi Repertorio</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.1rem; color: #D4AF37;">Mi Repertorio</h3>
+                        <button id="btn-download-repertoire-pdf" class="btn btn-secondary btn-icon" style="padding: 6px 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37;" title="Descargar PDF">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span>PDF</span>
+                        </button>
+                    </div>
                     <p class="text-muted" style="margin: 0; font-size: 0.82rem;">Marca tu nivel de dominio personal para cada marcha.</p>
                     <input type="text" id="search-comp-marcha" placeholder="Buscar marcha por título o autor..." style="width: 100%; padding: 10px; border-radius: 4px; background-color: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-color);">
                 </div>
@@ -1661,9 +1767,6 @@
             <div class="modal-header">
                 <h3>Nuevo Ensayo</h3>
                 <button class="modal-close" id="btn-close-rehearsal-modal">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
             </div>
@@ -1676,9 +1779,18 @@
                     <label for="rehearsal-type-input">Tipo de Ensayo</label>
                     <select id="rehearsal-type-input" style="width: 100%;">
                         <option value="general" selected>Ensayo General</option>
-                        <option value="primeras">Ensayo Primeras</option>
+                        <option value="trompetas1">Ensayo Trompetas 1ª</option>
                         <option value="bajos">Ensayo Bajos</option>
+                        <option value="trompetas2y3">Ensayo Trompetas 2ª y 3ª</option>
+                        <option value="cornetas">Ensayo Cornetas</option>
                         <option value="percusion">Ensayo Percusión</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="rehearsal-location-input">Lugar del Ensayo</label>
+                    <select id="rehearsal-location-input" style="width: 100%;">
+                        <option value="Parking" selected>Parking</option>
+                        <option value="Arrabal">Arrabal</option>
                     </select>
                 </div>
                 <div class="modal-actions">
@@ -1799,6 +1911,14 @@
                 </div>
             </div>
             <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;">
+                <button class="btn-detail-trash hidden" id="btn-delete-rehearsal-from-detail" title="Eliminar Ensayo">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                </button>
                 <button class="btn btn-primary" id="btn-edit-rehearsal-from-detail" style="display: inline-flex; align-items: center; gap: 6px;">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -1959,13 +2079,15 @@
                     <label for="quick-session-type">Tipo de Sesión</label>
                     <select id="quick-session-type" style="width: 100%;">
                         <option value="ensayo-general">Ensayo General</option>
-                        <option value="ensayo-primeras">Ensayo Primeras</option>
+                        <option value="ensayo-trompetas1">Ensayo Trompetas 1ª</option>
                         <option value="ensayo-bajos">Ensayo Bajos</option>
+                        <option value="ensayo-trompetas2y3">Ensayo Trompetas 2ª y 3ª</option>
+                        <option value="ensayo-cornetas">Ensayo Cornetas</option>
                         <option value="ensayo-percusion">Ensayo Percusión</option>
                         <option value="actuacion">Actuación</option>
                     </select>
                 </div>
-                
+                 
                 <!-- Group: Performance Name (hidden by default) -->
                 <div class="form-group hidden" id="quick-session-actuacion-group" style="margin-top: 15px;">
                     <label for="quick-session-actuacion-name">Nombre de la Actuación</label>
@@ -2130,9 +2252,9 @@
                 </div>
                 
                 <div class="form-group" style="margin-bottom: 20px;">
-                    <label for="firebase-admin-password">Contraseña de la Directiva</label>
-                    <input type="password" id="firebase-admin-password" placeholder="Define la contraseña para el resto de móviles/PCs" required style="width: 100%;">
-                    <span class="text-muted" style="font-size: 0.75rem; display: block; margin-top: 4px; line-height: 1.3;">Esta contraseña servirá para que el resto de compañeros de la directiva puedan entrar al panel desde sus propios dispositivos una vez instalen la app.</span>
+                    <label for="firebase-admin-password">Contrase&ntilde;a de la Directiva (Solo Directiva)</label>
+                    <input type="password" id="firebase-admin-password" placeholder="Deja en blanco si eres m&uacute;sico" style="width: 100%;">
+                    <span class="text-muted" style="font-size: 0.75rem; display: block; margin-top: 4px; line-height: 1.3;">Si eres de la directiva, introduce la contrase&ntilde;a para poder administrar la banda. Si eres m&uacute;sico, deja este campo totalmente en blanco.</span>
                 </div>
                 
                 <div class="modal-actions">
@@ -2264,7 +2386,13 @@
 
             <!-- Insignias del Componente -->
             <div class="card" style="margin-top: 16px; padding: 16px;">
-                <h3 style="font-family: 'Cinzel', serif; font-size: 1.05rem; color: #D4AF37; margin: 0 0 12px;">Insignias del Componente</h3>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <h3 style="font-family: 'Cinzel', serif; font-size: 1.05rem; color: #D4AF37; margin: 0;">Insignias del Componente</h3>
+                    <div class="profile-insignias-badge" id="detail-insignias-badge" title="Insignias desbloqueadas">
+                        <span class="insignias-badge-icon">🏅</span>
+                        <span class="insignias-badge-count" id="detail-insignias-val">0</span>
+                    </div>
+                </div>
                 
                 <!-- Asignación Manual por la Directiva -->
                 <div style="background-color: rgba(212, 175, 55, 0.03); border: 1px solid rgba(212, 175, 55, 0.12); padding: 16px; border-radius: 6px; margin-bottom: 16px;">
@@ -2324,15 +2452,38 @@
                                 <span style="font-size: 1.2rem; flex-shrink: 0;">🚌</span>
                                 <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Compañero de Ruta">Compañero de Ruta</div>
                             </div>
-                            <input type="checkbox" id="detail-badge-ruta-check" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                                <span style="font-size: 0.72rem; color: var(--text-muted);">Viajes:</span>
+                                <input type="number" id="detail-badge-ruta-trips" min="0" max="100" style="width: 50px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; color: #FFF; padding: 2px 4px; font-size: 0.8rem; text-align: center;">
+                            </div>
                         </div>
                         <!-- Agonía -->
                         <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color);">
                             <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-                                <span style="font-size: 1.2rem; flex-shrink: 0;">💀</span>
+                                <span style="font-size: 1.2rem; flex-shrink: 0;">🌹</span>
                                 <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Agonía">Agonía</div>
                             </div>
                             <input type="checkbox" id="detail-badge-agonia-check" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                        </div>
+                        <!-- Hasta el final -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                                <span style="font-size: 1.2rem; flex-shrink: 0;">🏁</span>
+                                <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Hasta el final">Hasta el final</div>
+                            </div>
+                            <input type="checkbox" id="detail-badge-hasta_final-check" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                        </div>
+
+                        <!-- Hermandad -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                                <span style="font-size: 1.2rem; flex-shrink: 0;">🤝</span>
+                                <div style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Hermandad">Hermandad</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                                <span style="font-size: 0.72rem; color: var(--text-muted);">Actividades:</span>
+                                <input type="number" id="detail-badge-hermandad-events" min="0" max="100" style="width: 50px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 4px; color: #FFF; padding: 2px 4px; font-size: 0.8rem; text-align: center;">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2651,7 +2802,7 @@
         </a>
     </nav>
 
-    <script src="app.js?v=210"></script>
+    <script src="app.js?v=211"></script>
     <script>
         // Desregistrar Service Worker y borrar cachés para desarrollo
         if ("serviceWorker" in navigator) {
