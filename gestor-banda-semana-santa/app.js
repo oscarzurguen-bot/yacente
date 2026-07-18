@@ -697,7 +697,7 @@ function startCloudSync() {
                             if (sessionData.type === "ensayo") {
                                 const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
                                 const locationVal = sessionData.location || "Parking";
-                                body = `${subtypeText} (${locationVal}) - ${formattedDate}`;
+                                body = `${subtypeText} - ${formattedDate} (${locationVal})`;
                             } else {
                                 body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
                             }
@@ -10837,14 +10837,14 @@ function renderGeneralOverviewChart() {
 }
 
 function getRehearsalSubtypeText(sub) {
-    if (sub === "trompetas1") return "Ensayo Trompetas 1ª";
-    if (sub === "bajos") return "Ensayo Bajos";
-    if (sub === "trompetas2y3") return "Ensayo Trompetas 2ª y 3ª";
-    if (sub === "cornetas") return "Ensayo Cornetas";
-    if (sub === "percusion") return "Ensayo Percusión";
-    if (sub === "primeras") return "Ensayo Primeras";
-    if (sub === "voces") return "Ensayo por Voces";
-    return "Ensayo General";
+    if (sub === "trompetas1") return "Trompetas 1ª";
+    if (sub === "bajos") return "Bajos";
+    if (sub === "trompetas2y3") return "Trompetas 2ª y 3ª";
+    if (sub === "cornetas") return "Cornetas";
+    if (sub === "percusion") return "Percusión";
+    if (sub === "primeras") return "Primeras";
+    if (sub === "voces") return "Voces";
+    return "General";
 }
 
 function isMusicianConvocated(musicianId, sessionInfo) {
@@ -10934,25 +10934,117 @@ function renderComponentNotificationsList() {
             gap: 4px;
             transition: all 0.2s;
             position: relative;
+            touch-action: pan-y;
+            user-select: none;
+            -webkit-user-select: none;
         `;
 
         itemDiv.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none;">
                 <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: ${notif.seen ? 'var(--text-primary)' : 'var(--color-gold)'};">${notif.title}</h4>
                 <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(notif.date).toLocaleDateString('es-ES', {hour: '2-digit', minute:'2-digit'})}</span>
             </div>
-            <p style="margin: 0; font-size: 0.8rem; color: var(--text-color);">${notif.body}</p>
+            <p style="margin: 0; font-size: 0.8rem; color: var(--text-color); pointer-events: none;">${notif.body}</p>
         `;
 
-        if (!notif.seen) {
-            itemDiv.addEventListener("click", () => {
+        // Swipe-to-delete gestures
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+        let hasMoved = false;
+
+        const handleStart = (clientX) => {
+            startX = clientX;
+            isDragging = true;
+            hasMoved = false;
+            itemDiv.style.transition = 'none';
+        };
+
+        const handleMove = (clientX) => {
+            if (!isDragging) return;
+            const deltaX = clientX - startX;
+            currentX = deltaX;
+            if (Math.abs(deltaX) > 8) {
+                hasMoved = true;
+            }
+            itemDiv.style.transform = `translateX(${deltaX}px)`;
+            itemDiv.style.opacity = Math.max(0.1, 1 - Math.abs(deltaX) / (itemDiv.offsetWidth * 0.8));
+        };
+
+        const handleEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            itemDiv.style.transition = 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)';
+            
+            const threshold = itemDiv.offsetWidth * 0.35;
+            if (Math.abs(currentX) > threshold) {
+                const direction = currentX > 0 ? 1 : -1;
+                itemDiv.style.transform = `translateX(${direction * 125}%)`;
+                itemDiv.style.opacity = '0';
+                
+                setTimeout(() => {
+                    itemDiv.style.maxHeight = itemDiv.offsetHeight + 'px';
+                    itemDiv.style.transition = 'all 0.3s ease';
+                    itemDiv.offsetHeight; // Reflow
+                    itemDiv.style.maxHeight = '0';
+                    itemDiv.style.padding = '0';
+                    itemDiv.style.margin = '0';
+                    itemDiv.style.border = 'none';
+                    
+                    setTimeout(() => {
+                        const index = notifs.findIndex(n => n.id === notif.id);
+                        if (index !== -1) {
+                            notifs.splice(index, 1);
+                            localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                            renderComponentNotificationsList();
+                            updateNotificationsBadge();
+                            showToast("Notificación eliminada", "info");
+                        }
+                    }, 300);
+                }, 150);
+            } else {
+                itemDiv.style.transform = 'translateX(0)';
+                itemDiv.style.opacity = '1';
+            }
+        };
+
+        itemDiv.addEventListener("touchstart", (e) => handleStart(e.touches[0].clientX), { passive: true });
+        itemDiv.addEventListener("touchmove", (e) => handleMove(e.touches[0].clientX), { passive: true });
+        itemDiv.addEventListener("touchend", handleEnd);
+
+        itemDiv.addEventListener("mousedown", (e) => {
+            handleStart(e.clientX);
+            const onMouseMove = (moveEvent) => handleMove(moveEvent.clientX);
+            const onMouseUp = () => {
+                handleEnd();
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
+            };
+            document.addEventListener("mousemove", onMouseMove);
+            document.addEventListener("mouseup", onMouseUp);
+        });
+
+        // Click handler handles both mark-as-read and filters drag
+        itemDiv.addEventListener("click", (e) => {
+            if (hasMoved) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            if (!notif.seen) {
                 notif.seen = true;
                 localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
                 renderComponentNotificationsList();
                 updateNotificationsBadge();
-            });
+            }
+        });
+
+        if (!notif.seen) {
             itemDiv.style.cursor = "pointer";
-            itemDiv.title = "Hacer clic para marcar como leída";
+            itemDiv.title = "Hacer clic para marcar como leída o deslizar para eliminar";
+        } else {
+            itemDiv.style.cursor = "grab";
+            itemDiv.title = "Deslizar para eliminar";
         }
 
         container.appendChild(itemDiv);
