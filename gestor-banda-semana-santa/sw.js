@@ -1,9 +1,71 @@
 /**
  * Yacente - Service Worker
- * Gestiona el cacheo de recursos para funcionamiento offline.
+ * Gestiona el cacheo de recursos para funcionamiento offline y notificaciones push.
  */
 
-const CACHE_NAME = "yacente-v232";
+// Importar SDK de Firebase para notificaciones push en segundo plano
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
+
+// Inicializa Firebase Messaging extrayendo la configuración desde la caché
+function initMessagingFromCache() {
+    if (typeof caches === 'undefined') return;
+    
+    caches.open('fcm-config')
+        .then(cache => cache.match('/config.json'))
+        .then(response => {
+            if (response) {
+                return response.json();
+            }
+        })
+        .then(config => {
+            if (config && firebase.apps.length === 0) {
+                firebase.initializeApp(config);
+                const messaging = firebase.messaging();
+                
+                messaging.onBackgroundMessage((payload) => {
+                    console.log('[SW] Recibido mensaje push en segundo plano:', payload);
+                    const title = payload.notification.title || "Nueva notificación";
+                    const options = {
+                        body: payload.notification.body || "",
+                        icon: "./icons/icon-192-rounded.png",
+                        badge: "./icons/icon-192-rounded.png",
+                        data: {
+                            click_action: payload.notification.click_action || "/"
+                        }
+                    };
+                    self.registration.showNotification(title, options);
+                });
+            }
+        })
+        .catch(err => console.error("[SW] Error al inicializar FCM desde caché:", err));
+}
+
+// Inicializar al cargar el script
+initMessagingFromCache();
+
+// Escucha evento click en notificaciones de segundo plano para redirigir
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const urlToOpen = (event.notification.data && event.notification.data.click_action) || '/';
+    
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // Si hay alguna pestaña ya abierta en la misma web, enfocarla
+            for (let client of windowClients) {
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // Si no, abrir una nueva pestaña
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
+});
+
+const CACHE_NAME = "yacente-v233";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",

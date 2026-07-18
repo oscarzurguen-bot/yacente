@@ -513,6 +513,13 @@ function initFirebase() {
             });
         }
         
+        // Guardar configuración en la caché para el Service Worker (FCM)
+        if (window.caches && state.firebaseConfig) {
+            caches.open('fcm-config').then(cache => {
+                cache.put('/config.json', new Response(JSON.stringify(state.firebaseConfig)));
+            }).catch(e => console.error("Error cacheando Firebase config:", e));
+        }
+        
         updateFirebaseStatusUI(true);
         
         // Si no estamos autenticados en esta sesión, bloquear pantalla
@@ -611,6 +618,13 @@ function startCloudSync() {
     
     // Detener escuchas previas si existen
     stopCloudSync();
+    
+    // Registrar token de dispositivo si es un músico
+    const authRole = getAuthRole();
+    const musicianId = getAuthMusicianId();
+    if (authRole === "component" && musicianId) {
+        registerDeviceToken(musicianId);
+    }
     
     // Escucha de músicos
     unsubMusicians = db.collection("musicians").onSnapshot(snapshot => {
@@ -1734,6 +1748,8 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            // Disparar notificaciones push para el nuevo ensayo
+            sendPushNotificationToConvocated(state.sessionTypes[sessionKey], sessionKey);
         } else {
             saveStateToLocalStorage();
         }
@@ -1799,6 +1815,8 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            // Disparar notificaciones push para la nueva actuación
+            sendPushNotificationToConvocated(state.sessionTypes[sessionKey], sessionKey);
         } else {
             saveStateToLocalStorage();
         }
@@ -1822,6 +1840,21 @@ function setupEventListeners() {
         renderAttendance();
         showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
     });
+
+    // Guardar configuración de notificaciones push
+    const formPushConfig = document.getElementById("form-push-config");
+    if (formPushConfig) {
+        formPushConfig.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const vapidKey = document.getElementById("push-vapid-key").value.trim();
+            const serverKey = document.getElementById("push-server-key").value.trim();
+            
+            localStorage.setItem("yacente_vapid_key", vapidKey);
+            localStorage.setItem("yacente_fcm_server_key", serverKey);
+            
+            showToast("Configuración push guardada correctamente", "success");
+        });
+    }
 
     // ==========================================
     // BACKUPS Y COPIAS
@@ -2268,6 +2301,10 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            // Disparar notificaciones push si es una sesión nueva
+            if (state.isAddingNewSession) {
+                sendPushNotificationToConvocated(newSession, sessionKey);
+            }
         } else {
             saveStateToLocalStorage();
         }
@@ -2539,6 +2576,14 @@ function renderActiveSection(sectionId) {
             pageTitle.innerText = "Ajustes";
             pageSubtitle.innerText = "Administración general y copias de seguridad";
             dateContainer.classList.add("hidden");
+            
+            // Popula claves push si existen
+            const savedVapid = localStorage.getItem("yacente_vapid_key") || "";
+            const savedServerKey = localStorage.getItem("yacente_fcm_server_key") || "";
+            const vapidInput = document.getElementById("push-vapid-key");
+            const serverKeyInput = document.getElementById("push-server-key");
+            if (vapidInput) vapidInput.value = savedVapid;
+            if (serverKeyInput) serverKeyInput.value = savedServerKey;
             break;
         case "section-componente-ficha":
             pageTitle.innerText = "Mi Ficha";
@@ -5616,9 +5661,14 @@ function setupFirebaseListeners() {
                 
                 // Conectar en segundo plano a la nube
                 startCloudSync();
+                registerDeviceToken(musicianId);
                 
                 if ("Notification" in window && Notification.permission === "default") {
-                    Notification.requestPermission();
+                    Notification.requestPermission().then(perm => {
+                        if (perm === "granted") {
+                            registerDeviceToken(musicianId);
+                        }
+                    });
                 }
                 
                 renderActiveSection("section-componente-ficha");
@@ -9655,6 +9705,7 @@ function renderComponentFicha() {
                         renderComponentFicha();
                         if (permission === "granted") {
                             showToast("¡Notificaciones de escritorio habilitadas!", "success");
+                            registerDeviceToken(musicianId);
                         }
                     });
                 });
@@ -10872,6 +10923,138 @@ function sendBrowserNotification(title, body) {
             console.error("Error showing browser notification:", e);
         }
     }
+}
+
+function registerDeviceToken(musicianId) {
+    if (!isCloudActive()) return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    
+    try {
+        const vapidKey = localStorage.getItem("yacente_vapid_key");
+        if (!vapidKey) {
+            console.warn("[FCM] VAPID Key no configurada. Omitiendo registro de dispositivo.");
+            return;
+        }
+        
+        const messaging = firebase.messaging();
+        messaging.getToken({ vapidKey: vapidKey })
+            .then((currentToken) => {
+                if (currentToken) {
+                    const db = firebase.firestore();
+                    db.collection("musicianTokens").doc(musicianId).set({
+                        tokens: firebase.firestore.FieldValue.arrayUnion(currentToken),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true })
+                    .then(() => console.log("[FCM] Token registrado correctamente en Firestore"))
+                    .catch(err => console.error("[FCM] Error al guardar token en base de datos:", err));
+                } else {
+                    console.warn("[FCM] No se pudo obtener el token del navegador.");
+                }
+            })
+            .catch((err) => {
+                console.error("[FCM] Error al solicitar el token FCM:", err);
+            });
+    } catch (e) {
+        console.error("[FCM] Mensajería no soportada o error de inicialización:", e);
+    }
+}
+
+function sendPushNotificationToConvocated(sessionData, sessionDate) {
+    if (!isCloudActive()) return;
+    
+    const serverKey = localStorage.getItem("yacente_fcm_server_key");
+    if (!serverKey) {
+        console.warn("[FCM] No se ha configurado la clave de servidor FCM, omitiendo envío de notificaciones push.");
+        return;
+    }
+    
+    const db = firebase.firestore();
+    const formattedDate = formatDateShortSpanish(sessionDate);
+    
+    // 1. Obtener todos los músicos
+    db.collection("musicians").get()
+        .then((querySnapshot) => {
+            const convocatedMusicians = [];
+            querySnapshot.forEach((doc) => {
+                const mus = doc.data();
+                // Convocatoria
+                if (isMusicianConvocated(mus.id, sessionData)) {
+                    convocatedMusicians.push(mus.id);
+                }
+            });
+            
+            if (convocatedMusicians.length === 0) {
+                console.log("[FCM] No hay músicos convocados para esta sesión.");
+                return;
+            }
+            
+            console.log(`[FCM] Se enviará notificación push a ${convocatedMusicians.length} músicos.`);
+            
+            // 2. Obtener tokens de dispositivo para los músicos convocados
+            const tokenPromises = convocatedMusicians.map(mId => 
+                db.collection("musicianTokens").doc(mId).get()
+                    .then(doc => doc.exists ? (doc.data().tokens || []) : [])
+                    .catch(err => {
+                        console.error(`[FCM] Error leyendo tokens del músico ${mId}:`, err);
+                        return [];
+                    })
+            );
+            
+            Promise.all(tokenPromises)
+                .then((results) => {
+                    // Planarizar y eliminar duplicados/vacíos
+                    const allTokens = [...new Set(results.flat().filter(Boolean))];
+                    if (allTokens.length === 0) {
+                        console.log("[FCM] No hay tokens de dispositivos registrados para los músicos convocados.");
+                        return;
+                    }
+                    
+                    console.log(`[FCM] Enviando push a ${allTokens.length} dispositivos.`);
+                    
+                    // 3. Preparar payload
+                    const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
+                    let body = "";
+                    if (sessionData.type === "ensayo") {
+                        const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
+                        const locationVal = sessionData.location || "Parking";
+                        body = `${subtypeText} - ${formattedDate} (${locationVal})`;
+                    } else {
+                        body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
+                    }
+                    
+                    // 4. Enviar mediante la API legacy de FCM (lotes de 500 max)
+                    const chunkSize = 500;
+                    for (let i = 0; i < allTokens.length; i += chunkSize) {
+                        const chunk = allTokens.slice(i, i + chunkSize);
+                        
+                        fetch("https://fcm.googleapis.com/fcm/send", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": "key=" + serverKey
+                            },
+                            body: JSON.stringify({
+                                registration_ids: chunk,
+                                notification: {
+                                    title: title,
+                                    body: body,
+                                    icon: "https://yacente.pages.dev/icons/icon-192-rounded.png",
+                                    badge: "https://yacente.pages.dev/icons/icon-192-rounded.png",
+                                    click_action: "https://yacente.pages.dev/"
+                                }
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            console.log("[FCM] Lote de notificaciones push enviado con éxito:", data);
+                        })
+                        .catch(err => {
+                            console.error("[FCM] Error en la petición HTTP POST de FCM:", err);
+                        });
+                    }
+                });
+        })
+        .catch(err => console.error("[FCM] Error obteniendo lista de músicos para notificaciones push:", err));
 }
 
 function updateNotificationsBadge() {

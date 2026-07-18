@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=232">
+    <link rel="stylesheet" href="style.css?v=233">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1098,6 +1098,26 @@
                                 Activar Nube
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Configuración de Notificaciones Push (FCM) -->
+                    <div class="card settings-card" id="push-settings-card">
+                        <h3>Notificaciones Push (FCM)</h3>
+                        <p class="text-muted" style="margin-bottom: 15px;">Configura las credenciales de Firebase Cloud Messaging para activar el envío de alertas directas a los dispositivos móviles de los músicos convocados.</p>
+                        
+                        <form id="form-push-config" style="display: flex; flex-direction: column; gap: 12px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="push-vapid-key">Clave Pública VAPID</label>
+                                <input type="text" id="push-vapid-key" placeholder="Ej: BEl3vXw..." style="width: 100%; font-family: monospace; font-size: 0.8rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="push-server-key">Clave de Servidor FCM (Legacy)</label>
+                                <input type="password" id="push-server-key" placeholder="Ej: AAAAYaC..." style="width: 100%; font-family: monospace; font-size: 0.8rem;">
+                            </div>
+                            <div class="settings-buttons" style="margin-top: 5px;">
+                                <button type="submit" class="btn btn-primary" id="btn-save-push-config">Guardar Claves Push</button>
+                            </div>
+                        </form>
                     </div>
 
                     <!-- Simulador de Formación -->
@@ -2811,7 +2831,7 @@
         </a>
     </nav>
 
-    <script src="app.js?v=232"></script>
+    <script src="app.js?v=233"></script>
     <script>
         // Desregistrar Service Worker y borrar cachés para desarrollo
         if ("serviceWorker" in navigator) {
