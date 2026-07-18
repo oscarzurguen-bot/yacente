@@ -3,7 +3,7 @@
  * Gestiona el cacheo de recursos para funcionamiento offline.
  */
 
-const CACHE_NAME = "yacente-v231";
+const CACHE_NAME = "yacente-v232";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",

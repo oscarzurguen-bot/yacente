@@ -11008,11 +11008,22 @@ function renderComponentNotificationsList() {
             }
         };
 
-        itemDiv.addEventListener("touchstart", (e) => handleStart(e.touches[0].clientX), { passive: true });
-        itemDiv.addEventListener("touchmove", (e) => handleMove(e.touches[0].clientX), { passive: true });
+        itemDiv.addEventListener("touchstart", (e) => {
+            handleStart(e.touches[0].clientX);
+        }, { passive: true });
+        
+        itemDiv.addEventListener("touchmove", (e) => {
+            if (isDragging) {
+                if (e.cancelable) e.preventDefault();
+                handleMove(e.touches[0].clientX);
+            }
+        }, { passive: false });
+        
         itemDiv.addEventListener("touchend", handleEnd);
+        itemDiv.addEventListener("touchcancel", handleEnd);
 
         itemDiv.addEventListener("mousedown", (e) => {
+            e.preventDefault(); // Prevent text selection and drag start
             handleStart(e.clientX);
             const onMouseMove = (moveEvent) => handleMove(moveEvent.clientX);
             const onMouseUp = () => {
