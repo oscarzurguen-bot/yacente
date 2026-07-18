@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=235">
+    <link rel="stylesheet" href="style.css?v=236">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1103,21 +1103,21 @@
                     <!-- Configuración de Notificaciones Push (FCM) -->
                     <div class="card settings-card" id="push-settings-card">
                         <h3>Notificaciones Push (FCM)</h3>
-                        <p class="text-muted" style="margin-bottom: 12px;">Configura las credenciales de Firebase Cloud Messaging para activar el envío de alertas directas a los dispositivos móviles de los músicos convocados.</p>
+                        <p class="text-muted" style="margin-bottom: 10px;">Configura las credenciales de Firebase Cloud Messaging v1 para activar el envío de alertas directas a los dispositivos móviles de los músicos convocados.</p>
                         
-                        <form id="form-push-config" style="display: flex; flex-direction: column; gap: 10px;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 12px; width: 100%;">
-                                <div class="form-group" style="flex: 1 1 200px; margin-bottom: 0;">
+                        <form id="form-push-config" style="display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 10px; width: 100%;">
+                                <div class="form-group" style="flex: 1 1 180px; margin-bottom: 0;">
                                     <label for="push-vapid-key" style="font-size: 0.75rem; margin-bottom: 4px;">Clave Pública VAPID</label>
-                                    <input type="text" id="push-vapid-key" placeholder="Ej: BEl3vXw..." style="width: 100%; font-family: monospace; font-size: 0.75rem; padding: 6px 10px;">
+                                    <input type="text" id="push-vapid-key" placeholder="Ej: BEl3vXw..." style="width: 100%; font-family: monospace; font-size: 0.72rem; padding: 5px 8px;">
                                 </div>
-                                <div class="form-group" style="flex: 1 1 200px; margin-bottom: 0;">
-                                    <label for="push-server-key" style="font-size: 0.75rem; margin-bottom: 4px;">Clave de Servidor FCM (Legacy)</label>
-                                    <input type="password" id="push-server-key" placeholder="Ej: AAAAYaC..." style="width: 100%; font-family: monospace; font-size: 0.75rem; padding: 6px 10px;">
+                                <div class="form-group" style="flex: 1 1 240px; margin-bottom: 0;">
+                                    <label for="push-service-account" style="font-size: 0.75rem; margin-bottom: 4px;">Cuenta de Servicio JSON (Firebase)</label>
+                                    <textarea id="push-service-account" placeholder='Pega aquí todo el contenido del archivo JSON generado...' style="width: 100%; height: 32px; font-family: monospace; font-size: 0.7rem; padding: 5px 8px; resize: vertical; min-height: 32px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-color);"></textarea>
                                 </div>
                             </div>
-                            <div class="settings-buttons" style="margin-top: 5px;">
-                                <button type="submit" class="btn btn-primary btn-sm" id="btn-save-push-config" style="padding: 6px 12px; font-size: 0.75rem;">Guardar Claves Push</button>
+                            <div class="settings-buttons" style="margin-top: 2px;">
+                                <button type="submit" class="btn btn-primary btn-sm" id="btn-save-push-config" style="padding: 5px 10px; font-size: 0.72rem;">Guardar Claves Push</button>
                             </div>
                         </form>
                     </div>
@@ -2833,7 +2833,7 @@
         </a>
     </nav>
 
-    <script src="app.js?v=235"></script>
+    <script src="app.js?v=236"></script>
     <script>
         // Desregistrar Service Worker y borrar cachés para desarrollo
         if ("serviceWorker" in navigator) {

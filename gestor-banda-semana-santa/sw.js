@@ -31,7 +31,7 @@ function initMessagingFromCache() {
                         icon: "./icons/icon-192-rounded.png",
                         badge: "./icons/icon-192-rounded.png",
                         data: {
-                            click_action: payload.notification.click_action || "/"
+                            click_action: (payload.notification && payload.notification.click_action) || (payload.data && payload.data.click_action) || "/"
                         }
                     };
                     self.registration.showNotification(title, options);
@@ -65,7 +65,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v235";
+const CACHE_NAME = "yacente-v236";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",

@@ -1847,10 +1847,23 @@ function setupEventListeners() {
         formPushConfig.addEventListener("submit", (e) => {
             e.preventDefault();
             const vapidKey = document.getElementById("push-vapid-key").value.trim();
-            const serverKey = document.getElementById("push-server-key").value.trim();
+            const saJsonStr = document.getElementById("push-service-account").value.trim();
+            
+            if (saJsonStr) {
+                try {
+                    const sa = JSON.parse(saJsonStr);
+                    if (!sa.project_id || !sa.private_key || !sa.client_email) {
+                        showToast("El JSON de la Cuenta de Servicio no tiene el formato correcto (faltan campos críticos)", "error");
+                        return;
+                    }
+                } catch (err) {
+                    showToast("El contenido de la Cuenta de Servicio no es un JSON válido", "error");
+                    return;
+                }
+            }
             
             localStorage.setItem("yacente_vapid_key", vapidKey);
-            localStorage.setItem("yacente_fcm_server_key", serverKey);
+            localStorage.setItem("yacente_service_account_json", saJsonStr);
             
             showToast("Configuración push guardada correctamente", "success");
         });
@@ -2579,11 +2592,11 @@ function renderActiveSection(sectionId) {
             
             // Popula claves push si existen
             const savedVapid = localStorage.getItem("yacente_vapid_key") || "";
-            const savedServerKey = localStorage.getItem("yacente_fcm_server_key") || "";
+            const savedSA = localStorage.getItem("yacente_service_account_json") || "";
             const vapidInput = document.getElementById("push-vapid-key");
-            const serverKeyInput = document.getElementById("push-server-key");
+            const saInput = document.getElementById("push-service-account");
             if (vapidInput) vapidInput.value = savedVapid;
-            if (serverKeyInput) serverKeyInput.value = savedServerKey;
+            if (saInput) saInput.value = savedSA;
             break;
         case "section-componente-ficha":
             pageTitle.innerText = "Mi Ficha";
@@ -10959,12 +10972,130 @@ function registerDeviceToken(musicianId) {
     }
 }
 
+function pemToArrayBuffer(pem) {
+    const cleanPem = pem.replace(/-----BEGIN PRIVATE KEY-----/, '')
+                        .replace(/-----END PRIVATE KEY-----/, '')
+                        .replace(/\s+/g, '');
+    const binary = atob(cleanPem);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+function arrayBufferToBase64Url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+function jsonToBase64Url(jsonObj) {
+    const str = JSON.stringify(jsonObj);
+    const bytes = new TextEncoder().encode(str);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+async function generateGAuthJWT(serviceAccount) {
+    const header = {
+        alg: "RS256",
+        typ: "JWT"
+    };
+    
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+        iss: serviceAccount.client_email,
+        scope: "https://www.googleapis.com/auth/firebase.messaging",
+        aud: "https://oauth2.googleapis.com/token",
+        exp: now + 3600,
+        iat: now
+    };
+    
+    const headerB64 = jsonToBase64Url(header);
+    const payloadB64 = jsonToBase64Url(payload);
+    const dataToSign = new TextEncoder().encode(headerB64 + "." + payloadB64);
+    
+    const privateKeyBuffer = pemToArrayBuffer(serviceAccount.private_key);
+    
+    const cryptoKey = await window.crypto.subtle.importKey(
+        "pkcs8",
+        privateKeyBuffer,
+        {
+            name: "RSASSA-PKCS1-v1_5",
+            hash: { name: "SHA-256" }
+        },
+        false,
+        ["sign"]
+    );
+    
+    const signatureBuffer = await window.crypto.subtle.sign(
+        "RSASSA-PKCS1-v1_5",
+        cryptoKey,
+        dataToSign
+    );
+    
+    const signatureB64 = arrayBufferToBase64Url(signatureBuffer);
+    return headerB64 + "." + payloadB64 + "." + signatureB64;
+}
+
+async function getFCMAccessToken(serviceAccount) {
+    const assertion = await generateGAuthJWT(serviceAccount);
+    const bodyParams = new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: assertion
+    });
+    
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: bodyParams.toString()
+    });
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error("Error al obtener token de Google OAuth2: " + errorText);
+    }
+    
+    const data = await response.json();
+    return data.access_token;
+}
+
 function sendPushNotificationToConvocated(sessionData, sessionDate) {
     if (!isCloudActive()) return;
     
-    const serverKey = localStorage.getItem("yacente_fcm_server_key");
-    if (!serverKey) {
-        console.warn("[FCM] No se ha configurado la clave de servidor FCM, omitiendo envío de notificaciones push.");
+    const saJsonStr = localStorage.getItem("yacente_service_account_json");
+    if (!saJsonStr) {
+        console.warn("[FCM] No se ha configurado la Cuenta de Servicio JSON de Firebase, omitiendo envío de notificaciones push.");
+        return;
+    }
+    
+    let serviceAccount;
+    try {
+        serviceAccount = JSON.parse(saJsonStr);
+    } catch (e) {
+        console.error("[FCM] Error al parsear el JSON de la Cuenta de Servicio:", e);
+        return;
+    }
+    
+    const projectId = serviceAccount.project_id;
+    if (!projectId) {
+        console.error("[FCM] project_id no encontrado en la Cuenta de Servicio.");
         return;
     }
     
@@ -11001,7 +11132,7 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
             );
             
             Promise.all(tokenPromises)
-                .then((results) => {
+                .then(async (results) => {
                     // Planarizar y eliminar duplicados/vacíos
                     const allTokens = [...new Set(results.flat().filter(Boolean))];
                     if (allTokens.length === 0) {
@@ -11009,7 +11140,17 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
                         return;
                     }
                     
-                    console.log(`[FCM] Enviando push a ${allTokens.length} dispositivos.`);
+                    console.log(`[FCM] Solicitando token de acceso OAuth2 para enviar push a ${allTokens.length} dispositivos...`);
+                    
+                    let accessToken;
+                    try {
+                        accessToken = await getFCMAccessToken(serviceAccount);
+                    } catch (err) {
+                        console.error("[FCM] Error de autenticación con Google OAuth2:", err);
+                        return;
+                    }
+                    
+                    console.log(`[FCM] Enviando push a ${allTokens.length} dispositivos mediante FCM HTTP v1.`);
                     
                     // 3. Preparar payload
                     const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
@@ -11022,36 +11163,48 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
                         body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
                     }
                     
-                    // 4. Enviar mediante la API legacy de FCM (lotes de 500 max)
-                    const chunkSize = 500;
-                    for (let i = 0; i < allTokens.length; i += chunkSize) {
-                        const chunk = allTokens.slice(i, i + chunkSize);
-                        
-                        fetch("https://fcm.googleapis.com/fcm/send", {
+                    // 4. Enviar mediante la API HTTP v1 de FCM
+                    const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+                    
+                    allTokens.forEach(token => {
+                        fetch(fcmUrl, {
                             method: "POST",
                             headers: {
                                 "Content-Type": "application/json",
-                                "Authorization": "key=" + serverKey
+                                "Authorization": "Bearer " + accessToken
                             },
                             body: JSON.stringify({
-                                registration_ids: chunk,
-                                notification: {
-                                    title: title,
-                                    body: body,
-                                    icon: "https://yacente.pages.dev/icons/icon-192-rounded.png",
-                                    badge: "https://yacente.pages.dev/icons/icon-192-rounded.png",
-                                    click_action: "https://yacente.pages.dev/"
+                                message: {
+                                    token: token,
+                                    notification: {
+                                        title: title,
+                                        body: body
+                                    },
+                                    data: {
+                                        click_action: "https://yacente.pages.dev/"
+                                    },
+                                    webpush: {
+                                        fcm_options: {
+                                            link: "https://yacente.pages.dev/"
+                                        }
+                                    }
                                 }
                             })
                         })
-                        .then(res => res.json())
-                        .then(data => {
-                            console.log("[FCM] Lote de notificaciones push enviado con éxito:", data);
+                        .then(res => {
+                            if (!res.ok) {
+                                return res.text().then(text => {
+                                    console.error(`[FCM] Error al enviar a token ${token}:`, text);
+                                });
+                            }
+                            return res.json().then(data => {
+                                console.log("[FCM] Notificación enviada con éxito a dispositivo:", data);
+                            });
                         })
                         .catch(err => {
-                            console.error("[FCM] Error en la petición HTTP POST de FCM:", err);
+                            console.error("[FCM] Error en la petición HTTP POST de FCM v1:", err);
                         });
-                    }
+                    });
                 });
         })
         .catch(err => console.error("[FCM] Error obteniendo lista de músicos para notificaciones push:", err));
