@@ -28,7 +28,8 @@ self.addEventListener('push', (event) => {
         body: body,
         icon: "./icons/icon-192-rounded.png",
         badge: "./icons/icon-192-rounded.png",
-        vibrate: [200, 100, 200], // Patrón de vibración (200ms encendido, 100ms apagado, 200ms encendido)
+        vibrate: [100, 50, 100],   // Patrón de vibración estándar
+        sound: 'default',          // Sonido por defecto del dispositivo
         requireInteraction: true,  // Mantiene la alerta en pantalla hasta que se interactúe
         data: {
             click_action: clickAction
@@ -66,7 +67,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v243";
+const CACHE_NAME = "yacente-v244";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
