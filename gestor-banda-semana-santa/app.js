@@ -494,6 +494,7 @@ let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
+let unsubPushConfig = null;
 
 // Inicializa Firebase
 function initFirebase() {
@@ -891,6 +892,19 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync formación desfile:", err);
     });
+
+    // Escucha de configuración Push (VAPID Key pública para los músicos)
+    unsubPushConfig = db.collection("config").doc("push").onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.vapidKey) {
+                localStorage.setItem("yacente_vapid_key", data.vapidKey);
+                console.log("[FCM] VAPID Key sincronizada desde Firestore");
+            }
+        }
+    }, err => {
+        console.error("Error sync push config:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -904,6 +918,7 @@ function stopCloudSync() {
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
+    if (unsubPushConfig) { unsubPushConfig(); unsubPushConfig = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1864,6 +1879,15 @@ function setupEventListeners() {
             
             localStorage.setItem("yacente_vapid_key", vapidKey);
             localStorage.setItem("yacente_service_account_json", saJsonStr);
+            
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("config").doc("push").set({
+                    vapidKey: vapidKey
+                }, { merge: true })
+                .then(() => console.log("[FCM] VAPID Key guardada en Firestore para músicos"))
+                .catch(err => console.error("[FCM] Error al guardar VAPID Key en Firestore:", err));
+            }
             
             showToast("Configuración push guardada correctamente", "success");
         });
