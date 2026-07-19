@@ -4694,9 +4694,20 @@ function renderMusicianDetailContent() {
     const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 0;
 
     // Tarjetas resumen
-    document.getElementById("detail-attendance-pct").innerText = `${pct}%`;
+    const pctEl = document.getElementById("detail-attendance-pct");
+    pctEl.innerText = `${pct}%`;
+    if (pct < 50) {
+        pctEl.style.setProperty("color", "#E74C3C", "important");
+    } else if (pct < 80) {
+        pctEl.style.setProperty("color", "#F1C40F", "important");
+    } else {
+        pctEl.style.setProperty("color", "#2ECC71", "important");
+    }
+
     document.getElementById("detail-total-sessions").innerText = totalSessions;
+    document.getElementById("detail-total-attended").innerText = presents;
     document.getElementById("detail-total-absences").innerText = totalAbsent;
+    document.getElementById("detail-total-justified").innerText = absentJustified;
 
     // Gráfico de sectores (pie chart)
     const pieSvg = document.getElementById("detail-pie-svg");

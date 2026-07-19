@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=256">
+    <link rel="stylesheet" href="style.css?v=257">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2348,18 +2348,26 @@
             </div>
 
             <!-- Resumen visual -->
-            <div class="stats-overview-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 16px;">
-                <div class="card stat-overview-card" style="padding: 14px;">
-                    <h3 style="font-size: 0.75rem;">Asistencia</h3>
-                    <div class="huge-number" id="detail-attendance-pct" style="font-size: 1.8rem;">0%</div>
+            <div class="stats-overview-grid" style="grid-template-columns: repeat(5, 1fr); margin-bottom: 16px; gap: 6px;">
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Asistencia</h3>
+                    <div class="huge-number" id="detail-attendance-pct" style="font-size: 1.35rem; font-weight: 700;">0%</div>
                 </div>
-                <div class="card stat-overview-card" style="padding: 14px;">
-                    <h3 style="font-size: 0.75rem;">Sesiones</h3>
-                    <div class="huge-number" id="detail-total-sessions" style="font-size: 1.8rem;">0</div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Sesiones</h3>
+                    <div class="huge-number" id="detail-total-sessions" style="font-size: 1.35rem; font-weight: 700; color: #D4AF37;">0</div>
                 </div>
-                <div class="card stat-overview-card" style="padding: 14px;">
-                    <h3 style="font-size: 0.75rem;">Faltas</h3>
-                    <div class="huge-number" id="detail-total-absences" style="font-size: 1.8rem; color: var(--color-absent);">0</div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Asistencias</h3>
+                    <div class="huge-number" id="detail-total-attended" style="font-size: 1.35rem; font-weight: 700; color: var(--color-present);">0</div>
+                </div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Faltas</h3>
+                    <div class="huge-number" id="detail-total-absences" style="font-size: 1.35rem; font-weight: 700; color: var(--color-absent);">0</div>
+                </div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Justificadas</h3>
+                    <div class="huge-number" id="detail-total-justified" style="font-size: 1.35rem; font-weight: 700; color: var(--color-justified);">0</div>
                 </div>
             </div>
 
@@ -2817,12 +2825,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=256"></script>
+    <script src="app.js?v=257"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=256")
+                navigator.serviceWorker.register("sw.js?v=257")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
