@@ -283,13 +283,6 @@ function initApp() {
             const mobNav = document.getElementById("component-mobile-nav");
             if (mobNav) mobNav.classList.remove("hidden");
             renderActiveSection("section-componente-ficha");
-            
-            // Auto-request notifications on load
-            if ("Notification" in window && Notification.permission === "default") {
-                Notification.requestPermission().then(() => {
-                    renderComponentFicha();
-                });
-            }
         } else {
             document.body.classList.remove("component-portal");
             renderActiveSection("section-pasar-lista");
