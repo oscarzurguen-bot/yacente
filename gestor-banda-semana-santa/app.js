@@ -9543,6 +9543,64 @@ function calculateMusicianStreak(musicianId) {
     return streak;
 }
 
+function updateNotificationPrompts(musicianId) {
+    if (!musicianId) return;
+    
+    const updateCard = (cardId, statusId, btnId) => {
+        const card = document.getElementById(cardId);
+        const status = document.getElementById(statusId);
+        const btn = document.getElementById(btnId);
+        
+        if (!card || !status || !btn) return;
+        
+        if (!("Notification" in window)) {
+            status.innerText = "No soportado en este navegador.";
+            btn.style.display = "none";
+            card.style.display = "flex";
+        } else if (Notification.permission === "granted") {
+            card.style.display = "none";
+        } else {
+            card.style.display = "flex";
+            
+            if (Notification.permission === "denied") {
+                status.innerText = "Notificaciones bloqueadas en tu navegador. Por favor, habilítalas en los ajustes del sitio.";
+                btn.innerText = "Comprobar y Activar";
+                btn.className = "btn btn-secondary btn-sm";
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            } else {
+                status.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
+                btn.innerText = "Habilitar Notificaciones";
+                btn.className = "btn btn-primary btn-sm";
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            }
+            
+            if (btn.tagName === "BUTTON") {
+                // Avoid duplicating listeners by replacing with a clone
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                newBtn.addEventListener("click", () => {
+                    if (Notification.permission === "denied") {
+                        showToast("Siguen bloqueadas. Haz clic en el icono del candado o configuración al lado de la barra de direcciones, cambia el permiso de Notificaciones a 'Permitir' y pulsa aquí de nuevo.", "warning");
+                    } else {
+                        Notification.requestPermission().then(permission => {
+                            updateNotificationPrompts(musicianId);
+                            if (permission === "granted") {
+                                showToast("¡Notificaciones de escritorio habilitadas!", "success");
+                                registerDeviceToken(musicianId);
+                            }
+                        });
+                    }
+                });
+            }
+        }
+    };
+    
+    updateCard("comp-notifications-card", "comp-notifications-status", "btn-comp-enable-notifications");
+    updateCard("comp-notifications-dashboard-card", "comp-notifications-dashboard-status", "btn-comp-dashboard-enable-notifications");
+}
+
 function renderComponentFicha() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
@@ -9712,54 +9770,7 @@ function renderComponentFicha() {
     }
 
     // Notificaciones Card State Handling
-    const notifCard = document.getElementById("comp-notifications-card");
-    const notifStatus = document.getElementById("comp-notifications-status");
-    const btnEnableNotif = document.getElementById("btn-comp-enable-notifications");
-    
-    if (notifCard && notifStatus && btnEnableNotif) {
-        if (!("Notification" in window)) {
-            notifStatus.innerText = "No soportado en este navegador.";
-            btnEnableNotif.style.display = "none";
-            notifCard.style.display = "flex";
-        } else if (Notification.permission === "granted") {
-            notifCard.style.display = "none";
-        } else {
-            notifCard.style.display = "flex";
-            
-            if (Notification.permission === "denied") {
-                notifStatus.innerText = "Notificaciones bloqueadas en tu navegador. Por favor, habilítalas en los ajustes del sitio.";
-                btnEnableNotif.innerText = "Comprobar y Activar";
-                btnEnableNotif.className = "btn btn-secondary btn-sm";
-                btnEnableNotif.disabled = false;
-                btnEnableNotif.style.opacity = "1";
-            } else {
-                notifStatus.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
-                btnEnableNotif.innerText = "Habilitar Notificaciones";
-                btnEnableNotif.className = "btn btn-primary btn-sm";
-                btnEnableNotif.disabled = false;
-                btnEnableNotif.style.opacity = "1";
-            }
-            
-            if (btnEnableNotif.tagName === "BUTTON") {
-                // Avoid duplicating listeners by replacing with a clone
-                const newBtn = btnEnableNotif.cloneNode(true);
-                btnEnableNotif.parentNode.replaceChild(newBtn, btnEnableNotif);
-                newBtn.addEventListener("click", () => {
-                    if (Notification.permission === "denied") {
-                        showToast("Siguen bloqueadas. Haz clic en el icono del candado o configuración al lado de la barra de direcciones, cambia el permiso de Notificaciones a 'Permitir' y pulsa aquí de nuevo.", "warning");
-                    } else {
-                        Notification.requestPermission().then(permission => {
-                            renderComponentFicha();
-                            if (permission === "granted") {
-                                showToast("¡Notificaciones de escritorio habilitadas!", "success");
-                                registerDeviceToken(musicianId);
-                            }
-                        });
-                    }
-                });
-            }
-        }
-    }
+    updateNotificationPrompts(musicianId);
 
     // Actualizar badge de notificaciones
     updateNotificationsBadge();
@@ -10051,6 +10062,9 @@ function renderComponentEventos() {
     
     const musician = state.musicians.find(m => m.id === musicianId);
     if (!musician) return;
+    
+    // Sincronizar alertas de notificación en el panel de inicio del músico
+    updateNotificationPrompts(musicianId);
     
     const container = document.getElementById("componente-eventos-lista");
     if (!container) return;
