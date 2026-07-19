@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=252">
+    <link rel="stylesheet" href="style.css?v=253">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1176,7 +1176,6 @@
                             </svg>
                         </div>
                         <div class="stat-summary-label">Asistencia General</div>
-                        <div id="comp-attendance-level-badge" style="font-size: 0.65rem; font-weight: 700; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; padding: 2px 8px; border-radius: 4px; border: 1px solid transparent;">-</div>
                     </div>
 
                     <div class="card stat-numbers-card">
@@ -2818,12 +2817,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=252"></script>
+    <script src="app.js?v=253"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=252")
+                navigator.serviceWorker.register("sw.js?v=253")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
