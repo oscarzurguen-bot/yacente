@@ -707,7 +707,8 @@ function startCloudSync() {
                             if (sessionData.type === "ensayo") {
                                 const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
                                 const locationVal = sessionData.location || "Parking";
-                                body = `${subtypeText} - ${formattedDate} (${locationVal})`;
+                                const timeStr = sessionData.time ? ` ${sessionData.time}` : "";
+                                body = `${subtypeText}${timeStr} - ${formattedDate} (${locationVal})`;
                             } else {
                                 body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
                             }
@@ -9654,6 +9655,13 @@ function renderComponentFicha() {
     const progressPath = document.getElementById("comp-progress-path");
     if (progressPath) {
         progressPath.setAttribute("stroke-dasharray", `${Math.round(attendancePct)}, 100`);
+        if (attendancePct < 50) {
+            progressPath.style.stroke = "var(--color-absent)";
+        } else if (attendancePct < 80) {
+            progressPath.style.stroke = "#F1C40F";
+        } else {
+            progressPath.style.stroke = "var(--color-present)";
+        }
     }
     
     const progressCircle = document.getElementById("comp-progress-circle");
