@@ -9091,16 +9091,16 @@ function getMusicianMedalsData(musicianId) {
         descEstudio = `Oro conseguido: Domina las ${totalMarchas} marchas del repertorio.`;
         unlockedEstudio = true;
         nextGoalEstudio = totalMarchas;
-    } else if (greenMarchas >= 70) {
+    } else if (greenMarchas >= 60) {
         starsEstudio = 2;
-        descEstudio = `Plata conseguido: Domina 70 marchas del repertorio. Domina todas (${totalMarchas}) para Oro.`;
+        descEstudio = `Plata conseguido: Domina 60 marchas del repertorio. Domina todas (${totalMarchas}) para Oro.`;
         unlockedEstudio = true;
         nextGoalEstudio = totalMarchas;
     } else if (greenMarchas >= 50) {
         starsEstudio = 1;
-        descEstudio = "Bronce conseguido: Domina 50 marchas del repertorio. Domina 70 para Plata.";
+        descEstudio = "Bronce conseguido: Domina 50 marchas del repertorio. Domina 60 para Plata.";
         unlockedEstudio = true;
-        nextGoalEstudio = 70;
+        nextGoalEstudio = 60;
     } else {
         starsEstudio = 0;
         descEstudio = "Domina (verde) 50 marchas del repertorio para desbloquear Bronce.";
