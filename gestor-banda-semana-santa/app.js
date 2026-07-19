@@ -3818,28 +3818,22 @@ function renderPlantillaTable() {
                     <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
                 </td>
                 <td style="white-space: nowrap; text-align: center; width: 100px;">
-                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; vertical-align: middle;">
-                        <span class="pin-status-icon" title="${musician.pin ? 'PIN configurado' : 'Sin PIN (Auto-registro activo)'}">
-                            ${musician.pin ? `
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); display: block;">
+                    <div style="display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">
+                        ${musician.pin ? `
+                            <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="PIN configurado. Pulsa para borrar/restablecer PIN">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lock-svg" style="color: var(--text-muted); display: block;">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
-                            ` : `
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); opacity: 0.45; display: block;">
+                            </button>
+                        ` : `
+                            <div style="padding: 4px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.45;" title="Sin PIN (Auto-registro activo)">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); display: block;">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
                                 </svg>
-                            `}
-                        </span>
-                        ${musician.pin ? `
-                            <button class="btn-reset-pin-row" data-id="${musician.id}" title="Borrar PIN (Restablecer)" style="margin: 0; padding: 2px;">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                </svg>
-                            </button>
-                        ` : ''}
+                            </div>
+                        `}
                     </div>
                 </td>
                 <td style="white-space: nowrap; width: 100px; text-align: center;">
@@ -3872,7 +3866,7 @@ function renderPlantillaTable() {
                 deleteMusician(musician.id);
             });
 
-            const resetPinBtn = tr.querySelector(".btn-reset-pin-row");
+            const resetPinBtn = tr.querySelector(".btn-reset-pin-row-padlock");
             if (resetPinBtn) {
                 resetPinBtn.addEventListener("click", () => {
                     if (confirm(`¿Estás seguro de que quieres restablecer el PIN de ${musician.name}? Volverá a registrarse con el siguiente PIN que introduzca.`)) {

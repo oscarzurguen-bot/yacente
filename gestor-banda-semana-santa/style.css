@@ -3596,25 +3596,22 @@ body.component-portal #candle-tribute-container {
     vertical-align: middle;
     display: inline-block;
 }
-.btn-reset-pin-row {
+.btn-reset-pin-row-padlock {
     background: none;
     border: none;
-    color: var(--text-muted);
-    cursor: pointer;
     padding: 4px;
-    border-radius: 4px;
+    cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    vertical-align: middle;
-    margin-left: 4px;
+    border-radius: 4px;
     transition: all 0.2s ease;
-    opacity: 0.6;
 }
-.btn-reset-pin-row:hover {
+.btn-reset-pin-row-padlock:hover {
     background-color: rgba(255, 255, 255, 0.08);
-    color: var(--text-color);
-    opacity: 1;
+}
+.btn-reset-pin-row-padlock:hover .lock-svg {
+    color: var(--color-absent) !important;
 }
 
 /* Optimizaciones extras para pantallas móviles muy pequeñas */
