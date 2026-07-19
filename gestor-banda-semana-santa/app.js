@@ -4706,7 +4706,7 @@ function renderMusicianDetailContent() {
 
     document.getElementById("detail-total-sessions").innerText = totalSessions;
     document.getElementById("detail-total-attended").innerText = presents;
-    document.getElementById("detail-total-absences").innerText = totalAbsent;
+    document.getElementById("detail-total-absences").innerText = absentUnjustified;
     document.getElementById("detail-total-justified").innerText = absentJustified;
 
     // Gráfico de sectores (pie chart)
