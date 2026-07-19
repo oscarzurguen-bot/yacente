@@ -9595,18 +9595,37 @@ function renderComponentFicha() {
     document.getElementById("comp-stat-attended").innerText = attended;
     document.getElementById("comp-stat-absent").innerText = absent;
     document.getElementById("comp-stat-justified").innerText = justified;
-    document.getElementById("comp-percentage-text").textContent = `${Math.round(attendancePct)}%`;
+    let strokeColor = "#2ECC71"; // green default
+    let glowColor = "rgba(46, 204, 113, 0.4)";
+    let levelText = "Alta (Excelente)";
+    let badgeBg = "rgba(46, 204, 113, 0.1)";
+    let badgeBorder = "rgba(46, 204, 113, 0.25)";
+
+    if (attendancePct < 50) {
+        strokeColor = "#E74C3C"; // red
+        glowColor = "rgba(231, 76, 60, 0.4)";
+        levelText = "Baja (Insuficiente)";
+        badgeBg = "rgba(231, 76, 60, 0.1)";
+        badgeBorder = "rgba(231, 76, 60, 0.25)";
+    } else if (attendancePct < 80) {
+        strokeColor = "#F1C40F"; // yellow
+        glowColor = "rgba(241, 196, 15, 0.4)";
+        levelText = "Media (Aceptable)";
+        badgeBg = "rgba(241, 196, 15, 0.1)";
+        badgeBorder = "rgba(241, 196, 15, 0.25)";
+    }
+
+    const percentageText = document.getElementById("comp-percentage-text");
+    if (percentageText) {
+        percentageText.textContent = `${Math.round(attendancePct)}%`;
+        percentageText.style.setProperty("fill", strokeColor, "important");
+    }
     
     const progressPath = document.getElementById("comp-progress-path");
     if (progressPath) {
         progressPath.setAttribute("stroke-dasharray", `${Math.round(attendancePct)}, 100`);
-        let strokeColor = "#2ECC71"; // green
-        if (attendancePct < 50) {
-            strokeColor = "#E74C3C"; // red
-        } else if (attendancePct < 80) {
-            strokeColor = "#F1C40F"; // yellow
-        }
         progressPath.style.setProperty("stroke", strokeColor, "important");
+        progressPath.style.setProperty("filter", `drop-shadow(0px 0px 4px ${glowColor})`, "important");
     }
     
     const progressCircle = document.getElementById("comp-progress-circle");
@@ -9622,6 +9641,14 @@ function renderComponentFicha() {
                 svgEl.classList.add("green");
             }
         }
+    }
+
+    const levelBadge = document.getElementById("comp-attendance-level-badge");
+    if (levelBadge) {
+        levelBadge.textContent = levelText;
+        levelBadge.style.setProperty("color", strokeColor, "important");
+        levelBadge.style.setProperty("background-color", badgeBg, "important");
+        levelBadge.style.setProperty("border-color", badgeBorder, "important");
     }
     
     // --- EVALUAR MEDALLAS / INSIGNIAS ---
