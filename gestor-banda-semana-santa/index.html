@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=250">
+    <link rel="stylesheet" href="style.css?v=251">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1102,16 +1102,7 @@
                         </div>
                     </div>
 
-                    <!-- Limpieza de Datos de Prueba -->
-                    <div class="card settings-card" id="clean-demo-card" style="border: 1px solid var(--color-absent); background: rgba(220, 53, 69, 0.05);">
-                        <h3 style="color: var(--color-absent);">Limpieza de Datos de Prueba</h3>
-                        <p class="text-muted" style="margin-bottom: 15px;">Si al configurar la nube en un dispositivo nuevo se subieron los músicos y marchas de demostración por defecto, pulsa este botón para eliminarlos de Firestore de forma segura.</p>
-                        <div class="settings-buttons">
-                            <button id="btn-clean-demo-data" class="btn" style="background-color: var(--color-absent); color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer;">
-                                Eliminar Músicos y Marchas de Demostración
-                            </button>
-                        </div>
-                    </div>
+
 
                     <!-- Simulador de Formación -->
                     <div class="card settings-card">
@@ -2826,12 +2817,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=250"></script>
+    <script src="app.js?v=251"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=250")
+                navigator.serviceWorker.register("sw.js?v=251")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
