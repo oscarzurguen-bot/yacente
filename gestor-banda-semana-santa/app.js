@@ -1691,6 +1691,9 @@ function setupEventListeners() {
         if (document.getElementById("rehearsal-location-input")) {
             document.getElementById("rehearsal-location-input").value = "Parking";
         }
+        if (document.getElementById("rehearsal-time-input")) {
+            document.getElementById("rehearsal-time-input").value = "";
+        }
         modalRehearsal.classList.add("active");
     });
 
@@ -1734,12 +1737,14 @@ function setupEventListeners() {
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
+        const timeVal = document.getElementById("rehearsal-time-input") ? document.getElementById("rehearsal-time-input").value.trim() : "";
         state.sessionTypes[sessionKey] = { 
             type: "ensayo", 
             subtype: subtype, 
             name: "", 
             convocatedVoices: convocatedVoices,
-            location: locationVal
+            location: locationVal,
+            time: timeVal
         };
         initializeAttendanceForDate(sessionKey, convocatedVoices);
         
@@ -2209,6 +2214,9 @@ function setupEventListeners() {
         
         // Reset defaults
         document.getElementById("quick-session-actuacion-name").value = "";
+        if (document.getElementById("quick-session-time")) {
+            document.getElementById("quick-session-time").value = "";
+        }
         
         const sessionInfo = state.sessionTypes[date];
         if (sessionInfo) {
@@ -2235,6 +2243,9 @@ function setupEventListeners() {
                 if (document.getElementById("quick-session-location")) {
                     document.getElementById("quick-session-location").value = sessionInfo.location || "Parking";
                 }
+                if (document.getElementById("quick-session-time")) {
+                    document.getElementById("quick-session-time").value = sessionInfo.time || "";
+                }
             }
         } else {
             // Default when not created
@@ -2260,13 +2271,16 @@ function setupEventListeners() {
         const type = quickSessionTypeSelect.value;
         const actuacionGroup = document.getElementById("quick-session-actuacion-group");
         const locationGroup = document.getElementById("quick-session-location-group");
+        const timeGroup = document.getElementById("quick-session-time-group");
         
         if (type === "actuacion") {
             actuacionGroup.classList.remove("hidden");
             if (locationGroup) locationGroup.classList.add("hidden");
+            if (timeGroup) timeGroup.classList.add("hidden");
         } else {
             actuacionGroup.classList.add("hidden");
             if (locationGroup) locationGroup.classList.remove("hidden");
+            if (timeGroup) timeGroup.classList.remove("hidden");
         }
     }
     
@@ -2283,27 +2297,28 @@ function setupEventListeners() {
         
         if (type.startsWith("ensayo-")) {
             const locationVal = document.getElementById("quick-session-location") ? document.getElementById("quick-session-location").value : "Parking";
+            const timeVal = document.getElementById("quick-session-time") ? document.getElementById("quick-session-time").value.trim() : "";
             
             if (type === "ensayo-general") {
-                newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal };
+                newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal, time: timeVal };
             } else if (type === "ensayo-trompetas1") {
                 convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
-                newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-bajos") {
                 convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
-                newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-trompetas2y3") {
                 convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
-                newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-cornetas") {
                 convocatedVoices = ["Cornetas"];
-                newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-percusion") {
                 convocatedVoices = ["Tambores", "Bombos", "Platos"];
-                newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-primeras") {
                 convocatedVoices = ["Trompetas 1ª", "Cornetas"];
-                newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices, location: locationVal }; // Fallback
+                newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices, location: locationVal, time: timeVal }; // Fallback
             }
         } else if (type === "actuacion") {
             const actuacionName = document.getElementById("quick-session-actuacion-name").value.trim();
@@ -3112,7 +3127,7 @@ function renderEnsayosList() {
             currentMonthStr = ""; // reset month when year changes
             const yearHeaderTr = document.createElement("tr");
             yearHeaderTr.innerHTML = `
-                <td colspan="7" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
+                <td colspan="8" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
                     Año ${yyyy}
                 </td>
             `;
@@ -3124,7 +3139,7 @@ function renderEnsayosList() {
             currentMonthStr = monthName;
             const monthHeaderTr = document.createElement("tr");
             monthHeaderTr.innerHTML = `
-                <td colspan="7" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
+                <td colspan="8" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
                     ${monthName}
                 </td>
             `;
@@ -3191,13 +3206,16 @@ function renderEnsayosList() {
                 <strong>${formatDateShortSpanish(date)}</strong>
             </td>
             <td>
+                <span>${sessionInfo && sessionInfo.time ? sessionInfo.time : "-"}</span>
+            </td>
+            <td>
                 <span>${locationVal}</span>
             </td>
             <td style="white-space: nowrap;">
                 ${typeLabel}
             </td>
             <td>
-                <span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos
+                <span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total}
             </td>
             <td style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
@@ -3298,7 +3316,8 @@ function openRehearsalDetailModal(date) {
         subtypeText = `Ensayo por Voces (Convocadas: ${convocated.join(", ")})`;
     }
     const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
-    document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}`;
+    const timeVal = sessionInfo && sessionInfo.time ? ` | Hora: ${sessionInfo.time}` : "";
+    document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}${timeVal}`;
 
     // Marchas
     const marchasContainer = document.getElementById("rehearsal-detail-marchas");
@@ -5503,8 +5522,25 @@ function setupFirebaseListeners() {
                 })
                 .then(() => {
                     showToast("Contraseña de seguridad configurada en la nube", "success");
-                    // Ofrecer migración de datos
-                    syncLocalToCloud();
+                    
+                    // Verificar si ya existen músicos en la nube antes de subir los datos locales (evita mezclar mock data)
+                    db.collection("musicians").limit(1).get()
+                    .then((querySnapshot) => {
+                        if (querySnapshot.empty) {
+                            console.log("Firestore está vacío. Sincronizando datos locales iniciales...");
+                            syncLocalToCloud();
+                        } else {
+                            console.log("Firestore ya contiene datos. Omitiendo sincronización local para evitar mezclar datos.");
+                            showToast("Conectado con éxito. Cargando base de datos existente...", "success");
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error al comprobar datos existentes en Firestore:", err);
+                        window.location.reload();
+                    });
                 })
                 .catch(err => {
                     console.error("Error al guardar hash en Firestore:", err);
@@ -6369,6 +6405,9 @@ function renderCalendar() {
             document.getElementById("quick-session-type").value = "ensayo-general";
             if (document.getElementById("quick-session-location")) {
                 document.getElementById("quick-session-location").value = "Parking";
+            }
+            if (document.getElementById("quick-session-time")) {
+                document.getElementById("quick-session-time").value = "";
             }
             
             // Hide actuation name field by default
@@ -9617,6 +9656,21 @@ function renderComponentFicha() {
         progressPath.setAttribute("stroke-dasharray", `${Math.round(attendancePct)}, 100`);
     }
     
+    const progressCircle = document.getElementById("comp-progress-circle");
+    if (progressCircle) {
+        const svgEl = progressCircle.querySelector(".circular-chart");
+        if (svgEl) {
+            svgEl.classList.remove("gold", "red", "yellow", "green");
+            if (attendancePct < 50) {
+                svgEl.classList.add("red");
+            } else if (attendancePct < 80) {
+                svgEl.classList.add("yellow");
+            } else {
+                svgEl.classList.add("green");
+            }
+        }
+    }
+    
     // --- EVALUAR MEDALLAS / INSIGNIAS ---
     const medalsData = getMusicianMedalsData(musicianId);
     medalsData.forEach(medal => {
@@ -9945,7 +9999,10 @@ function renderComponentHistorial() {
             typeLabel = "Actuación";
         }
         
-        const sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        if (session.type === "ensayo" && session.time) {
+            sessionTitle += ` ${session.time}`;
+        }
         
         const row = document.createElement("div");
         row.className = "comp-session-row";
@@ -10077,7 +10134,10 @@ function renderComponentEventos() {
             typeLabel = "Actuación";
         }
         
-        const sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        if (session.type === "ensayo" && session.time) {
+            sessionTitle += ` ${session.time}`;
+        }
         
         const row = document.createElement("div");
         row.className = "comp-session-row";

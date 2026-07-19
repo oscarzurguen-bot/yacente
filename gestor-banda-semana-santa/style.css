@@ -3164,6 +3164,15 @@ body.component-portal #candle-tribute-container {
 .circular-chart.gold .circle {
     stroke: #D4AF37;
 }
+.circular-chart.red .circle {
+    stroke: var(--color-absent);
+}
+.circular-chart.yellow .circle {
+    stroke: #F1C40F;
+}
+.circular-chart.green .circle {
+    stroke: var(--color-present);
+}
 .percentage {
     fill: #fff;
     font-family: 'Outfit', sans-serif;
