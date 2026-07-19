@@ -1838,40 +1838,60 @@ function setupEventListeners() {
         showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
     });
 
-    // Guardar configuración de notificaciones push
-    const formPushConfig = document.getElementById("form-push-config");
-    if (formPushConfig) {
-        formPushConfig.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const vapidKey = document.getElementById("push-vapid-key").value.trim();
-            const saJsonStr = document.getElementById("push-service-account").value.trim();
-            
-            if (saJsonStr) {
-                try {
-                    const sa = JSON.parse(saJsonStr);
-                    if (!sa.project_id || !sa.private_key || !sa.client_email) {
-                        showToast("El JSON de la Cuenta de Servicio no tiene el formato correcto (faltan campos críticos)", "error");
-                        return;
-                    }
-                } catch (err) {
-                    showToast("El contenido de la Cuenta de Servicio no es un JSON válido", "error");
-                    return;
-                }
+    // Botón para limpiar datos de prueba de Firestore
+    const btnCleanDemo = document.getElementById("btn-clean-demo-data");
+    if (btnCleanDemo) {
+        btnCleanDemo.addEventListener("click", () => {
+            if (!isCloudActive()) {
+                showToast("Esta opción solo funciona si tienes la sincronización en la nube activa.", "warning");
+                return;
             }
             
-            localStorage.setItem("yacente_vapid_key", vapidKey);
-            localStorage.setItem("yacente_service_account_json", saJsonStr);
-            
-            if (isCloudActive()) {
-                const db = firebase.firestore();
-                db.collection("config").doc("push").set({
-                    vapidKey: vapidKey
-                }, { merge: true })
-                .then(() => console.log("[FCM] VAPID Key guardada en Firestore para músicos"))
-                .catch(err => console.error("[FCM] Error al guardar VAPID Key en Firestore:", err));
+            if (!confirm("¿Seguro que deseas eliminar los 23 músicos de prueba (Carlos Ruiz Serna, Daniel Benítez, etc.) y las 4 marchas de prueba (Amarguras, Soleá dame la mano, La Estrella Sublime, Rocío) de tu base de datos en la nube? Esta acción no afectará a tus músicos y marchas reales.")) {
+                return;
             }
             
-            showToast("Configuración push guardada correctamente", "success");
+            showToast("Iniciando eliminación de datos de prueba...", "info");
+            const db = firebase.firestore();
+            const batch = db.batch();
+            
+            // 1. Eliminar músicos de prueba (mus-1 a mus-23)
+            for (let i = 1; i <= 23; i++) {
+                const ref = db.collection("musicians").doc("mus-" + i);
+                batch.delete(ref);
+                
+                const refTokens = db.collection("musicianTokens").doc("mus-" + i);
+                batch.delete(refTokens);
+            }
+            
+            // 2. Eliminar marchas de prueba (mar-1 a mar-4)
+            for (let i = 1; i <= 4; i++) {
+                const ref = db.collection("marchas").doc("mar-" + i);
+                batch.delete(ref);
+            }
+            
+            // 3. Eliminar fechas de prueba (2026-06-15, 2026-06-18, 2026-06-22, 2026-06-25, 2026-06-29)
+            const demoDates = ["2026-06-15", "2026-06-18", "2026-06-22", "2026-06-25", "2026-06-29"];
+            demoDates.forEach(date => {
+                const refAtt = db.collection("attendance").doc(date);
+                batch.delete(refAtt);
+                const refSess = db.collection("sessionTypes").doc(date);
+                batch.delete(refSess);
+                const refPlayed = db.collection("playedMarchas").doc(date);
+                batch.delete(refPlayed);
+            });
+            
+            batch.commit()
+            .then(() => {
+                showToast("Datos de prueba eliminados correctamente. Recargando la aplicación...", "success");
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            })
+            .catch(err => {
+                console.error("Error al eliminar datos de prueba:", err);
+                showToast("Error al eliminar datos de prueba de Firestore: " + err.message, "error");
+            });
         });
     }
 
