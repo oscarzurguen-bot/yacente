@@ -11168,26 +11168,28 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
             
             console.log(`[FCM] Se enviará notificación push a ${convocatedMusicians.length} músicos.`);
             
-            // 2. Obtener tokens de dispositivo para los músicos convocados
+            // 2. Obtener tokens de dispositivo para los músicos convocados, manteniendo el mapeo al ID del músico
             const tokenPromises = convocatedMusicians.map(mId => 
                 db.collection("musicianTokens").doc(mId).get()
-                    .then(doc => doc.exists ? (doc.data().tokens || []) : [])
+                    .then(doc => doc.exists ? { mId: mId, tokens: doc.data().tokens || [] } : null)
                     .catch(err => {
                         console.error(`[FCM] Error leyendo tokens del músico ${mId}:`, err);
-                        return [];
+                        return null;
                     })
             );
             
             Promise.all(tokenPromises)
                 .then(async (results) => {
-                    // Planarizar y eliminar duplicados/vacíos
-                    const allTokens = [...new Set(results.flat().filter(Boolean))];
-                    if (allTokens.length === 0) {
+                    // Filtrar vacíos y agrupar tokens a procesar
+                    const userTokensMap = results.filter(Boolean);
+                    const totalTokensCount = userTokensMap.reduce((acc, curr) => acc + curr.tokens.length, 0);
+                    
+                    if (totalTokensCount === 0) {
                         console.log("[FCM] No hay tokens de dispositivos registrados para los músicos convocados.");
                         return;
                     }
                     
-                    console.log(`[FCM] Solicitando token de acceso OAuth2 para enviar push a ${allTokens.length} dispositivos...`);
+                    console.log(`[FCM] Solicitando token de acceso OAuth2 para enviar push...`);
                     
                     let accessToken;
                     try {
@@ -11197,7 +11199,7 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
                         return;
                     }
                     
-                    console.log(`[FCM] Enviando push a ${allTokens.length} dispositivos mediante FCM HTTP v1.`);
+                    console.log(`[FCM] Enviando push mediante FCM HTTP v1.`);
                     
                     // 3. Preparar payload
                     const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
@@ -11213,43 +11215,60 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
                     // 4. Enviar mediante la API HTTP v1 de FCM
                     const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
                     
-                    allTokens.forEach(token => {
-                        fetch(fcmUrl, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": "Bearer " + accessToken
-                            },
-                            body: JSON.stringify({
-                                message: {
-                                    token: token,
-                                    notification: {
-                                        title: title,
-                                        body: body
-                                    },
-                                    data: {
-                                        click_action: "https://yacente.pages.dev/"
-                                    },
-                                    webpush: {
-                                        fcm_options: {
-                                            link: "https://yacente.pages.dev/"
+                    userTokensMap.forEach(userMap => {
+                        const mId = userMap.mId;
+                        userMap.tokens.filter(Boolean).forEach(token => {
+                            fetch(fcmUrl, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "Authorization": "Bearer " + accessToken
+                                },
+                                body: JSON.stringify({
+                                    message: {
+                                        token: token,
+                                        notification: {
+                                            title: title,
+                                            body: body
+                                        },
+                                        data: {
+                                            click_action: "https://yacente.pages.dev/"
+                                        },
+                                        webpush: {
+                                            fcm_options: {
+                                                link: "https://yacente.pages.dev/"
+                                            }
                                         }
                                     }
-                                }
+                                })
                             })
-                        })
-                        .then(res => {
-                            if (!res.ok) {
-                                return res.text().then(text => {
-                                    console.error(`[FCM] Error al enviar a token ${token}:`, text);
+                            .then(res => {
+                                if (!res.ok) {
+                                    return res.text().then(text => {
+                                        console.error(`[FCM] Error al enviar a token ${token}:`, text);
+                                        
+                                        // Auto-limpieza de tokens obsoletos (404 o UNREGISTERED)
+                                        try {
+                                            const errorData = JSON.parse(text);
+                                            const errorCode = errorData.error && errorData.error.details && errorData.error.details[0] && errorData.error.details[0].errorCode;
+                                            if (res.status === 404 || errorCode === "UNREGISTERED") {
+                                                console.log(`[FCM] Detectado token obsoleto, procediendo a eliminarlo para músico ${mId}`);
+                                                db.collection("musicianTokens").doc(mId).update({
+                                                    tokens: firebase.firestore.FieldValue.arrayRemove(token)
+                                                }).catch(err => console.error("[FCM] Error al auto-limpiar token:", err));
+                                            }
+                                        } catch (parseErr) {
+                                            // Si no es JSON, no hacemos nada
+                                        }
+                                    });
+                                }
+                                return res.json().then(data => {
+                                    console.log("[FCM] Notificación enviada con éxito a dispositivo:", data);
                                 });
-                            }
-                            return res.json().then(data => {
-                                console.log("[FCM] Notificación enviada con éxito a dispositivo:", data);
+                            })
+                            .catch(err => {
+                                console.error("[FCM] Error en la petición HTTP POST de FCM v1:", err);
                             });
-                        })
-                        .catch(err => {
-                            console.error("[FCM] Error en la petición HTTP POST de FCM v1:", err);
                         });
                     });
                 });
