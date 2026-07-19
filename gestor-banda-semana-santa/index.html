@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=239">
+    <link rel="stylesheet" href="style.css?v=240">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2834,23 +2834,18 @@
         </a>
     </nav>
 
-    <script src="app.js?v=239"></script>
+    <script src="app.js?v=240"></script>
     <script>
-        // Desregistrar Service Worker y borrar cachés para desarrollo
+        // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                for (let registration of registrations) {
-                    registration.unregister().then(() => {
-                        console.log("[PWA] Service Worker desregistrado para forzar recarga de cambios.");
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("sw.js?v=240")
+                    .then((registration) => {
+                        console.log("[PWA] Service Worker registrado correctamente:", registration);
+                    })
+                    .catch((err) => {
+                        console.error("[PWA] Error al registrar Service Worker:", err);
                     });
-                }
-            });
-        }
-        if (window.caches) {
-            caches.keys().then((names) => {
-                for (let name of names) {
-                    caches.delete(name);
-                }
             });
         }
     </script>

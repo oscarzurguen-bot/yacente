@@ -10985,23 +10985,35 @@ function registerDeviceToken(musicianId) {
         }
         
         const messaging = firebase.messaging();
-        messaging.getToken({ vapidKey: vapidKey })
-            .then((currentToken) => {
-                if (currentToken) {
-                    const db = firebase.firestore();
-                    db.collection("musicianTokens").doc(musicianId).set({
-                        tokens: firebase.firestore.FieldValue.arrayUnion(currentToken),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true })
-                    .then(() => console.log("[FCM] Token registrado correctamente en Firestore"))
-                    .catch(err => console.error("[FCM] Error al guardar token en base de datos:", err));
-                } else {
-                    console.warn("[FCM] No se pudo obtener el token del navegador.");
-                }
-            })
-            .catch((err) => {
-                console.error("[FCM] Error al solicitar el token FCM:", err);
+        
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.ready.then((registration) => {
+                messaging.getToken({ 
+                    vapidKey: vapidKey,
+                    serviceWorkerRegistration: registration
+                })
+                .then((currentToken) => {
+                    if (currentToken) {
+                        const db = firebase.firestore();
+                        db.collection("musicianTokens").doc(musicianId).set({
+                            tokens: firebase.firestore.FieldValue.arrayUnion(currentToken),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true })
+                        .then(() => console.log("[FCM] Token registrado correctamente en Firestore"))
+                        .catch(err => console.error("[FCM] Error al guardar token en base de datos:", err));
+                    } else {
+                        console.warn("[FCM] No se pudo obtener el token del navegador.");
+                    }
+                })
+                .catch((err) => {
+                    console.error("[FCM] Error al solicitar el token FCM:", err);
+                });
+            }).catch((err) => {
+                console.error("[FCM] Error esperando a que el Service Worker esté listo:", err);
             });
+        } else {
+            console.warn("[FCM] Service Worker no soportado en este navegador.");
+        }
     } catch (e) {
         console.error("[FCM] Mensajería no soportada o error de inicialización:", e);
     }
