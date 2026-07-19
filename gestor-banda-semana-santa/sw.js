@@ -3,48 +3,7 @@
  * Gestiona el cacheo de recursos para funcionamiento offline y notificaciones push.
  */
 
-// Escucha de eventos push en segundo plano de forma síncrona
-self.addEventListener('push', (event) => {
-    console.log('[SW] Recibido evento push nativo:', event);
-    
-    let payload = {};
-    if (event.data) {
-        try {
-            payload = event.data.json();
-        } catch (e) {
-            console.error('[SW] Error al parsear JSON del push nativo:', e);
-        }
-    }
-    
-    // Extraer datos del payload de Firebase FCM (HTTP v1 o Legacy)
-    const notification = payload.notification || {};
-    const data = payload.data || {};
-    
-    const title = notification.title || "AM Cristo Yacente";
-    const body = notification.body || data.body || "";
-    const clickAction = data.click_action || notification.click_action || "/";
-    
-    const options = {
-        body: body,
-        icon: "./icons/icon-192-rounded.png",
-        badge: "./icons/icon-192-rounded.png",
-        vibrate: [100, 50, 100],   // Patrón de vibración estándar
-        sound: 'default',          // Sonido por defecto del dispositivo
-        requireInteraction: true,  // Mantiene la alerta en pantalla hasta que se interactúe
-        data: {
-            click_action: clickAction
-        }
-    };
-    
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
-});
 
-// Registrar evento pushsubscriptionchange síncronamente
-self.addEventListener('pushsubscriptionchange', (event) => {
-    console.log('[SW] Recibido evento pushsubscriptionchange nativo:', event);
-});
 
 // Escucha evento click en notificaciones de segundo plano para redirigir
 self.addEventListener('notificationclick', (event) => {
@@ -67,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v244";
+const CACHE_NAME = "yacente-v245";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -81,7 +40,7 @@ const ASSETS_TO_CACHE = [
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js",
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js",
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js",
-    "https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js",
+
     "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
 ];
 

@@ -494,7 +494,7 @@ let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
-let unsubPushConfig = null;
+
 
 // Inicializa Firebase
 function initFirebase() {
@@ -620,12 +620,7 @@ function startCloudSync() {
     // Detener escuchas previas si existen
     stopCloudSync();
     
-    // Registrar token de dispositivo si es un músico
-    const authRole = getAuthRole();
-    const musicianId = getAuthMusicianId();
-    if (authRole === "component" && musicianId) {
-        registerDeviceToken(musicianId);
-    }
+
     
     // Escucha de músicos
     unsubMusicians = db.collection("musicians").onSnapshot(snapshot => {
@@ -893,18 +888,7 @@ function startCloudSync() {
         console.error("Error sync formación desfile:", err);
     });
 
-    // Escucha de configuración Push (VAPID Key pública para los músicos)
-    unsubPushConfig = db.collection("config").doc("push").onSnapshot(doc => {
-        if (doc.exists) {
-            const data = doc.data();
-            if (data.vapidKey) {
-                localStorage.setItem("yacente_vapid_key", data.vapidKey);
-                console.log("[FCM] VAPID Key sincronizada desde Firestore");
-            }
-        }
-    }, err => {
-        console.error("Error sync push config:", err);
-    });
+
 }
 
 // Detiene escuchas en tiempo real
@@ -918,7 +902,7 @@ function stopCloudSync() {
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
-    if (unsubPushConfig) { unsubPushConfig(); unsubPushConfig = null; }
+
 }
 
 // Función para subir los datos locales a la nube
@@ -1763,8 +1747,7 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            // Disparar notificaciones push para el nuevo ensayo
-            sendPushNotificationToConvocated(state.sessionTypes[sessionKey], sessionKey);
+
         } else {
             saveStateToLocalStorage();
         }
@@ -1830,8 +1813,7 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            // Disparar notificaciones push para la nueva actuación
-            sendPushNotificationToConvocated(state.sessionTypes[sessionKey], sessionKey);
+
         } else {
             saveStateToLocalStorage();
         }
@@ -2338,10 +2320,7 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            // Disparar notificaciones push si es una sesión nueva
-            if (state.isAddingNewSession) {
-                sendPushNotificationToConvocated(newSession, sessionKey);
-            }
+
         } else {
             saveStateToLocalStorage();
         }
@@ -2614,13 +2593,7 @@ function renderActiveSection(sectionId) {
             pageSubtitle.innerText = "Administración general y copias de seguridad";
             dateContainer.classList.add("hidden");
             
-            // Popula claves push si existen
-            const savedVapid = localStorage.getItem("yacente_vapid_key") || "";
-            const savedSA = localStorage.getItem("yacente_service_account_json") || "";
-            const vapidInput = document.getElementById("push-vapid-key");
-            const saInput = document.getElementById("push-service-account");
-            if (vapidInput) vapidInput.value = savedVapid;
-            if (saInput) saInput.value = savedSA;
+
             break;
         case "section-componente-ficha":
             pageTitle.innerText = "Mi Ficha";
@@ -5698,15 +5671,7 @@ function setupFirebaseListeners() {
                 
                 // Conectar en segundo plano a la nube
                 startCloudSync();
-                registerDeviceToken(musicianId);
-                
-                if ("Notification" in window && Notification.permission === "default") {
-                    Notification.requestPermission().then(perm => {
-                        if (perm === "granted") {
-                            registerDeviceToken(musicianId);
-                        }
-                    });
-                }
+
                 
                 renderActiveSection("section-componente-ficha");
                 showToast(`Bienvenido/a, ${musician.name}`, "success");
@@ -9543,63 +9508,7 @@ function calculateMusicianStreak(musicianId) {
     return streak;
 }
 
-function updateNotificationPrompts(musicianId) {
-    if (!musicianId) return;
-    
-    const updateCard = (cardId, statusId, btnId) => {
-        const card = document.getElementById(cardId);
-        const status = document.getElementById(statusId);
-        const btn = document.getElementById(btnId);
-        
-        if (!card || !status || !btn) return;
-        
-        if (!("Notification" in window)) {
-            status.innerText = "No soportado en este navegador.";
-            btn.style.display = "none";
-            card.style.display = "flex";
-        } else if (Notification.permission === "granted") {
-            card.style.display = "none";
-        } else {
-            card.style.display = "flex";
-            
-            if (Notification.permission === "denied") {
-                status.innerText = "Notificaciones bloqueadas en tu navegador. Por favor, habilítalas en los ajustes del sitio.";
-                btn.innerText = "Comprobar y Activar";
-                btn.className = "btn btn-secondary btn-sm";
-                btn.disabled = false;
-                btn.style.opacity = "1";
-            } else {
-                status.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
-                btn.innerText = "Habilitar Notificaciones";
-                btn.className = "btn btn-primary btn-sm";
-                btn.disabled = false;
-                btn.style.opacity = "1";
-            }
-            
-            if (btn.tagName === "BUTTON") {
-                // Avoid duplicating listeners by replacing with a clone
-                const newBtn = btn.cloneNode(true);
-                btn.parentNode.replaceChild(newBtn, btn);
-                newBtn.addEventListener("click", () => {
-                    if (Notification.permission === "denied") {
-                        showToast("Siguen bloqueadas. Haz clic en el icono del candado o configuración al lado de la barra de direcciones, cambia el permiso de Notificaciones a 'Permitir' y pulsa aquí de nuevo.", "warning");
-                    } else {
-                        Notification.requestPermission().then(permission => {
-                            updateNotificationPrompts(musicianId);
-                            if (permission === "granted") {
-                                showToast("¡Notificaciones de escritorio habilitadas!", "success");
-                                registerDeviceToken(musicianId);
-                            }
-                        });
-                    }
-                });
-            }
-        }
-    };
-    
-    updateCard("comp-notifications-card", "comp-notifications-status", "btn-comp-enable-notifications");
-    updateCard("comp-notifications-dashboard-card", "comp-notifications-dashboard-status", "btn-comp-dashboard-enable-notifications");
-}
+
 
 function renderComponentFicha() {
     const musicianId = getAuthMusicianId();
@@ -9769,8 +9678,7 @@ function renderComponentFicha() {
         }
     }
 
-    // Notificaciones Card State Handling
-    updateNotificationPrompts(musicianId);
+
 
     // Actualizar badge de notificaciones
     updateNotificationsBadge();
@@ -10063,8 +9971,7 @@ function renderComponentEventos() {
     const musician = state.musicians.find(m => m.id === musicianId);
     if (!musician) return;
     
-    // Sincronizar alertas de notificación en el panel de inicio del músico
-    updateNotificationPrompts(musicianId);
+
     
     const container = document.getElementById("componente-eventos-lista");
     if (!container) return;
@@ -10987,311 +10894,7 @@ function sendBrowserNotification(title, body) {
     }
 }
 
-function registerDeviceToken(musicianId) {
-    if (!isCloudActive()) return;
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    
-    try {
-        const vapidKey = localStorage.getItem("yacente_vapid_key");
-        if (!vapidKey) {
-            console.warn("[FCM] VAPID Key no configurada. Omitiendo registro de dispositivo.");
-            return;
-        }
-        
-        const messaging = firebase.messaging();
-        
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.ready.then((registration) => {
-                messaging.getToken({ 
-                    vapidKey: vapidKey,
-                    serviceWorkerRegistration: registration
-                })
-                .then((currentToken) => {
-                    if (currentToken) {
-                        const db = firebase.firestore();
-                        db.collection("musicianTokens").doc(musicianId).set({
-                            tokens: firebase.firestore.FieldValue.arrayUnion(currentToken),
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }, { merge: true })
-                        .then(() => console.log("[FCM] Token registrado correctamente en Firestore"))
-                        .catch(err => console.error("[FCM] Error al guardar token en base de datos:", err));
-                    } else {
-                        console.warn("[FCM] No se pudo obtener el token del navegador.");
-                    }
-                })
-                .catch((err) => {
-                    console.error("[FCM] Error al solicitar el token FCM:", err);
-                });
-            }).catch((err) => {
-                console.error("[FCM] Error esperando a que el Service Worker esté listo:", err);
-            });
-        } else {
-            console.warn("[FCM] Service Worker no soportado en este navegador.");
-        }
-    } catch (e) {
-        console.error("[FCM] Mensajería no soportada o error de inicialización:", e);
-    }
-}
 
-function pemToArrayBuffer(pem) {
-    const cleanPem = pem.replace(/-----BEGIN PRIVATE KEY-----/, '')
-                        .replace(/-----END PRIVATE KEY-----/, '')
-                        .replace(/\s+/g, '');
-    const binary = atob(cleanPem);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
-
-function arrayBufferToBase64Url(buffer) {
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-}
-
-function jsonToBase64Url(jsonObj) {
-    const str = JSON.stringify(jsonObj);
-    const bytes = new TextEncoder().encode(str);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-}
-
-async function generateGAuthJWT(serviceAccount) {
-    const header = {
-        alg: "RS256",
-        typ: "JWT"
-    };
-    
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-        iss: serviceAccount.client_email,
-        scope: "https://www.googleapis.com/auth/firebase.messaging",
-        aud: "https://oauth2.googleapis.com/token",
-        exp: now + 3600,
-        iat: now
-    };
-    
-    const headerB64 = jsonToBase64Url(header);
-    const payloadB64 = jsonToBase64Url(payload);
-    const dataToSign = new TextEncoder().encode(headerB64 + "." + payloadB64);
-    
-    const privateKeyBuffer = pemToArrayBuffer(serviceAccount.private_key);
-    
-    const cryptoKey = await window.crypto.subtle.importKey(
-        "pkcs8",
-        privateKeyBuffer,
-        {
-            name: "RSASSA-PKCS1-v1_5",
-            hash: { name: "SHA-256" }
-        },
-        false,
-        ["sign"]
-    );
-    
-    const signatureBuffer = await window.crypto.subtle.sign(
-        "RSASSA-PKCS1-v1_5",
-        cryptoKey,
-        dataToSign
-    );
-    
-    const signatureB64 = arrayBufferToBase64Url(signatureBuffer);
-    return headerB64 + "." + payloadB64 + "." + signatureB64;
-}
-
-async function getFCMAccessToken(serviceAccount) {
-    const assertion = await generateGAuthJWT(serviceAccount);
-    const bodyParams = new URLSearchParams({
-        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion: assertion
-    });
-    
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: bodyParams.toString()
-    });
-    
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error("Error al obtener token de Google OAuth2: " + errorText);
-    }
-    
-    const data = await response.json();
-    return data.access_token;
-}
-
-function sendPushNotificationToConvocated(sessionData, sessionDate) {
-    if (!isCloudActive()) return;
-    
-    const saJsonStr = localStorage.getItem("yacente_service_account_json");
-    if (!saJsonStr) {
-        console.warn("[FCM] No se ha configurado la Cuenta de Servicio JSON de Firebase, omitiendo envío de notificaciones push.");
-        return;
-    }
-    
-    let serviceAccount;
-    try {
-        serviceAccount = JSON.parse(saJsonStr);
-    } catch (e) {
-        console.error("[FCM] Error al parsear el JSON de la Cuenta de Servicio:", e);
-        return;
-    }
-    
-    const projectId = serviceAccount.project_id;
-    if (!projectId) {
-        console.error("[FCM] project_id no encontrado en la Cuenta de Servicio.");
-        return;
-    }
-    
-    const db = firebase.firestore();
-    const formattedDate = formatDateShortSpanish(sessionDate);
-    
-    // 1. Obtener todos los músicos
-    db.collection("musicians").get()
-        .then((querySnapshot) => {
-            const convocatedMusicians = [];
-            querySnapshot.forEach((doc) => {
-                const mus = doc.data();
-                // Convocatoria
-                if (isMusicianConvocated(mus.id, sessionData)) {
-                    convocatedMusicians.push(mus.id);
-                }
-            });
-            
-            if (convocatedMusicians.length === 0) {
-                console.log("[FCM] No hay músicos convocados para esta sesión.");
-                return;
-            }
-            
-            console.log(`[FCM] Se enviará notificación push a ${convocatedMusicians.length} músicos.`);
-            
-            // 2. Obtener tokens de dispositivo para los músicos convocados, manteniendo el mapeo al ID del músico
-            const tokenPromises = convocatedMusicians.map(mId => 
-                db.collection("musicianTokens").doc(mId).get()
-                    .then(doc => doc.exists ? { mId: mId, tokens: doc.data().tokens || [] } : null)
-                    .catch(err => {
-                        console.error(`[FCM] Error leyendo tokens del músico ${mId}:`, err);
-                        return null;
-                    })
-            );
-            
-            Promise.all(tokenPromises)
-                .then(async (results) => {
-                    // Filtrar vacíos y agrupar tokens a procesar
-                    const userTokensMap = results.filter(Boolean);
-                    const totalTokensCount = userTokensMap.reduce((acc, curr) => acc + curr.tokens.length, 0);
-                    
-                    if (totalTokensCount === 0) {
-                        console.log("[FCM] No hay tokens de dispositivos registrados para los músicos convocados.");
-                        return;
-                    }
-                    
-                    console.log(`[FCM] Solicitando token de acceso OAuth2 para enviar push...`);
-                    
-                    let accessToken;
-                    try {
-                        accessToken = await getFCMAccessToken(serviceAccount);
-                    } catch (err) {
-                        console.error("[FCM] Error de autenticación con Google OAuth2:", err);
-                        return;
-                    }
-                    
-                    console.log(`[FCM] Enviando push mediante FCM HTTP v1.`);
-                    
-                    // 3. Preparar payload
-                    const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
-                    let body = "";
-                    if (sessionData.type === "ensayo") {
-                        const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
-                        const locationVal = sessionData.location || "Parking";
-                        body = `${subtypeText} - ${formattedDate} (${locationVal})`;
-                    } else {
-                        body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
-                    }
-                    
-                    // 4. Enviar mediante la API HTTP v1 de FCM
-                    const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
-                    
-                    userTokensMap.forEach(userMap => {
-                        const mId = userMap.mId;
-                        userMap.tokens.filter(Boolean).forEach(token => {
-                            fetch(fcmUrl, {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    "Authorization": "Bearer " + accessToken
-                                },
-                                body: JSON.stringify({
-                                    message: {
-                                        token: token,
-                                        notification: {
-                                            title: title,
-                                            body: body
-                                        },
-                                        data: {
-                                            click_action: "https://yacente.pages.dev/"
-                                        },
-                                        webpush: {
-                                            headers: {
-                                                Urgency: "high"
-                                            },
-                                            fcm_options: {
-                                                link: "https://yacente.pages.dev/"
-                                            }
-                                        }
-                                    }
-                                })
-                            })
-                            .then(res => {
-                                if (!res.ok) {
-                                    return res.text().then(text => {
-                                        console.error(`[FCM] Error al enviar a token ${token}:`, text);
-                                        
-                                        // Auto-limpieza de tokens obsoletos (404 o UNREGISTERED)
-                                        try {
-                                            const errorData = JSON.parse(text);
-                                            const errorCode = errorData.error && errorData.error.details && errorData.error.details[0] && errorData.error.details[0].errorCode;
-                                            if (res.status === 404 || errorCode === "UNREGISTERED") {
-                                                console.log(`[FCM] Detectado token obsoleto, procediendo a eliminarlo para músico ${mId}`);
-                                                db.collection("musicianTokens").doc(mId).update({
-                                                    tokens: firebase.firestore.FieldValue.arrayRemove(token)
-                                                }).catch(err => console.error("[FCM] Error al auto-limpiar token:", err));
-                                            }
-                                        } catch (parseErr) {
-                                            // Si no es JSON, no hacemos nada
-                                        }
-                                    });
-                                }
-                                return res.json().then(data => {
-                                    console.log("[FCM] Notificación enviada con éxito a dispositivo:", data);
-                                });
-                            })
-                            .catch(err => {
-                                console.error("[FCM] Error en la petición HTTP POST de FCM v1:", err);
-                            });
-                        });
-                    });
-                });
-        })
-        .catch(err => console.error("[FCM] Error obteniendo lista de músicos para notificaciones push:", err));
-}
 
 function updateNotificationsBadge() {
     const musicianId = getAuthMusicianId();

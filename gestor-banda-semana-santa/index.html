@@ -95,13 +95,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=244">
+    <link rel="stylesheet" href="style.css?v=245">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
+
 
 </head>
 <body class="mobile-simplified-active">
@@ -1101,27 +1101,7 @@
                         </div>
                     </div>
 
-                    <!-- Configuración de Notificaciones Push (FCM) -->
-                    <div class="card settings-card" id="push-settings-card">
-                        <h3>Notificaciones Push (FCM)</h3>
-                        <p class="text-muted" style="margin-bottom: 10px;">Configura las credenciales de Firebase Cloud Messaging v1 para activar el envío de alertas directas a los dispositivos móviles de los músicos convocados.</p>
-                        
-                        <form id="form-push-config" style="display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 10px; width: 100%;">
-                                <div class="form-group" style="flex: 1 1 180px; margin-bottom: 0;">
-                                    <label for="push-vapid-key" style="font-size: 0.75rem; margin-bottom: 4px;">Clave Pública VAPID</label>
-                                    <input type="text" id="push-vapid-key" placeholder="Ej: BEl3vXw..." style="width: 100%; font-family: monospace; font-size: 0.72rem; padding: 5px 8px;">
-                                </div>
-                                <div class="form-group" style="flex: 1 1 240px; margin-bottom: 0;">
-                                    <label for="push-service-account" style="font-size: 0.75rem; margin-bottom: 4px;">Cuenta de Servicio JSON (Firebase)</label>
-                                    <textarea id="push-service-account" placeholder='Pega aquí todo el contenido del archivo JSON generado...' style="width: 100%; height: 32px; font-family: monospace; font-size: 0.7rem; padding: 5px 8px; resize: vertical; min-height: 32px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-color);"></textarea>
-                                </div>
-                            </div>
-                            <div class="settings-buttons" style="margin-top: 2px;">
-                                <button type="submit" class="btn btn-primary btn-sm" id="btn-save-push-config" style="padding: 5px 10px; font-size: 0.72rem;">Guardar Claves Push</button>
-                            </div>
-                        </form>
-                    </div>
+
 
                     <!-- Simulador de Formación -->
                     <div class="card settings-card">
@@ -1182,17 +1162,7 @@
                     </div>
                 </div>
 
-                <!-- Notificaciones Push Setting -->
-                <div class="card" id="comp-notifications-card" style="margin-top: 15px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.15);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem; line-height: 1;">🔔</span>
-                        <div>
-                            <h4 style="margin: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-primary);">Notificaciones Push</h4>
-                            <p id="comp-notifications-status" style="margin: 2px 0 0 0; font-size: 0.76rem; color: var(--text-muted); line-height: 1.3;">Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.</p>
-                        </div>
-                    </div>
-                    <button id="btn-comp-enable-notifications" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">Habilitar</button>
-                </div>
+
 
                 <!-- Estadísticas Resumen Grid -->
                 <div class="stats-cards-grid" style="margin-top: 20px;">
@@ -1524,17 +1494,7 @@
 
             <!-- Sección: Eventos Programados (Futuros) -->
             <section id="section-componente-eventos" class="app-section">
-                <!-- Notificaciones Push Setting (Dashboard) -->
-                <div class="card" id="comp-notifications-dashboard-card" style="margin-bottom: 20px; padding: 16px; display: none; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.15);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem; line-height: 1;">🔔</span>
-                        <div>
-                            <h4 style="margin: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-primary);">Notificaciones Push</h4>
-                            <p id="comp-notifications-dashboard-status" style="margin: 2px 0 0 0; font-size: 0.76rem; color: var(--text-muted); line-height: 1.3;">Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.</p>
-                        </div>
-                    </div>
-                    <button id="btn-comp-dashboard-enable-notifications" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">Habilitar</button>
-                </div>
+
 
                 <!-- Calendario Mensual Músicos -->
                 <div class="card" style="padding: 16px; margin-bottom: 20px; box-sizing: border-box;">
@@ -2846,12 +2806,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=244"></script>
+    <script src="app.js?v=245"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=244")
+                navigator.serviceWorker.register("sw.js?v=245")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
