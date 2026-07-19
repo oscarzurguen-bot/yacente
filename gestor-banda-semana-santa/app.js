@@ -11249,6 +11249,9 @@ function sendPushNotificationToConvocated(sessionData, sessionDate) {
                                             click_action: "https://yacente.pages.dev/"
                                         },
                                         webpush: {
+                                            headers: {
+                                                Urgency: "high"
+                                            },
                                             fcm_options: {
                                                 link: "https://yacente.pages.dev/"
                                             }
