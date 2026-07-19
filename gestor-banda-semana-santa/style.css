@@ -3605,10 +3605,11 @@ body.component-portal #candle-tribute-container {
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, background-color 0.2s ease;
 }
 .btn-reset-pin-row-padlock:hover {
     background-color: rgba(255, 255, 255, 0.08);
+    transform: scale(1.18);
 }
 .btn-reset-pin-row-padlock:hover .lock-svg {
     color: var(--color-absent) !important;
