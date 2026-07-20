@@ -2071,6 +2071,35 @@ svg.chevron {
         font-family: 'Outfit', sans-serif !important;
         align-items: center !important;
     }
+
+    /* Estilos adicionales para el informe de temporada */
+    .print-repertoire-flex {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 20px !important;
+        margin-top: 10px !important;
+        width: 100% !important;
+    }
+    .print-repertoire-col {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .print-repertoire-col-title {
+        font-size: 8.5pt !important;
+        font-weight: 700 !important;
+        color: #475569 !important;
+        margin-bottom: 8px !important;
+        border-bottom: 1px dashed #cbd5e1 !important;
+        padding-bottom: 4px !important;
+    }
+    .print-repertoire-item-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        font-size: 8pt !important;
+        padding: 3px 0 !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
 }
 
 #print-report-area {

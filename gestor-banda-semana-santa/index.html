@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=261">
+    <link rel="stylesheet" href="style.css?v=263">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -975,6 +975,13 @@
                                 <select id="stats-ov-year-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; width: auto; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
                                     <!-- Populated dynamically -->
                                 </select>
+                                <button id="btn-download-season-report" class="btn btn-secondary btn-icon" style="padding: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="Descargar Informe de Temporada (PDF)">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
 
@@ -2825,12 +2832,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=261"></script>
+    <script src="app.js?v=263"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=261")
+                navigator.serviceWorker.register("sw.js?v=263")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })

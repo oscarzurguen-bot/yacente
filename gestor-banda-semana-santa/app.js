@@ -1387,6 +1387,14 @@ function setupEventListeners() {
         });
     }
 
+    const btnDownloadSeasonReport = document.getElementById("btn-download-season-report");
+    if (btnDownloadSeasonReport) {
+        btnDownloadSeasonReport.addEventListener("click", () => {
+            const season = document.getElementById("stats-ov-year-select").value;
+            downloadSeasonPDFReport(season);
+        });
+    }
+
     // Filtros de Historial de Ensayos
     document.getElementById("rehearsals-filter-year").addEventListener("change", () => {
         renderEnsayosList();
@@ -1576,11 +1584,16 @@ function setupEventListeners() {
     document.getElementById("btn-reset-attendance").addEventListener("click", () => {
         if (confirm("¿Resetear la lista? Todos los componentes se marcarán como ausentes.")) {
             const date = state.currentDate;
+            if (!state.sessionTypes[date]) {
+                state.sessionTypes[date] = { type: "ensayo", name: "" };
+                dbSaveSessionType(date, state.sessionTypes[date]);
+            }
             state.musicians.forEach(musician => {
                 if (state.attendance[date] && state.attendance[date][musician.id]) {
                     state.attendance[date][musician.id].status = "absent";
                     state.attendance[date][musician.id].justified = false;
                     state.attendance[date][musician.id].reason = "";
+                    dbSaveAttendance(date, musician.id, state.attendance[date][musician.id]);
                 }
             });
             saveStateToLocalStorage();
@@ -2862,6 +2875,10 @@ function showAbsenceSummary(card, reasonText) {
 function ensureAttendanceRecord(date, id) {
     if (!state.attendance[date]) {
         state.attendance[date] = {};
+    }
+    if (!state.sessionTypes[date]) {
+        state.sessionTypes[date] = { type: "ensayo", name: "" };
+        dbSaveSessionType(date, state.sessionTypes[date]);
     }
     if (!state.attendance[date][id]) {
         state.attendance[date][id] = {
@@ -5246,6 +5263,447 @@ function downloadRepertoirePDFReport() {
 
     window.print();
     
+    setTimeout(() => {
+        printArea.innerHTML = "";
+    }, 10000);
+}
+
+function downloadSeasonPDFReport(selectedSeason) {
+    if (!selectedSeason) {
+        showToast("Selecciona una temporada válida", "warning");
+        return;
+    }
+
+    const seasonParts = selectedSeason.split("-");
+    const year1 = parseInt(seasonParts[0], 10);
+    const year2 = parseInt(seasonParts[1], 10);
+
+    const allDates = Object.keys(state.attendance);
+    const seasonDates = allDates.filter(date => {
+        const parts = date.split("-");
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        return (y === year1 && m >= 9) || (y === year2 && m < 9);
+    }).sort((a, b) => a.localeCompare(b));
+
+    if (seasonDates.length === 0) {
+        showToast("No hay convocatorias registradas para la temporada " + selectedSeason, "warning");
+        return;
+    }
+
+    let totalConvocatorias = seasonDates.length;
+    let totalEnsayosCount = 0;
+    let totalActuacionesCount = 0;
+
+    seasonDates.forEach(date => {
+        const info = state.sessionTypes[date];
+        if (info && info.type === "actuacion") {
+            totalActuacionesCount++;
+        } else {
+            totalEnsayosCount++;
+        }
+    });
+
+    let totalAsistenciasGral = 0;
+    let totalFaltasUnjustifiedGral = 0;
+    let totalFaltasJustifiedGral = 0;
+    let totalEvaluationsGral = 0;
+
+    const musicianStats = {};
+    state.musicians.forEach(m => {
+        musicianStats[m.id] = {
+            id: m.id,
+            name: m.name,
+            instrument: m.instrument,
+            role: m.role,
+            presents: 0,
+            absentJustified: 0,
+            absentUnjustified: 0,
+            total: 0,
+            maxStreak: 0,
+            currentStreak: 0
+        };
+    });
+
+    seasonDates.forEach(date => {
+        const dayRecord = state.attendance[date] || {};
+        state.musicians.forEach(m => {
+            const r = dayRecord[m.id];
+            if (r) {
+                const stats = musicianStats[m.id];
+                stats.total++;
+                totalEvaluationsGral++;
+
+                if (r.status === "present") {
+                    stats.presents++;
+                    totalAsistenciasGral++;
+                    
+                    stats.currentStreak++;
+                    if (stats.currentStreak > stats.maxStreak) {
+                        stats.maxStreak = stats.currentStreak;
+                    }
+                } else {
+                    if (r.justified) {
+                        stats.absentJustified++;
+                        totalFaltasJustifiedGral++;
+                    } else {
+                        stats.absentUnjustified++;
+                        totalFaltasUnjustifiedGral++;
+                    }
+                    stats.currentStreak = 0;
+                }
+            }
+        });
+    });
+
+    const totalFaltasTotalesGral = totalFaltasUnjustifiedGral + totalFaltasJustifiedGral;
+    const avgAttendancePct = totalEvaluationsGral > 0 ? Math.round((totalAsistenciasGral / totalEvaluationsGral) * 100) : 0;
+    const avgUnjustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100) : 0;
+    const avgJustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasJustifiedGral / totalEvaluationsGral) * 100) : 0;
+    const presentsPctOfTotal = totalEvaluationsGral > 0 ? ((totalAsistenciasGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
+    const absentUnjustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
+    const absentJustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasJustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
+
+    const sections = {};
+    state.musicians.forEach(m => {
+        const sec = m.instrument || "Otros";
+        if (!sections[sec]) {
+            sections[sec] = { presents: 0, absentJustified: 0, absentUnjustified: 0, total: 0 };
+        }
+        const stats = musicianStats[m.id];
+        if (stats) {
+            sections[sec].presents += stats.presents;
+            sections[sec].absentJustified += stats.absentJustified;
+            sections[sec].absentUnjustified += stats.absentUnjustified;
+            sections[sec].total += stats.total;
+        }
+    });
+
+    let sectionsHTML = "";
+    const sortedSections = Object.keys(sections).sort((a, b) => {
+        const pctA = sections[a].total > 0 ? (sections[a].presents / sections[a].total) : 0;
+        const pctB = sections[b].total > 0 ? (sections[b].presents / sections[b].total) : 0;
+        return pctB - pctA;
+    });
+
+    sortedSections.forEach(secName => {
+        const s = sections[secName];
+        const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 0;
+        let color = "var(--color-absent)";
+        if (pct >= 80) color = "var(--color-present)";
+        else if (pct >= 50) color = "var(--color-gold)";
+
+        sectionsHTML += `
+            <tr>
+                <td><strong>${secName}</strong></td>
+                <td style="text-align: center;">${s.presents}</td>
+                <td style="text-align: center;">${s.absentUnjustified}</td>
+                <td style="text-align: center;">${s.absentJustified}</td>
+                <td style="text-align: right; padding-right: 15px; color: ${color}; font-weight: bold;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    const musiciansList = Object.values(musicianStats);
+
+    const top3Streaks = [...musiciansList]
+        .filter(m => m.total > 0)
+        .sort((a, b) => b.maxStreak - a.maxStreak || b.presents - a.presents)
+        .slice(0, 3);
+
+    let streaksHTML = "";
+    const streakMedals = ["🥇 1º Puesto", "🥈 2º Puesto", "🥉 3º Puesto"];
+    for (let i = 0; i < 3; i++) {
+        const m = top3Streaks[i];
+        if (m && m.maxStreak > 0) {
+            streaksHTML += `
+                <div class="print-stat-box" style="text-align: left; padding: 10px;">
+                    <div class="print-stat-title">${streakMedals[i]}</div>
+                    <div style="font-size: 9pt; font-weight: 700; color: #0f172a; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.name}</div>
+                    <div style="font-size: 7.5pt; color: #64748b;">${m.instrument}</div>
+                    <div style="font-size: 11pt; font-weight: 800; color: #E67E22; margin-top: 4px;">${m.maxStreak} 🔥 <span style="font-size: 7pt; font-weight: 500; color: #64748b;">consecutivos</span></div>
+                </div>
+            `;
+        } else {
+            streaksHTML += `
+                <div class="print-stat-box" style="text-align: left; padding: 10px; display: flex; align-items: center; justify-content: center; min-height: 70px;">
+                    <div style="font-size: 8pt; color: #94a3b8; font-style: italic; text-align: center;">Sin registros</div>
+                </div>
+            `;
+        }
+    }
+
+    const top5Attendance = [...musiciansList]
+        .filter(m => m.total > 0)
+        .sort((a, b) => {
+            const pctA = a.presents / a.total;
+            const pctB = b.presents / b.total;
+            return pctB - pctA || b.presents - a.presents;
+        })
+        .slice(0, 5);
+
+    let top5HTML = "";
+    top5Attendance.forEach((m, idx) => {
+        const pct = Math.round((m.presents / m.total) * 100);
+        top5HTML += `
+            <tr>
+                <td><strong>${idx + 1}º ${m.name}</strong></td>
+                <td>${m.instrument}</td>
+                <td style="text-align: center;">${m.presents} / ${m.total}</td>
+                <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    if (top5HTML === "") {
+        top5HTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin datos en este periodo.</td></tr>`;
+    }
+
+    const alertMusicians = musiciansList
+        .filter(m => m.total > 0 && (m.presents / m.total) < 0.5)
+        .sort((a, b) => (a.presents / a.total) - (b.presents / b.total));
+
+    let alertsHTML = "";
+    alertMusicians.forEach(m => {
+        const pct = Math.round((m.presents / m.total) * 100);
+        alertsHTML += `
+            <tr class="alert-row">
+                <td><strong>${m.name}</strong></td>
+                <td>${m.instrument}</td>
+                <td style="text-align: center;">${m.presents} / ${m.total}</td>
+                <td style="text-align: right; padding-right: 15px; font-weight: bold;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    if (alertsHTML === "") {
+        alertsHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b; font-style: italic;">No hay componentes por debajo del 50% de asistencia en esta temporada. ¡Buen compromiso general!</td></tr>`;
+    }
+
+    const totalMarchas = state.marchas ? state.marchas.length : 0;
+    let greenCount = 0;
+    let yellowCount = 0;
+    let redCount = 0;
+    let noneCount = 0;
+
+    if (state.marchas && state.musicianMarchaStatuses) {
+        state.marchas.forEach(marcha => {
+            let greens = 0;
+            let totalActive = 0;
+            state.musicians.forEach(m => {
+                const key = `${m.id}_${marcha.id}`;
+                const status = state.musicianMarchaStatuses[key];
+                if (status) {
+                    totalActive++;
+                    if (status === "green") greens++;
+                }
+            });
+            const pct = totalActive > 0 ? (greens / totalActive) : 0;
+            if (pct >= 0.7) greenCount++;
+            else if (pct >= 0.3) yellowCount++;
+            else if (pct > 0) redCount++;
+            else noneCount++;
+        });
+    }
+
+    const greenPct = totalMarchas > 0 ? Math.round((greenCount / totalMarchas) * 100) : 0;
+    const redPct = totalMarchas > 0 ? Math.round((redCount / totalMarchas) * 100) : 0;
+
+    const marchaPlays = {};
+    if (state.marchas) {
+        state.marchas.forEach(m => {
+            marchaPlays[m.id] = 0;
+        });
+    }
+
+    seasonDates.forEach(date => {
+        const info = state.sessionTypes[date];
+        if (info && info.marchas && Array.isArray(info.marchas)) {
+            info.marchas.forEach(mid => {
+                if (marchaPlays[mid] !== undefined) {
+                    marchaPlays[mid]++;
+                }
+            });
+        }
+    });
+
+    const sortedMarchas = [...(state.marchas || [])].map(m => ({
+        ...m,
+        count: marchaPlays[m.id] || 0
+    }));
+
+    const top5MostEnsayadas = [...sortedMarchas]
+        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
+        .slice(0, 5);
+
+    let top5MostEnsayadasHTML = "";
+    top5MostEnsayadas.forEach((m, idx) => {
+        top5MostEnsayadasHTML += `
+            <div class="print-repertoire-item-row">
+                <span>${idx + 1}. <strong>${m.title}</strong></span>
+                <span>${m.count} ${m.count === 1 ? 'ensayo' : 'ensayos'}</span>
+            </div>
+        `;
+    });
+
+    const top5LeastEnsayadas = [...sortedMarchas]
+        .sort((a, b) => a.count - b.count || a.title.localeCompare(b.title))
+        .slice(0, 5);
+
+    let top5LeastEnsayadasHTML = "";
+    top5LeastEnsayadas.forEach((m, idx) => {
+        const countText = m.count === 0 ? "0 Ensayos" : `${m.count} ${m.count === 1 ? 'ensayo' : 'ensayos'}`;
+        const style = m.count === 0 ? `style="color: var(--color-absent); font-weight: 500;"` : "";
+        top5LeastEnsayadasHTML += `
+            <div class="print-repertoire-item-row">
+                <span>${idx + 1}. <strong>${m.title}</strong></span>
+                <span ${style}>${countText}</span>
+            </div>
+        `;
+    });
+
+    const printArea = document.getElementById("print-report-area");
+    if (!printArea) return;
+
+    printArea.innerHTML = `
+        <div class="print-header">
+            <div class="print-brand">
+                <h1 class="print-title">YACENTE</h1>
+                <div class="print-subtitle">Asociación Musical Yacente • Informe de Temporada</div>
+            </div>
+            <div class="print-meta">
+                <strong>Temporada:</strong> ${selectedSeason}<br>
+                <strong>Fecha de generación:</strong> ${new Date().toLocaleDateString("es-ES")}<br>
+                <strong>Generado por:</strong> Dirección
+            </div>
+        </div>
+
+        <div class="print-section-title">1. Resumen General de la Temporada</div>
+        <div class="print-grid">
+            <div class="print-stat-box">
+                <div class="print-stat-title">Asistencia Media</div>
+                <div class="print-stat-value" style="color: ${avgAttendancePct >= 80 ? 'var(--color-present)' : (avgAttendancePct >= 50 ? 'var(--color-gold)' : 'var(--color-absent)')};">${avgAttendancePct}%</div>
+                <div class="print-stat-desc">${avgAttendancePct >= 80 ? 'Excelente (>=80%)' : (avgAttendancePct >= 50 ? 'Aceptable (50%-80%)' : 'Crítico (<50%)')}</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Total Convocatorias</div>
+                <div class="print-stat-value">${totalConvocatorias}</div>
+                <div class="print-stat-desc">${totalEnsayosCount} Ensayos | ${totalActuacionesCount} Actuaciones</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Incidencia de Faltas</div>
+                <div class="print-stat-value" style="color: var(--color-absent);">${avgUnjustifiedPct}%</div>
+                <div class="print-stat-desc">${totalFaltasUnjustifiedGral} Faltas sin justificar</div>
+            </div>
+        </div>
+        <div class="print-grid" style="margin-top: -5px;">
+            <div class="print-stat-box">
+                <div class="print-stat-title">Asistencias Totales</div>
+                <div class="print-stat-value" style="color: var(--color-present); font-size: 13pt;">${totalAsistenciasGral.toLocaleString()} presencias</div>
+                <div class="print-stat-desc">${presentsPctOfTotal}% del total general</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Faltas Justificadas</div>
+                <div class="print-stat-value" style="color: var(--color-justified); font-size: 13pt;">${totalFaltasJustifiedGral.toLocaleString()} justificadas</div>
+                <div class="print-stat-desc">${absentJustifiedPctOfTotal}% del total general</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Faltas Sin Justificar</div>
+                <div class="print-stat-value" style="color: var(--color-absent); font-size: 13pt;">${totalFaltasUnjustifiedGral.toLocaleString()} injustificadas</div>
+                <div class="print-stat-desc">${absentUnjustifiedPctOfTotal}% del total general</div>
+            </div>
+        </div>
+
+        <div class="print-section-title">2. Asistencia por Secciones / Voces</div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Sección / Instrumento</th>
+                    <th style="text-align: center;">Presencias</th>
+                    <th style="text-align: center;">Faltas S.J.</th>
+                    <th style="text-align: center;">Faltas Just.</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sectionsHTML}
+            </tbody>
+        </table>
+
+        <div class="print-section-title">3. Compromiso y Rendimiento de Componentes</div>
+        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+            Top 3 Rachas de Asistencia de la Temporada
+        </div>
+        <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
+            ${streaksHTML}
+        </div>
+
+        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+            Top 5 Componentes con Mayor Asistencia
+        </div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Músico</th>
+                    <th>Sección</th>
+                    <th style="text-align: center;">Asistidas / Convocadas</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${top5HTML}
+            </tbody>
+        </table>
+
+        <div class="print-section-title">4. Componentes con Alerta de Asistencia (&lt;50%)</div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Músico</th>
+                    <th>Sección</th>
+                    <th style="text-align: center;">Asistidas / Convocadas</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${alertsHTML}
+            </tbody>
+        </table>
+
+        <div class="print-section-title">5. Trabajo de Repertorio de la Temporada</div>
+        <div class="print-grid">
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Marchas en Catálogo</div>
+                <div class="print-stat-value" style="font-size: 13pt;">${totalMarchas} marchas</div>
+            </div>
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Bien Trabajadas (🟢)</div>
+                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-present);">${greenCount} (${greenPct}%)</div>
+            </div>
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Por Trabajar (🔴)</div>
+                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-absent);">${redCount} (${redPct}%)</div>
+            </div>
+        </div>
+
+        <div class="print-repertoire-flex">
+            <div class="print-repertoire-col">
+                <div class="print-repertoire-col-title">Top 5 Marchas más Ensayadas</div>
+                ${top5MostEnsayadasHTML}
+            </div>
+            <div class="print-repertoire-col">
+                <div class="print-repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
+                ${top5LeastEnsayadasHTML}
+            </div>
+        </div>
+
+        <div class="print-footer">
+            Asociación Musical Yacente • Salamanca • Sistema de Asistencia e Informes Interno
+        </div>
+    `;
+
+    window.print();
+
     setTimeout(() => {
         printArea.innerHTML = "";
     }, 10000);
