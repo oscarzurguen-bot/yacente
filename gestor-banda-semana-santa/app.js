@@ -3115,9 +3115,9 @@ function renderEnsayosList() {
             if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
                 return;
             }
-            const r = dayRecord[m.id];
+            total++;
+            const r = dayRecord ? dayRecord[m.id] : null;
             if (r) {
-                total++;
                 if (r.status === "present") {
                     present++;
                 } else if (r.justified) {
@@ -3125,6 +3125,8 @@ function renderEnsayosList() {
                 } else {
                     absentUnjustified++;
                 }
+            } else {
+                absentUnjustified++;
             }
         });
 
@@ -3529,9 +3531,9 @@ function renderActuacionesList() {
         let total = 0;
 
         state.musicians.forEach(m => {
-            const r = dayRecord[m.id];
+            total++;
+            const r = dayRecord ? dayRecord[m.id] : null;
             if (r) {
-                total++;
                 if (r.status === "present") {
                     present++;
                 } else if (r.justified) {
@@ -3539,6 +3541,8 @@ function renderActuacionesList() {
                 } else {
                     absentUnjustified++;
                 }
+            } else {
+                absentUnjustified++;
             }
         });
 
