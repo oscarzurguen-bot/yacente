@@ -3052,6 +3052,42 @@ body.component-portal #candle-tribute-container {
     display: none !important;
 }
 
+/* Transiciones de Desplazamiento Suave (Swipe Slide Animations) */
+.main-content {
+    overflow-x: hidden;
+    position: relative;
+}
+
+.slide-in-right {
+    animation: slideInRight 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.slide-in-left {
+    animation: slideInLeft 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes slideInRight {
+    0% {
+        opacity: 0.4;
+        transform: translateX(50px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInLeft {
+    0% {
+        opacity: 0.4;
+        transform: translateX(-50px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
 /* Mi Ficha - Separación uniforme y moderada entre paneles */
 #section-componente-ficha.active {
     display: flex !important;
@@ -3090,21 +3126,21 @@ body.component-portal #candle-tribute-container {
     flex-wrap: nowrap;
 }
 .profile-avatar {
-    width: 95px;
-    height: 95px;
+    width: 75px;
+    height: 75px;
     border-radius: 50%;
     background-color: rgba(212, 175, 55, 0.12);
-    border: 2.5px solid var(--color-gold);
+    border: 2px solid var(--color-gold);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #D4AF37;
     font-weight: 700;
-    font-size: 2rem;
+    font-size: 1.6rem;
     font-family: 'Cinzel', serif;
     overflow: hidden;
     flex-shrink: 0;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
     position: relative;
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -3696,9 +3732,9 @@ body.component-portal #candle-tribute-container {
         gap: 14px !important;
     }
     .profile-avatar {
-        width: 80px !important;
-        height: 80px !important;
-        font-size: 1.7rem !important;
+        width: 62px !important;
+        height: 62px !important;
+        font-size: 1.3rem !important;
     }
     .profile-meta h3 {
         font-size: 1.05rem !important;

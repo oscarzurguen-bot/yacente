@@ -2546,35 +2546,60 @@ function setupComponentSwipeNavigation() {
 
             if (currentIndex !== -1) {
                 if (deltaX < 0) {
-                    // Deslizar izquierda -> Siguiente página
+                    // Deslizar izquierda -> Siguiente página (desplazar desde la derecha)
                     if (currentIndex < sectionsOrder.length - 1) {
-                        renderActiveSection(sectionsOrder[currentIndex + 1]);
+                        renderActiveSection(sectionsOrder[currentIndex + 1], "next");
                     }
                 } else {
-                    // Deslizar derecha -> Página anterior
+                    // Deslizar derecha -> Página anterior (desplazar desde la izquierda)
                     if (currentIndex > 0) {
-                        renderActiveSection(sectionsOrder[currentIndex - 1]);
+                        renderActiveSection(sectionsOrder[currentIndex - 1], "prev");
                     }
                 }
             } else if (currentId === "section-componente-notificaciones") {
                 if (deltaX > 0) {
-                    renderActiveSection("section-componente-ficha");
+                    renderActiveSection("section-componente-ficha", "prev");
                 }
             }
         }
     }, { passive: true });
 }
 
-function renderActiveSection(sectionId) {
+function renderActiveSection(sectionId, forcedDirection) {
     const activeRole = getAuthRole();
     if (activeRole === "component" && !sectionId.startsWith("section-componente-")) {
         sectionId = "section-componente-ficha";
     }
 
+    const previousActive = document.querySelector(".app-section.active");
+    const sectionsOrder = [
+        "section-componente-ficha",
+        "section-componente-eventos",
+        "section-componente-historial",
+        "section-componente-repertorio"
+    ];
+
+    let direction = forcedDirection;
+    if (!direction && activeRole === "component" && previousActive && previousActive.id !== sectionId) {
+        const prevIdx = sectionsOrder.indexOf(previousActive.id);
+        const nextIdx = sectionsOrder.indexOf(sectionId);
+        if (prevIdx !== -1 && nextIdx !== -1) {
+            direction = nextIdx > prevIdx ? "next" : "prev";
+        }
+    }
+
     document.querySelectorAll(".app-section").forEach(section => {
-        section.classList.remove("active");
+        section.classList.remove("active", "slide-in-right", "slide-in-left");
     });
-    document.getElementById(sectionId).classList.add("active");
+
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.add("active");
+        if (activeRole === "component" && direction) {
+            const animClass = direction === "next" ? "slide-in-right" : "slide-in-left";
+            targetSection.classList.add(animClass);
+        }
+    }
 
     const pageTitle = document.getElementById("page-title");
     const pageSubtitle = document.getElementById("page-subtitle");
