@@ -3200,14 +3200,14 @@ body.component-portal #candle-tribute-container {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(230, 126, 34, 0.15);
-    border: 1px solid rgba(230, 126, 34, 0.35);
+    background: rgba(255, 119, 0, 0.16);
+    border: 1px solid rgba(255, 120, 0, 0.65);
     padding: 5px 10px;
     border-radius: 20px;
-    color: #E67E22;
+    color: #ff8c1a;
     font-weight: 700;
     font-size: 0.85rem;
-    box-shadow: 0 4px 10px rgba(230, 126, 34, 0.1);
+    box-shadow: 0 0 10px rgba(255, 119, 0, 0.25);
 }
 .profile-insignias-badge {
     display: flex;
