@@ -10343,10 +10343,17 @@ function renderComponentHistorial() {
         ...Object.keys(state.attendance)
     ]));
 
-    // Obtener todas las fechas en las que el músico está convocado o tiene registro (sólo pasadas)
+    // Obtener todas las fechas en las que el músico está convocado (sólo pasadas, anteriores a hoy)
     const allConvocatedDates = allUniqueDates.filter(date => {
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        return date <= todayStr && record !== null && record !== undefined;
+        if (date >= todayStr) return false;
+        
+        const session = state.sessionTypes[date];
+        if (session && session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
+            if (!session.convocatedVoices.includes(musician.instrument)) {
+                return false;
+            }
+        }
+        return true;
     });
         
     populateHistoryFilters(allConvocatedDates);
@@ -10492,9 +10499,9 @@ function renderComponentEventos() {
         ...Object.keys(state.attendance)
     ]));
 
-    // Obtener todas las fechas futuras en las que el músico está convocado
+    // Obtener todas las fechas de hoy y futuras en las que el músico está convocado
     const allFutureDates = allUniqueDates.filter(date => {
-        if (date <= todayStr) return false;
+        if (date < todayStr) return false;
         
         const session = state.sessionTypes[date] || { type: "ensayo", subtype: "general", name: "Ensayo" };
         const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
