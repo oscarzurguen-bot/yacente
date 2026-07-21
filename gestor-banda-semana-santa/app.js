@@ -2472,7 +2472,11 @@ function setupMarchasDragAndDrop() {
     // Notificaciones de Músicos
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
     if (btnNotifBell) {
-        btnNotifBell.addEventListener("click", () => {
+        btnNotifBell.addEventListener("click", (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
             renderActiveSection("section-componente-notificaciones");
         });
     }
@@ -2519,10 +2523,10 @@ function renderActiveSection(sectionId) {
     if (sessionBadge) sessionBadge.style.display = "none";
     if (configBtn) configBtn.style.display = "none";
 
-    // Manejo del botón de notificaciones del músico (alineado con el título de página)
+    // Manejo del botón de notificaciones del músico (esquina superior derecha)
     const compNotifBell = document.getElementById("btn-comp-notifications-bell");
     if (compNotifBell) {
-        if (activeRole === "component") {
+        if (activeRole === "component" && sectionId !== "section-componente-notificaciones") {
             compNotifBell.classList.remove("hidden");
         } else {
             compNotifBell.classList.add("hidden");

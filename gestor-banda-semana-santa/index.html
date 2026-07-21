@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=271">
+    <link rel="stylesheet" href="style.css?v=272">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -336,16 +336,16 @@
                             <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
                     </button>
-                    <!-- Campana de Notificaciones Músico (Alineada en la misma fila del título) -->
-                    <button id="btn-comp-notifications-bell" class="btn-notifications-bell hidden" title="Ver Notificaciones" style="position: relative; flex-shrink: 0;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
-                        <!-- Badge -->
-                        <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
-                    </button>
                 </div>
+                <!-- Campana de Notificaciones Músico (Esquina superior derecha de la página) -->
+                <button id="btn-comp-notifications-bell" class="btn-notifications-bell hidden" title="Ver Notificaciones" style="position: absolute; top: 16px; right: 20px; z-index: 100;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <!-- Badge -->
+                    <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
+                </button>
             </header>
 
             <!-- Section: Pasar Lista -->
@@ -1156,12 +1156,17 @@
                 <!-- Perfil Card -->
                 <div class="card component-profile-card">
                     <div class="profile-header-layout">
-                        <!-- Foto de perfil muy grande con icono lápiz en la esquina -->
+                        <!-- Foto de perfil muy grande (115px) con insignia circular de cámara -->
                         <div class="profile-avatar" id="comp-profile-avatar-container" style="position: relative; cursor: pointer;" title="Haz clic para cambiar tu foto de perfil">
                             <span id="comp-avatar-letters">--</span>
                             <img id="comp-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-                            <!-- Botón lápiz muy pequeño a un lateral abajo -->
-                            <div id="btn-edit-photo" title="Cambiar foto de perfil" style="position: absolute; bottom: 0; right: -2px; width: 24px; height: 24px; border-radius: 50%; background: var(--color-gold); border: 2px solid var(--bg-card); color: #000; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: pointer; transition: transform 0.2s ease;">✏️</div>
+                            <!-- Insignia circular de cámara proporcional (32px) -->
+                            <div id="btn-edit-photo" title="Cambiar foto de perfil">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                    <circle cx="12" cy="13" r="4"></circle>
+                                </svg>
+                            </div>
                         </div>
                         <input type="file" id="comp-photo-file-input" accept="image/*" class="hidden">
                         
@@ -2846,12 +2851,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=271"></script>
+    <script src="app.js?v=272"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=271")
+                navigator.serviceWorker.register("sw.js?v=272")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
