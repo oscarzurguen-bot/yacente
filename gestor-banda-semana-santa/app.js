@@ -6439,7 +6439,7 @@ function renderMarchasList() {
         const hasNotes = m.notes && m.notes.trim().length > 0;
         const notesTitle = hasNotes ? m.notes.trim().replace(/"/g, '&quot;') : '';
         const notesBadge = hasNotes 
-            ? `<span class="marcha-has-notes-icon" title="Nota de dirección: ${notesTitle}" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(230, 126, 34, 0.22); border: 1px solid #e67e22; color: #e67e22; font-size: 0.7rem; font-weight: 800; margin-left: 6px; flex-shrink: 0; vertical-align: middle;">❗</span>` 
+            ? `<span class="marcha-has-notes-icon" title="Nota de dirección: ${notesTitle}" style="margin-left: 6px; font-size: 0.85rem; vertical-align: middle; flex-shrink: 0; cursor: help;">❗</span>` 
             : '';
 
         if (state.marchasViewMode === "list") {
