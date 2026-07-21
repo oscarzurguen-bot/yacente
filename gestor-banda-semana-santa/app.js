@@ -11220,12 +11220,21 @@ function setupPreavisoEvents() {
 
 function setupProfilePhotoEvents() {
     const avatarContainer = document.getElementById("comp-profile-avatar-container");
+    const btnEditPhoto = document.getElementById("btn-edit-photo");
     const fileInput = document.getElementById("comp-photo-file-input");
 
-    if (avatarContainer && fileInput) {
-        avatarContainer.addEventListener("click", () => {
-            fileInput.click();
-        });
+    if (fileInput) {
+        if (avatarContainer) {
+            avatarContainer.addEventListener("click", () => {
+                fileInput.click();
+            });
+        }
+        if (btnEditPhoto) {
+            btnEditPhoto.addEventListener("click", (e) => {
+                e.stopPropagation();
+                fileInput.click();
+            });
+        }
 
         fileInput.addEventListener("change", (e) => {
             const file = e.target.files[0];

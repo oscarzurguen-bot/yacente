@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=268">
+    <link rel="stylesheet" href="style.css?v=270">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1144,28 +1144,37 @@
             <section id="section-componente-ficha" class="app-section">
                 <!-- Debug Box -->
                 <div id="ficha-debug-box" style="padding: 12px; margin-bottom: 15px; background: rgba(212, 175, 55, 0.08); border: 1px dashed var(--color-gold); border-radius: 6px; font-size: 0.8rem; color: var(--text-primary); line-height: 1.4; display: none;"></div>
+                <!-- Top Bar (Notificaciones arriba a la derecha de la página) -->
+                <div class="comp-section-top-bar" style="display: flex; justify-content: flex-end; align-items: center; width: 100%;">
+                    <button id="btn-comp-notifications-bell" class="btn-notifications-bell" title="Ver Notificaciones" style="position: relative;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <!-- Badge -->
+                        <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
+                    </button>
+                </div>
                 <!-- Perfil Card -->
                 <div class="card component-profile-card">
                     <div class="profile-header-layout">
-                        <div class="profile-avatar" id="comp-profile-avatar-container" style="position: relative; cursor: pointer;" title="Haz clic para cambiar tu foto de perfil">
-                            <span id="comp-avatar-letters">--</span>
-                            <img id="comp-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-                            <div id="btn-edit-photo" title="Cambiar foto de perfil" style="position: absolute; bottom: 0; right: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--color-gold); border: 2px solid var(--bg-card); color: #000; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; box-shadow: 0 2px 4px rgba(0,0,0,0.4); transition: transform 0.2s ease;">📷</div>
+                        <!-- Foto de perfil grande y botón cambiar abajo -->
+                        <div class="profile-avatar-col" style="display: flex; flex-direction: column; align-items: center; flex-shrink: 0;">
+                            <div class="profile-avatar" id="comp-profile-avatar-container" style="position: relative; cursor: pointer;" title="Haz clic para cambiar tu foto de perfil">
+                                <span id="comp-avatar-letters">--</span>
+                                <img id="comp-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                            </div>
+                            <button type="button" id="btn-edit-photo" style="background: none; border: none; color: var(--color-gold); font-size: 0.7rem; padding: 4px 0 0 0; cursor: pointer; text-decoration: underline; font-weight: 500; font-family: 'Outfit', sans-serif;">Cambiar foto</button>
                         </div>
                         <input type="file" id="comp-photo-file-input" accept="image/*" class="hidden">
+                        
+                        <!-- Meta: Nombre y Rol -->
                         <div class="profile-meta">
                             <h3 id="comp-profile-name">Cargando nombre...</h3>
                             <p id="comp-profile-details" class="text-muted">Cargando instrumento...</p>
                         </div>
-                        <!-- Campana de Notificaciones (dentro de botón circular a color) -->
-                        <button id="btn-comp-notifications-bell" class="btn-notifications-bell" title="Ver Notificaciones">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                            </svg>
-                            <!-- Badge -->
-                            <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
-                        </button>
+                        
+                        <!-- Racha arriba a la derecha del panel -->
                         <div class="profile-streak-badge" id="comp-streak-badge" title="Racha de ensayos consecutivos">
                             <span class="streak-icon">🔥</span>
                             <span class="streak-count" id="comp-streak-val">0</span>
@@ -1176,7 +1185,7 @@
 
 
                 <!-- Estadísticas Resumen Grid -->
-                <div class="stats-cards-grid" style="margin-top: 20px;">
+                <div class="stats-cards-grid">
                     <div class="card stat-summary-card">
                         <div class="stat-circle-progress" id="comp-progress-circle">
                             <svg viewBox="0 0 36 36" class="circular-chart gold">
@@ -1207,7 +1216,7 @@
                 </div>
 
                 <!-- Insignias / Medallas -->
-                <div class="card" style="margin-top: 20px; padding: 20px;">
+                <div class="card" style="padding: 20px;">
                     <div class="insignias-header-row" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
                         <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Mis Insignias</h3>
                         <div class="profile-insignias-badge" id="comp-insignias-badge" title="Insignias desbloqueadas">
@@ -2840,12 +2849,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=268"></script>
+    <script src="app.js?v=270"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=268")
+                navigator.serviceWorker.register("sw.js?v=270")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
