@@ -8441,18 +8441,30 @@ function createConcertSeatDOM(musicianId, lineIndex, seatIndex, x, y, container)
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
         if (sourceType === "seat" && sourceLineStr !== undefined) {
-            const sourceLine = parseInt(sourceLineStr, 10);
-            
-            // Buscar la posición del músico arrastrado en la línea de origen
-            const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
-            
-            if (sourceSeatIdx !== -1) {
-                // Intercambiar músicos en los dos puestos
-                state.formacionConcierto[lineIndex][seatIndex] = draggedMusicianId;
-                state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
+            if (sourceLineStr === "director") {
+                // Intercambiar (Swap): el músico arrastrado es el Director
+                const oldDirectorId = state.directorConcierto;
+                const oldMusicianId = musicianId;
+                
+                // El músico de este asiento pasa a ser Director (o null si el asiento estaba libre)
+                state.directorConcierto = oldMusicianId || null;
+                // El antiguo director pasa a ocupar este asiento de concierto
+                state.formacionConcierto[lineIndex][seatIndex] = oldDirectorId;
+            } else {
+                const sourceLine = parseInt(sourceLineStr, 10);
+                const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
+                
+                if (sourceSeatIdx !== -1) {
+                    // Intercambiar músicos en los dos puestos de concierto
+                    state.formacionConcierto[lineIndex][seatIndex] = draggedMusicianId;
+                    state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
+                }
             }
         } else if (sourceType === "roster") {
-            // Reemplazar músico en este puesto (quitar de otra fila si estaba)
+            // Reemplazar músico en este puesto (quitar del director si estaba allí)
+            if (state.directorConcierto === draggedMusicianId) {
+                state.directorConcierto = null;
+            }
             for (let i = 0; i < state.formacionConcierto.length; i++) {
                 state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
             }
@@ -8539,22 +8551,27 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
         
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
-        // Quitar de cualquier otra posición en concierto
-        for (let i = 0; i < state.formacionConcierto.length; i++) {
-            state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
-        }
+        const oldDirectorId = state.directorConcierto;
         
-        if (sourceType === "seat" && sourceLineStr !== undefined) {
-            if (sourceLineStr !== "director") {
-                const sourceLine = parseInt(sourceLineStr, 10);
-                const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
-                
-                if (sourceSeatIdx !== -1) {
-                    if (musicianId) {
-                        // Swap: colocar director actual en la silla de origen
-                        state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
-                    }
+        if (sourceType === "seat" && sourceLineStr !== undefined && sourceLineStr !== "director") {
+            const sourceLine = parseInt(sourceLineStr, 10);
+            const sourceSeatIdx = state.formacionConcierto[sourceLine] ? state.formacionConcierto[sourceLine].indexOf(draggedMusicianId) : -1;
+            
+            // Quitar el músico arrastrado de su fila actual
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
+            }
+            
+            if (sourceSeatIdx !== -1) {
+                if (oldDirectorId) {
+                    // Swap: colocar el director anterior en la silla de concierto que deja libre el músico
+                    state.formacionConcierto[sourceLine].splice(sourceSeatIdx, 0, oldDirectorId);
                 }
+            }
+        } else {
+            // Arrastrado desde el roster
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
             }
         }
         
@@ -9109,15 +9126,42 @@ function renderPopoverMusicians() {
 function assignMusicianToSeat(seatId, musicianId) {
     const map = getActiveFormationMap();
     
-    if (musicianId) {
-        Object.keys(map).forEach(key => {
-            if (map[key] === musicianId) {
-                map[key] = null;
+    if (seatId === "seat-director") {
+        const oldDirectorId = state.directorConcierto;
+        if (musicianId && oldDirectorId && musicianId !== oldDirectorId) {
+            let foundLine = -1;
+            let foundIdx = -1;
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                const idx = state.formacionConcierto[i].indexOf(musicianId);
+                if (idx !== -1) {
+                    foundLine = i;
+                    foundIdx = idx;
+                    break;
+                }
             }
-        });
+            if (foundLine !== -1 && foundIdx !== -1) {
+                state.formacionConcierto[foundLine][foundIdx] = oldDirectorId;
+            }
+        }
+        if (musicianId) {
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== musicianId);
+            }
+        }
+        state.directorConcierto = musicianId || null;
+    } else {
+        if (musicianId) {
+            if (state.directorConcierto === musicianId) {
+                state.directorConcierto = null;
+            }
+            Object.keys(map).forEach(key => {
+                if (map[key] === musicianId) {
+                    map[key] = null;
+                }
+            });
+        }
+        map[seatId] = musicianId;
     }
-    
-    map[seatId] = musicianId;
     
     renderSimulatorSeats();
     renderSimulatorRoster();
