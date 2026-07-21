@@ -3053,8 +3053,8 @@ body.component-portal #candle-tribute-container {
 }
 
 /* Mi Ficha - Separación uniforme y moderada entre paneles */
-#section-componente-ficha {
-    display: flex;
+#section-componente-ficha.active {
+    display: flex !important;
     flex-direction: column;
     gap: 12px;
 }
@@ -3137,16 +3137,16 @@ body.component-portal #candle-tribute-container {
     font-family: 'Cinzel', serif;
     font-size: 1.15rem;
     color: #FFF;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
 }
 .profile-meta p {
     margin: 3px 0 0 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.85rem;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
 }
 .profile-streak-badge {
     position: absolute;
