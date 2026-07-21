@@ -2604,7 +2604,7 @@ function renderActiveSection(sectionId, forcedDirection) {
     if (targetSection) {
         targetSection.classList.add("active");
         if (activeRole === "component" && direction) {
-            const style = window.swipeTransitionStyle || "glass";
+            const style = window.swipeTransitionStyle || "ios";
             const animClass = `trans-${style}-${direction === "next" ? "right" : "left"}`;
             targetSection.classList.add(animClass);
         }
