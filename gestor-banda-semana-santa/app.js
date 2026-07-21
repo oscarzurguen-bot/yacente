@@ -6436,9 +6436,18 @@ function renderMarchasList() {
         const btnStyle = `padding: 2px; background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;`;
         const iconSize = state.marchasViewMode === "list" ? 14 : 11;
 
+        const hasNotes = m.notes && m.notes.trim().length > 0;
+        const notesTitle = hasNotes ? m.notes.trim().replace(/"/g, '&quot;') : '';
+        const notesBadge = hasNotes 
+            ? `<span class="marcha-has-notes-icon" title="Nota de dirección: ${notesTitle}" style="display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(230, 126, 34, 0.22); border: 1px solid #e67e22; color: #e67e22; font-size: 0.7rem; font-weight: 800; margin-left: 6px; flex-shrink: 0; vertical-align: middle;">❗</span>` 
+            : '';
+
         if (state.marchasViewMode === "list") {
             card.innerHTML = `
-                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 8px;">${m.title}</h4>
+                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 8px; display: flex; align-items: center;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.title}</span>
+                    ${notesBadge}
+                </h4>
                 <div class="marcha-right-controls" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto;">
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 6px;">
                         ${metaHtml}
@@ -6471,7 +6480,10 @@ function renderMarchasList() {
         } else {
             // Status or difficulty columns mode
             card.innerHTML = `
-                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 4px;">${m.title}</h4>
+                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 4px; display: flex; align-items: center;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.title}</span>
+                    ${notesBadge}
+                </h4>
                 <div class="marcha-right-controls" style="display: flex; align-items: center; gap: 3px; flex-shrink: 0; margin-left: auto;">
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 2px; margin-right: 0px;">
                         ${metaHtml}
@@ -7264,6 +7276,7 @@ function saveMarchaNotes() {
         marcha.notes = notesText;
         dbSaveMarcha(marcha);
         showToast("Notas de la dirección guardadas", "success");
+        renderMarchasList();
     }
     
     closeMarchaNotesModal();
