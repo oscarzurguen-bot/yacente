@@ -8343,16 +8343,17 @@ function createParadeSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) 
         
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
-        if (sourceType === "seat" && sourceLineStr !== undefined) {
+        if (sourceType === "seat" && sourceLineStr !== undefined && sourceLineStr !== null) {
             const sourceLine = parseInt(sourceLineStr, 10);
-            
-            // Buscar la posición del músico arrastrado en la línea de origen
-            const sourceSeatIdx = state.formacionDesfile[sourceLine].indexOf(draggedMusicianId);
-            
-            if (sourceSeatIdx !== -1) {
-                // Intercambiar músicos en los dos puestos
-                state.formacionDesfile[lineIndex][seatIndex] = draggedMusicianId;
-                state.formacionDesfile[sourceLine][sourceSeatIdx] = musicianId;
+            if (!isNaN(sourceLine) && state.formacionDesfile[sourceLine]) {
+                // Buscar la posición del músico arrastrado en la línea de origen
+                const sourceSeatIdx = state.formacionDesfile[sourceLine].indexOf(draggedMusicianId);
+                
+                if (sourceSeatIdx !== -1) {
+                    // Intercambiar músicos en los dos puestos
+                    state.formacionDesfile[lineIndex][seatIndex] = draggedMusicianId;
+                    state.formacionDesfile[sourceLine][sourceSeatIdx] = musicianId;
+                }
             }
         } else if (sourceType === "roster") {
             // Reemplazar músico en este puesto (quitar de otra fila si estaba)
@@ -8440,7 +8441,7 @@ function createConcertSeatDOM(musicianId, lineIndex, seatIndex, x, y, container)
         
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
-        if (sourceType === "seat" && sourceLineStr !== undefined) {
+        if (sourceType === "seat" && sourceLineStr !== undefined && sourceLineStr !== null) {
             if (sourceLineStr === "director") {
                 // Intercambiar (Swap): el músico arrastrado es el Director
                 const oldDirectorId = state.directorConcierto;
@@ -8452,12 +8453,14 @@ function createConcertSeatDOM(musicianId, lineIndex, seatIndex, x, y, container)
                 state.formacionConcierto[lineIndex][seatIndex] = oldDirectorId;
             } else {
                 const sourceLine = parseInt(sourceLineStr, 10);
-                const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
-                
-                if (sourceSeatIdx !== -1) {
-                    // Intercambiar músicos en los dos puestos de concierto
-                    state.formacionConcierto[lineIndex][seatIndex] = draggedMusicianId;
-                    state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
+                if (!isNaN(sourceLine) && state.formacionConcierto[sourceLine]) {
+                    const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
+                    
+                    if (sourceSeatIdx !== -1) {
+                        // Intercambiar músicos en los dos puestos de concierto
+                        state.formacionConcierto[lineIndex][seatIndex] = draggedMusicianId;
+                        state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
+                    }
                 }
             }
         } else if (sourceType === "roster") {
@@ -8562,7 +8565,7 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
                 state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
             }
             
-            if (sourceSeatIdx !== -1) {
+            if (sourceSeatIdx !== -1 && !isNaN(sourceLine) && state.formacionConcierto[sourceLine]) {
                 if (oldDirectorId) {
                     // Swap: colocar el director anterior en la silla de concierto que deja libre el músico
                     state.formacionConcierto[sourceLine].splice(sourceSeatIdx, 0, oldDirectorId);
