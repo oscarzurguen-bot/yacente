@@ -1161,6 +1161,8 @@ function setupEventListeners() {
             }
         });
     });
+    // Navegación táctil por deslizamiento (Swipe Gestures) para el portal de músicos
+    setupComponentSwipeNavigation();
 
     // Formulario de cambio de PIN en Ficha
     const formChangePin = document.getElementById("form-change-pin");
@@ -2501,6 +2503,66 @@ function setupMarchasDragAndDrop() {
             showToast("Todas las notificaciones marcadas como leídas.", "success");
         });
     }
+}
+
+function setupComponentSwipeNavigation() {
+    const mainContent = document.querySelector(".main-content");
+    if (!mainContent) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const sectionsOrder = [
+        "section-componente-ficha",
+        "section-componente-eventos",
+        "section-componente-historial",
+        "section-componente-repertorio"
+    ];
+
+    mainContent.addEventListener("touchstart", (e) => {
+        if (getAuthRole() !== "component") return;
+        if (!e.touches || e.touches.length > 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    mainContent.addEventListener("touchend", (e) => {
+        if (getAuthRole() !== "component") return;
+        if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+
+        // Umbral de deslizamiento horizontal (min 50px) y tolerancia vertical (max 60px)
+        if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 60) {
+            const activeSection = document.querySelector(".app-section.active");
+            if (!activeSection) return;
+
+            const currentId = activeSection.id;
+            const currentIndex = sectionsOrder.indexOf(currentId);
+
+            if (currentIndex !== -1) {
+                if (deltaX < 0) {
+                    // Deslizar izquierda -> Siguiente página
+                    if (currentIndex < sectionsOrder.length - 1) {
+                        renderActiveSection(sectionsOrder[currentIndex + 1]);
+                    }
+                } else {
+                    // Deslizar derecha -> Página anterior
+                    if (currentIndex > 0) {
+                        renderActiveSection(sectionsOrder[currentIndex - 1]);
+                    }
+                }
+            } else if (currentId === "section-componente-notificaciones") {
+                if (deltaX > 0) {
+                    renderActiveSection("section-componente-ficha");
+                }
+            }
+        }
+    }, { passive: true });
 }
 
 function renderActiveSection(sectionId) {

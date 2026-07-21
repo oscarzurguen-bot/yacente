@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=276">
+    <link rel="stylesheet" href="style.css?v=278">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1147,17 +1147,10 @@
                 <!-- Perfil Card -->
                 <div class="card component-profile-card">
                     <div class="profile-header-layout">
-                        <!-- Foto de perfil muy grande (115px) con insignia circular de cámara -->
+                        <!-- Foto de perfil interactiva (haz clic para cambiar la foto) -->
                         <div class="profile-avatar" id="comp-profile-avatar-container" style="position: relative; cursor: pointer;" title="Haz clic para cambiar tu foto de perfil">
                             <span id="comp-avatar-letters">--</span>
                             <img id="comp-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
-                            <!-- Insignia circular de cámara proporcional (32px) -->
-                            <div id="btn-edit-photo" title="Cambiar foto de perfil">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                                    <circle cx="12" cy="13" r="4"></circle>
-                                </svg>
-                            </div>
                         </div>
                         <input type="file" id="comp-photo-file-input" accept="image/*" class="hidden">
                         
@@ -2853,12 +2846,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=276"></script>
+    <script src="app.js?v=278"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=276")
+                navigator.serviceWorker.register("sw.js?v=278")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
