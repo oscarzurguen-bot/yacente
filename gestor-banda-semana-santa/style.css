@@ -3207,7 +3207,6 @@ body.component-portal #candle-tribute-container {
     color: #ff8c1a;
     font-weight: 700;
     font-size: 0.85rem;
-    box-shadow: 0 0 10px rgba(255, 119, 0, 0.25);
 }
 .profile-insignias-badge {
     display: flex;
