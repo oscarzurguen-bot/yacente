@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=272">
+    <link rel="stylesheet" href="style.css?v=274">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -337,15 +337,6 @@
                         </svg>
                     </button>
                 </div>
-                <!-- Campana de Notificaciones Músico (Esquina superior derecha de la página) -->
-                <button id="btn-comp-notifications-bell" class="btn-notifications-bell hidden" title="Ver Notificaciones" style="position: absolute; top: 16px; right: 20px; z-index: 100;">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                    <!-- Badge -->
-                    <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
-                </button>
             </header>
 
             <!-- Section: Pasar Lista -->
@@ -1176,10 +1167,21 @@
                             <p id="comp-profile-details" class="text-muted">Cargando instrumento...</p>
                         </div>
                         
-                        <!-- Racha arriba a la derecha del panel -->
-                        <div class="profile-streak-badge" id="comp-streak-badge" title="Racha de ensayos consecutivos">
-                            <span class="streak-icon">🔥</span>
-                            <span class="streak-count" id="comp-streak-val">0</span>
+                        <!-- Acciones Arriba a la Derecha del Panel: Racha y Notificaciones -->
+                        <div style="position: absolute; top: -2px; right: 0; display: flex; align-items: center; gap: 8px;">
+                            <div class="profile-streak-badge" id="comp-streak-badge" title="Racha de ensayos consecutivos" style="position: relative; top: 0; right: 0;">
+                                <span class="streak-icon">🔥</span>
+                                <span class="streak-count" id="comp-streak-val">0</span>
+                            </div>
+                            <!-- Botón Notificaciones del Músico -->
+                            <button id="btn-comp-notifications-bell" class="btn-notifications-bell" title="Ver Notificaciones" style="position: relative;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <!-- Badge -->
+                                <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -2851,12 +2853,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=272"></script>
+    <script src="app.js?v=274"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=272")
+                navigator.serviceWorker.register("sw.js?v=274")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })

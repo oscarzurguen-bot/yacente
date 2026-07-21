@@ -2523,16 +2523,6 @@ function renderActiveSection(sectionId) {
     if (sessionBadge) sessionBadge.style.display = "none";
     if (configBtn) configBtn.style.display = "none";
 
-    // Manejo del botón de notificaciones del músico (esquina superior derecha)
-    const compNotifBell = document.getElementById("btn-comp-notifications-bell");
-    if (compNotifBell) {
-        if (activeRole === "component" && sectionId !== "section-componente-notificaciones") {
-            compNotifBell.classList.remove("hidden");
-        } else {
-            compNotifBell.classList.add("hidden");
-        }
-    }
-
     // Manejo del contenedor de tributo (vela)
     const tributeContainer = document.getElementById("candle-tribute-container");
     if (tributeContainer) {
