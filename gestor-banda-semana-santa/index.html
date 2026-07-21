@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=266">
+    <link rel="stylesheet" href="style.css?v=267">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1147,9 +1147,12 @@
                 <!-- Perfil Card -->
                 <div class="card component-profile-card">
                     <div class="profile-header-layout">
-                        <div class="profile-avatar">
+                        <div class="profile-avatar" id="comp-profile-avatar-container" style="position: relative; cursor: pointer;" title="Haz clic para cambiar tu foto de perfil">
                             <span id="comp-avatar-letters">--</span>
+                            <img id="comp-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                            <div id="btn-edit-photo" title="Cambiar foto de perfil" style="position: absolute; bottom: 0; right: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--color-gold); border: 2px solid var(--bg-card); color: #000; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; box-shadow: 0 2px 4px rgba(0,0,0,0.4); transition: transform 0.2s ease;">📷</div>
                         </div>
+                        <input type="file" id="comp-photo-file-input" accept="image/*" class="hidden">
                         <div class="profile-meta">
                             <h3 id="comp-profile-name">Cargando nombre...</h3>
                             <p id="comp-profile-details" class="text-muted">Cargando instrumento...</p>
@@ -2294,9 +2297,12 @@
     <div id="modal-musician-stats" class="modal-overlay">
         <div class="modal-card" style="max-width: 640px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
-                <div>
-                    <h3 id="detail-musician-name" style="margin: 0;">Componente</h3>
-                    <p id="detail-musician-instrument" class="text-muted" style="margin: 4px 0 0; font-size: 0.85rem;"></p>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div id="detail-musician-avatar" style="width: 44px; height: 44px; min-width: 44px; border-radius: 50%; background-color: rgba(212, 175, 55, 0.15); color: var(--color-gold); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(212, 175, 55, 0.3);">--</div>
+                    <div>
+                        <h3 id="detail-musician-name" style="margin: 0;">Componente</h3>
+                        <p id="detail-musician-instrument" class="text-muted" style="margin: 4px 0 0; font-size: 0.85rem;"></p>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <button class="btn btn-secondary btn-sm" id="btn-download-pdf" title="Descargar informe PDF" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;">
@@ -2834,12 +2840,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=266"></script>
+    <script src="app.js?v=267"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=266")
+                navigator.serviceWorker.register("sw.js?v=267")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })

@@ -2465,8 +2465,9 @@ function setupMarchasDragAndDrop() {
         });
     });
     
-    // Inicializar eventos de preaviso
+    // Inicializar eventos de preaviso y foto de perfil
     setupPreavisoEvents();
+    setupProfilePhotoEvents();
 
     // Notificaciones de Músicos
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -2729,10 +2730,13 @@ function renderAttendance() {
             }
 
             const initials = getInitials(musician.name);
+            const avatarMarkup = musician.photo
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                : initials;
             
             cardDiv.innerHTML = `
                 <div class="musician-card-top">
-                    <div class="musician-avatar">${initials}</div>
+                    <div class="musician-avatar">${avatarMarkup}</div>
                     <div class="musician-details">
                         <span class="musician-name">${musician.name}</span>
                         <span class="musician-role">${musician.role || 'Músico de fila'}</span>
@@ -3831,9 +3835,16 @@ function renderPlantillaTable() {
 
         musiciansInVoice.forEach(musician => {
             const tr = document.createElement("tr");
+            const miniAvatarMarkup = musician.photo
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 26px; height: 26px; min-width: 26px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">`
+                : `<div style="width: 26px; height: 26px; min-width: 26px; border-radius: 50%; background: rgba(212,175,55,0.15); color: var(--color-gold); font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${getInitials(musician.name)}</div>`;
+
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">
-                    <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${miniAvatarMarkup}
+                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                    </div>
                 </td>
                 <td style="white-space: nowrap;">
                     <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
@@ -4594,6 +4605,15 @@ function renderMusicianDetailContent() {
     const badgeColor = hasVolverEnsayar ? "var(--color-absent)" : "var(--color-gold)";
     const badgeBorder = hasVolverEnsayar ? "1px solid rgba(231, 76, 60, 0.35)" : "1px solid rgba(212, 175, 55, 0.25)";
     const badgeIcon = hasVolverEnsayar ? "⚠️" : "🏅";
+
+    const detailAvatarEl = document.getElementById("detail-musician-avatar");
+    if (detailAvatarEl) {
+        if (musician.photo) {
+            detailAvatarEl.innerHTML = `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            detailAvatarEl.innerText = getInitials(musician.name);
+        }
+    }
 
     document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(230, 126, 34, 0.12); color: #e67e22; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600;"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>`;
     document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role || "Músico"}`;
@@ -9998,7 +10018,26 @@ function renderComponentFicha() {
     
     const parts = musician.name.trim().split(" ");
     const initials = parts.map(p => p[0]).slice(0, 2).join("").toUpperCase();
-    document.getElementById("comp-avatar-letters").innerText = initials;
+    
+    const avatarLettersEl = document.getElementById("comp-avatar-letters");
+    const avatarImgEl = document.getElementById("comp-avatar-img");
+    if (musician.photo) {
+        if (avatarImgEl) {
+            avatarImgEl.src = musician.photo;
+            avatarImgEl.classList.remove("hidden");
+        }
+        if (avatarLettersEl) {
+            avatarLettersEl.classList.add("hidden");
+        }
+    } else {
+        if (avatarLettersEl) {
+            avatarLettersEl.innerText = initials;
+            avatarLettersEl.classList.remove("hidden");
+        }
+        if (avatarImgEl) {
+            avatarImgEl.classList.add("hidden");
+        }
+    }
     
     document.getElementById("comp-profile-name").innerText = musician.name;
     document.getElementById("comp-profile-details").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
@@ -11182,6 +11221,61 @@ function setupPreavisoEvents() {
             renderComponentEventos();
             renderComponenteCalendario();
             renderComponentHistorial();
+        });
+    }
+}
+
+function setupProfilePhotoEvents() {
+    const avatarContainer = document.getElementById("comp-profile-avatar-container");
+    const fileInput = document.getElementById("comp-photo-file-input");
+
+    if (avatarContainer && fileInput) {
+        avatarContainer.addEventListener("click", () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const musicianId = getAuthMusicianId();
+            if (!musicianId) return;
+
+            const musician = state.musicians.find(m => m.id === musicianId);
+            if (!musician) return;
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    const maxDim = 200;
+                    let width = img.width;
+                    let height = img.height;
+
+                    const minDim = Math.min(width, height);
+                    const sx = (width - minDim) / 2;
+                    const sy = (height - minDim) / 2;
+
+                    canvas.width = maxDim;
+                    canvas.height = maxDim;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, maxDim, maxDim);
+
+                    const base64Photo = canvas.toDataURL("image/jpeg", 0.82);
+                    musician.photo = base64Photo;
+
+                    saveStateToLocalStorage();
+                    dbSaveMusician(musician);
+
+                    renderComponentFicha();
+                    renderAttendance();
+                    showToast("Foto de perfil actualizada correctamente", "success");
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+            fileInput.value = "";
         });
     }
 }

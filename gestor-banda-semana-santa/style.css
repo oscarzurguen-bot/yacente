@@ -1044,6 +1044,8 @@ svg.chevron {
     background-color: var(--color-purple-dark);
     color: var(--color-gold);
     border: 1px solid var(--border-color);
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
 .musician-details {
@@ -3082,6 +3084,12 @@ body.component-portal #candle-tribute-container {
     font-weight: 700;
     font-size: 1.25rem;
     font-family: 'Cinzel', serif;
+    overflow: visible;
+    flex-shrink: 0;
+}
+#comp-profile-avatar-container:hover #btn-edit-photo {
+    transform: scale(1.18);
+}
     text-shadow: 0 0 10px rgba(212, 175, 55, 0.25);
     flex-shrink: 0;
 }
