@@ -2511,13 +2511,6 @@ function setupComponentSwipeNavigation() {
 
     let touchStartX = 0;
     let touchStartY = 0;
-    let isDragging = false;
-    let isSwiping = false;
-    let activeSection = null;
-    let targetSection = null;
-    let targetId = null;
-    let direction = null; // 'next' or 'prev'
-    let containerWidth = 0;
 
     const sectionsOrder = [
         "section-componente-ficha",
@@ -2526,194 +2519,50 @@ function setupComponentSwipeNavigation() {
         "section-componente-repertorio"
     ];
 
-    function cleanInlineStyles() {
-        if (activeSection) {
-            activeSection.style.transition = "";
-            activeSection.style.transform = "";
-            activeSection.style.position = "";
-            activeSection.style.width = "";
-            activeSection.style.top = "";
-            activeSection.style.zIndex = "";
-        }
-        if (targetSection) {
-            targetSection.style.transition = "";
-            targetSection.style.transform = "";
-            targetSection.style.position = "";
-            targetSection.style.width = "";
-            targetSection.style.top = "";
-            targetSection.style.zIndex = "";
-            if (!targetSection.classList.contains("active")) {
-                targetSection.style.display = "";
-            }
-        }
-        activeSection = null;
-        targetSection = null;
-        targetId = null;
-        direction = null;
-        isDragging = false;
-        isSwiping = false;
-    }
-
     mainContent.addEventListener("touchstart", (e) => {
         if (getAuthRole() !== "component") return;
         if (!e.touches || e.touches.length > 1) return;
-
-        activeSection = document.querySelector(".app-section.active");
-        if (!activeSection) return;
-
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
-        containerWidth = mainContent.clientWidth || window.innerWidth;
-        isDragging = true;
-        isSwiping = false;
-        targetSection = null;
-        targetId = null;
-        direction = null;
     }, { passive: true });
 
-    mainContent.addEventListener("touchmove", (e) => {
-        if (!isDragging || getAuthRole() !== "component") return;
-        if (!e.touches || e.touches.length === 0) return;
+    mainContent.addEventListener("touchend", (e) => {
+        if (getAuthRole() !== "component") return;
+        if (!e.changedTouches || e.changedTouches.length === 0) return;
 
-        const currentX = e.touches[0].clientX;
-        const currentY = e.touches[0].clientY;
-        const deltaX = currentX - touchStartX;
-        const deltaY = currentY - touchStartY;
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
 
-        // Verificar si el gesto horizontal predomina sobre el vertical
-        if (!isSwiping) {
-            if (Math.abs(deltaX) > 12 && Math.abs(deltaX) > Math.abs(deltaY)) {
-                isSwiping = true;
-            } else if (Math.abs(deltaY) > 12) {
-                isDragging = false; // Scroll vertical normal
-                return;
-            }
-        }
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
 
-        if (isSwiping) {
-            if (e.cancelable) e.preventDefault(); // Evitar scroll vertical durante el arrastre continuo
+        // Umbral de deslizamiento horizontal (min 50px) y tolerancia vertical (max 60px)
+        if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 60) {
+            const activeSection = document.querySelector(".app-section.active");
+            if (!activeSection) return;
 
             const currentId = activeSection.id;
             const currentIndex = sectionsOrder.indexOf(currentId);
 
-            let newDirection = null;
-            let newTargetId = null;
-
-            if (deltaX < 0) {
-                // Arrastre a la izquierda -> Siguiente tarjeta
-                if (currentIndex !== -1 && currentIndex < sectionsOrder.length - 1) {
-                    newDirection = "next";
-                    newTargetId = sectionsOrder[currentIndex + 1];
-                }
-            } else if (deltaX > 0) {
-                // Arrastre a la derecha -> Tarjeta anterior
-                if (currentIndex !== -1 && currentIndex > 0) {
-                    newDirection = "prev";
-                    newTargetId = sectionsOrder[currentIndex - 1];
-                } else if (currentId === "section-componente-notificaciones") {
-                    newDirection = "prev";
-                    newTargetId = "section-componente-ficha";
-                }
-            }
-
-            if (newTargetId !== targetId) {
-                if (targetSection && targetSection !== activeSection) {
-                    targetSection.style.display = "";
-                    targetSection.style.transform = "";
-                }
-                targetId = newTargetId;
-                direction = newDirection;
-                if (targetId) {
-                    targetSection = document.getElementById(targetId);
+            if (currentIndex !== -1) {
+                if (deltaX < 0) {
+                    // Deslizar izquierda -> Siguiente página (desplazar desde la derecha)
+                    if (currentIndex < sectionsOrder.length - 1) {
+                        renderActiveSection(sectionsOrder[currentIndex + 1], "next");
+                    }
                 } else {
-                    targetSection = null;
-                }
-            }
-
-            if (targetSection) {
-                // Desplazamiento continuo en tiempo real al ritmo del dedo (estilo WhatsApp)
-                activeSection.style.transition = "none";
-                activeSection.style.position = "relative";
-                activeSection.style.zIndex = "1";
-                activeSection.style.transform = `translateX(${deltaX}px)`;
-
-                targetSection.style.display = "flex";
-                targetSection.style.flexDirection = "column";
-                targetSection.style.position = "absolute";
-                targetSection.style.top = "0";
-                targetSection.style.left = "0";
-                targetSection.style.width = "100%";
-                targetSection.style.zIndex = "2";
-                targetSection.style.transition = "none";
-
-                if (direction === "next") {
-                    targetSection.style.transform = `translateX(${containerWidth + deltaX}px)`;
-                } else {
-                    targetSection.style.transform = `translateX(${-containerWidth + deltaX}px)`;
-                }
-            } else {
-                // Resistencia al llegar al borde inicial/final
-                activeSection.style.transition = "none";
-                activeSection.style.transform = `translateX(${deltaX * 0.25}px)`;
-            }
-        }
-    }, { passive: false });
-
-    mainContent.addEventListener("touchend", (e) => {
-        if (!isDragging) return;
-        if (!e.changedTouches || e.changedTouches.length === 0) {
-            cleanInlineStyles();
-            return;
-        }
-
-        const endX = e.changedTouches[0].clientX;
-        const deltaX = endX - touchStartX;
-
-        if (isSwiping && activeSection) {
-            const ratio = Math.abs(deltaX) / containerWidth;
-
-            if (targetSection && ratio > 0.18) {
-                // Completar la transición de forma fluida hasta el 100%
-                activeSection.style.transition = "transform 0.22s ease-out";
-                targetSection.style.transition = "transform 0.22s ease-out";
-
-                if (direction === "next") {
-                    activeSection.style.transform = `translateX(${-containerWidth}px)`;
-                    targetSection.style.transform = `translateX(0px)`;
-                } else {
-                    activeSection.style.transform = `translateX(${containerWidth}px)`;
-                    targetSection.style.transform = `translateX(0px)`;
-                }
-
-                setTimeout(() => {
-                    const finalTargetId = targetId;
-                    cleanInlineStyles();
-                    renderActiveSection(finalTargetId);
-                }, 220);
-            } else {
-                // Cancelar la transición si el recorrido fue corto (retorno elástico)
-                activeSection.style.transition = "transform 0.2s ease-out";
-                activeSection.style.transform = "translateX(0px)";
-                if (targetSection) {
-                    targetSection.style.transition = "transform 0.2s ease-out";
-                    if (direction === "next") {
-                        targetSection.style.transform = `translateX(${containerWidth}px)`;
-                    } else {
-                        targetSection.style.transform = `translateX(${-containerWidth}px)`;
+                    // Deslizar derecha -> Página anterior (desplazar desde la izquierda)
+                    if (currentIndex > 0) {
+                        renderActiveSection(sectionsOrder[currentIndex - 1], "prev");
                     }
                 }
-                setTimeout(() => {
-                    cleanInlineStyles();
-                }, 200);
+            } else if (currentId === "section-componente-notificaciones") {
+                if (deltaX > 0) {
+                    renderActiveSection("section-componente-ficha", "prev");
+                }
             }
-        } else {
-            cleanInlineStyles();
         }
-    });
-
-    mainContent.addEventListener("touchcancel", () => {
-        cleanInlineStyles();
-    });
+    }, { passive: true });
 }
 
 function renderActiveSection(sectionId, forcedDirection) {
