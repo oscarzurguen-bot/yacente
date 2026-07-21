@@ -3835,16 +3835,9 @@ function renderPlantillaTable() {
 
         musiciansInVoice.forEach(musician => {
             const tr = document.createElement("tr");
-            const miniAvatarMarkup = musician.photo
-                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 26px; height: 26px; min-width: 26px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">`
-                : `<div style="width: 26px; height: 26px; min-width: 26px; border-radius: 50%; background: rgba(212,175,55,0.15); color: var(--color-gold); font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">${getInitials(musician.name)}</div>`;
-
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        ${miniAvatarMarkup}
-                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
-                    </div>
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">
+                    <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
                 </td>
                 <td style="white-space: nowrap;">
                     <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
