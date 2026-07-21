@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v270";
+const CACHE_NAME = "yacente-v271";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",

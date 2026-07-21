@@ -3090,24 +3090,25 @@ body.component-portal #candle-tribute-container {
     flex-wrap: nowrap;
 }
 .profile-avatar {
-    width: 70px;
-    height: 70px;
+    width: 85px;
+    height: 85px;
     border-radius: 50%;
     background-color: rgba(212, 175, 55, 0.12);
-    border: 2px solid var(--color-gold);
+    border: 2.5px solid var(--color-gold);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #D4AF37;
     font-weight: 700;
-    font-size: 1.45rem;
+    font-size: 1.8rem;
     font-family: 'Cinzel', serif;
-    overflow: hidden;
+    overflow: visible;
     flex-shrink: 0;
-    box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+    box-shadow: 0 0 14px rgba(212, 175, 55, 0.25);
+    position: relative;
 }
-#btn-edit-photo:hover {
-    color: #FFF !important;
+#comp-profile-avatar-container:hover #btn-edit-photo {
+    transform: scale(1.18);
 }
 .profile-meta {
     flex: 1;
