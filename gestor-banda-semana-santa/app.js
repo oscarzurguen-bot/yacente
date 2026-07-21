@@ -2588,15 +2588,24 @@ function renderActiveSection(sectionId, forcedDirection) {
         }
     }
 
+    const allTransClasses = [
+        "trans-ios-right", "trans-ios-left",
+        "trans-glass-right", "trans-glass-left",
+        "trans-snappy-right", "trans-snappy-left",
+        "trans-3d-right", "trans-3d-left",
+        "slide-in-right", "slide-in-left"
+    ];
+
     document.querySelectorAll(".app-section").forEach(section => {
-        section.classList.remove("active", "slide-in-right", "slide-in-left");
+        section.classList.remove("active", ...allTransClasses);
     });
 
     const targetSection = document.getElementById(sectionId);
     if (targetSection) {
         targetSection.classList.add("active");
         if (activeRole === "component" && direction) {
-            const animClass = direction === "next" ? "slide-in-right" : "slide-in-left";
+            const style = window.swipeTransitionStyle || "glass";
+            const animClass = `trans-${style}-${direction === "next" ? "right" : "left"}`;
             targetSection.classList.add(animClass);
         }
     }

@@ -3058,34 +3058,56 @@ body.component-portal #candle-tribute-container {
     position: relative;
 }
 
-.slide-in-right {
-    animation: slideInRight 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+/* Opción 1: iOS Push (Página entra con sombra desde el lateral, estilo iOS nativo) */
+.trans-ios-right { animation: iosPushRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.trans-ios-left { animation: iosPushLeft 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+
+@keyframes iosPushRight {
+    0% { opacity: 0.7; transform: translateX(100%); box-shadow: -12px 0 30px rgba(0,0,0,0.6); }
+    100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes iosPushLeft {
+    0% { opacity: 0.7; transform: translateX(-100%); box-shadow: 12px 0 30px rgba(0,0,0,0.6); }
+    100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
 }
 
-.slide-in-left {
-    animation: slideInLeft 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+/* Opción 2: Glass Flow (Fundido con desenfoque de cristal y desplazamiento sutil) */
+.trans-glass-right { animation: glassFlowRight 0.28s ease-out forwards; }
+.trans-glass-left { animation: glassFlowLeft 0.28s ease-out forwards; }
+
+@keyframes glassFlowRight {
+    0% { opacity: 0; filter: blur(8px); transform: translateX(45px); }
+    100% { opacity: 1; filter: blur(0px); transform: translateX(0); }
+}
+@keyframes glassFlowLeft {
+    0% { opacity: 0; filter: blur(8px); transform: translateX(-45px); }
+    100% { opacity: 1; filter: blur(0px); transform: translateX(0); }
 }
 
-@keyframes slideInRight {
-    0% {
-        opacity: 0.4;
-        transform: translateX(50px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateX(0);
-    }
+/* Opción 3: Snappy Parallax (Deslizamiento 100% directo, instantáneo e hiper-rápido) */
+.trans-snappy-right { animation: snappyRight 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
+.trans-snappy-left { animation: snappyLeft 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
+
+@keyframes snappyRight {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(0); }
+}
+@keyframes snappyLeft {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(0); }
 }
 
-@keyframes slideInLeft {
-    0% {
-        opacity: 0.4;
-        transform: translateX(-50px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateX(0);
-    }
+/* Opción 4: Tarjeta 3D (Desplazamiento con leve perspectiva y giro 3D) */
+.trans-3d-right { animation: card3DRight 0.32s ease-out forwards; }
+.trans-3d-left { animation: card3DLeft 0.32s ease-out forwards; }
+
+@keyframes card3DRight {
+    0% { opacity: 0.2; transform: perspective(800px) rotateY(-14deg) translateX(70px); }
+    100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+}
+@keyframes card3DLeft {
+    0% { opacity: 0.2; transform: perspective(800px) rotateY(14deg) translateX(-70px); }
+    100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
 }
 
 /* Mi Ficha - Separación uniforme y moderada entre paneles */
