@@ -2841,22 +2841,21 @@ function renderAttendance() {
                         <span class="musician-name">${musician.name}</span>
                         <span class="musician-role">${musician.role || 'Músico de fila'}</span>
                     </div>
-                </div>
-                
-                <div class="attendance-actions">
-                    <button class="toggle-btn btn-present" data-id="${musician.id}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Presente
-                    </button>
-                    <button class="toggle-btn btn-absent" data-id="${musician.id}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                        Ausente
-                    </button>
+                    <div class="attendance-actions">
+                        <button class="toggle-btn btn-present" data-id="${musician.id}">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Presente
+                        </button>
+                        <button class="toggle-btn btn-absent" data-id="${musician.id}">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Ausente
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="absence-details-container ${attState.status === 'present' ? 'hidden' : ''} ${attState.status === 'absent' && attState.justified && attState.reason && attState.reason.trim() !== '' ? 'show-summary' : 'show-form'}">

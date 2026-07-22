@@ -1005,9 +1005,9 @@ svg.chevron {
 /* Grid of Musicians */
 .musicians-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 16px;
-    padding: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 10px;
+    padding: 14px;
 }
 
 /* Musician Card */
@@ -1015,10 +1015,10 @@ svg.chevron {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    padding: 16px;
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
     transition: var(--transition-normal);
 }
 .musician-card:hover {
@@ -1028,19 +1028,20 @@ svg.chevron {
 .musician-card-top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+    width: 100%;
 }
 
 /* Dynamic avatar styling */
 .musician-avatar {
-    width: 42px;
-    height: 42px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.78rem;
     background-color: var(--color-purple-dark);
     color: var(--color-gold);
     border: 1px solid var(--border-color);
@@ -1051,16 +1052,26 @@ svg.chevron {
 .musician-details {
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
 }
 .musician-name {
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
 }
 .musician-role {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
 }
 
 /* Card states */
@@ -1096,25 +1107,29 @@ svg.chevron {
 
 /* Quick attendance toggle button group */
 .attendance-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .toggle-btn {
-    border-radius: var(--radius-sm);
-    padding: 8px;
+    border-radius: 5px;
+    padding: 4px 8px;
     font-weight: 600;
-    font-size: 0.85rem;
-    display: flex;
+    font-size: 0.76rem;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 3px;
     cursor: pointer;
     background-color: var(--bg-primary);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
     transition: var(--transition-fast);
+    height: 26px;
+    line-height: 1;
 }
 
 .toggle-btn.btn-present:hover, 
@@ -1135,10 +1150,11 @@ svg.chevron {
 /* Justified options that fade in when absent */
 .absence-details-container {
     border-top: 1px dashed var(--border-color);
-    padding-top: 12px;
+    padding-top: 8px;
+    margin-top: 2px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     max-height: 250px;
     opacity: 1;
     overflow: hidden;
