@@ -389,7 +389,6 @@ function updateSessionBadge() {
             badge.style.color = "var(--color-gold)";
         }
     }
-    updatePastLockIndicator();
 }
 
 function updateAttendanceSessionSelector() {
@@ -1171,7 +1170,6 @@ function setupEventListeners() {
         formChangePin.addEventListener("submit", (e) => {
             e.preventDefault();
             const musicianId = getAuthMusicianId();
-            const musician = state.musicians.find(m => m.id === musicianId);
             const newPin = document.getElementById("change-pin-new").value.trim();
             
             if (newPin.length !== 4 || isNaN(newPin)) {
@@ -1179,104 +1177,19 @@ function setupEventListeners() {
                 return;
             }
             
-            if (musician) {
-                musician.pin = newPin;
-                saveStateToLocalStorage();
-                if (isCloudActive()) {
-                    const db = firebase.firestore();
-                    db.collection("musicians").doc(musicianId).update({ pin: newPin })
-                        .then(() => {
-                            showToast("PIN actualizado con éxito en la nube", "success");
-                            document.getElementById("change-pin-new").value = "";
-                            renderComponentFicha();
-                        })
-                        .catch(err => {
-                            console.error("Error al actualizar PIN:", err);
-                            showToast("PIN guardado en almacenamiento local", "success");
-                            document.getElementById("change-pin-new").value = "";
-                            renderComponentFicha();
-                        });
-                } else {
-                    showToast("PIN guardado en almacenamiento local", "success");
-                    document.getElementById("change-pin-new").value = "";
-                    renderComponentFicha();
-                }
-            }
-        });
-    }
-
-    // Formulario de autorización para modificar ensayos pasados
-    const formPastAuth = document.getElementById("form-past-edit-auth");
-    if (formPastAuth) {
-        formPastAuth.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const inputPass = document.getElementById("input-past-auth-password").value.trim();
-            const expectedPass = getEffectivePastEditPin();
+            const musician = state.musicians.find(m => m.id === musicianId);
+            if (!musician) return;
             
-            if (inputPass === expectedPass) {
-                const sessionKey = pendingPastAuthSessionKey || state.currentDate;
-                const rawDate = sessionKey.split("_")[0];
-                
-                pastEditUnlockedSessions[sessionKey] = true;
-                pastEditUnlockedSessions[rawDate] = true;
-                
-                showToast("🔒 Modificación de ensayo pasado autorizada", "success");
-                
-                const callback = pendingPastAuthCallback;
-                closePastAuthModal();
-                
-                updatePastLockIndicator();
-                
-                if (typeof callback === "function") {
-                    callback();
-                }
-            } else {
-                showToast("⚠️ Contraseña incorrecta. No se han guardado los cambios.", "danger");
-            }
-        });
-    }
-    
-    document.getElementById("btn-close-past-auth-modal")?.addEventListener("click", closePastAuthModal);
-    document.getElementById("btn-cancel-past-auth-modal")?.addEventListener("click", closePastAuthModal);
-
-    // Formulario de configuración de Contraseña para Ensayos Pasados en Ajustes
-    const btnOpenPastPinModal = document.getElementById("btn-open-past-pin-modal");
-    if (btnOpenPastPinModal) {
-        btnOpenPastPinModal.addEventListener("click", () => {
-            document.getElementById("input-past-pin-new").value = "";
-            document.getElementById("input-past-pin-confirm").value = "";
-            document.getElementById("modal-config-past-pin").classList.add("active");
-        });
-    }
-    
-    document.getElementById("btn-close-config-past-pin-modal")?.addEventListener("click", () => {
-        document.getElementById("modal-config-past-pin").classList.remove("active");
-    });
-    document.getElementById("btn-cancel-config-past-pin-modal")?.addEventListener("click", () => {
-        document.getElementById("modal-config-past-pin").classList.remove("active");
-    });
-    
-    const formConfigPastPin = document.getElementById("form-config-past-pin");
-    if (formConfigPastPin) {
-        formConfigPastPin.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const newPin = document.getElementById("input-past-pin-new").value.trim();
-            const confirmPin = document.getElementById("input-past-pin-confirm").value.trim();
+            musician.pin = newPin;
+            saveStateToLocalStorage();
             
-            if (!newPin) return;
-            if (newPin !== confirmPin) {
-                showToast("Las contraseñas introducidas no coinciden", "warning");
-                return;
-            }
-            
-            localStorage.setItem("yacente_past_edit_pin", newPin);
-            state.pastEditPin = newPin;
-            
-            if (typeof isCloudActive === "function" && isCloudActive()) {
+            if (isCloudActive()) {
                 const db = firebase.firestore();
-                db.collection("config").doc("security").set({ pastEditPin: newPin }, { merge: true })
+                db.collection("musicians").doc(musicianId).update({ pin: newPin })
                     .then(() => {
-                        showToast("Contraseña de ensayos pasados guardada y sincronizada en la nube", "success");
+                        showToast("PIN actualizado con éxito en la nube", "success");
+                        document.getElementById("change-pin-new").value = "";
+                        renderComponentFicha();
                     })
                     .catch(err => {
                         console.error("Error al actualizar PIN:", err);
@@ -3080,119 +2993,7 @@ function ensureAttendanceRecord(date, id) {
     }
 }
 
-// ==========================================================================
-// SEGURIDAD Y AUTORIZACIÓN DE ENSAYOS PASADOS
-// ==========================================================================
-let pastEditUnlockedSessions = {};
-let pendingPastAuthCallback = null;
-let pendingPastAuthSessionKey = null;
-
-function isPastSessionDate(sessionKey) {
-    if (!sessionKey) return false;
-    const rawDate = sessionKey.split("_")[0];
-    const todayStr = new Date().toISOString().split("T")[0];
-    return rawDate < todayStr;
-}
-
-function getEffectivePastEditPin() {
-    const customPin = localStorage.getItem("yacente_past_edit_pin");
-    if (customPin && customPin.trim().length > 0) {
-        return customPin.trim();
-    }
-    return localStorage.getItem("yacente_firebase_hash") || localStorage.getItem("yacente_master_pass") || "1234";
-}
-
-function checkPastEditPermission(sessionKey, onAuthorized) {
-    const activeKey = sessionKey || state.currentDate || "";
-    
-    if (!isPastSessionDate(activeKey)) {
-        if (typeof onAuthorized === "function") onAuthorized();
-        return true;
-    }
-    
-    const rawDate = activeKey.split("_")[0];
-    if (pastEditUnlockedSessions[activeKey] || pastEditUnlockedSessions[rawDate]) {
-        if (typeof onAuthorized === "function") onAuthorized();
-        return true;
-    }
-    
-    pendingPastAuthSessionKey = activeKey;
-    pendingPastAuthCallback = onAuthorized;
-    openPastAuthModal(activeKey);
-    return false;
-}
-
-function openPastAuthModal(sessionKey) {
-    const rawDate = sessionKey.split("_")[0];
-    const formattedDate = typeof formatDateSpanish === "function" ? formatDateSpanish(rawDate) : rawDate;
-    const modal = document.getElementById("modal-past-edit-auth");
-    const descText = document.getElementById("past-auth-desc-text");
-    const passwordInput = document.getElementById("input-past-auth-password");
-    
-    if (descText) {
-        descText.innerHTML = `🔒 <strong>El ensayo del ${formattedDate}</strong> pertenece al pasado.<br>Para modificar o tomar asistencia en ensayos históricos, introduce la contraseña de protección de ensayos pasados:`;
-    }
-    if (passwordInput) passwordInput.value = "";
-    if (modal) modal.classList.add("active");
-    setTimeout(() => { if (passwordInput) passwordInput.focus(); }, 100);
-}
-
-function closePastAuthModal() {
-    const modal = document.getElementById("modal-past-edit-auth");
-    if (modal) modal.classList.remove("active");
-    pendingPastAuthCallback = null;
-    pendingPastAuthSessionKey = null;
-}
-
-function updatePastLockIndicator() {
-    const indicator = document.getElementById("past-lock-indicator");
-    if (!indicator) return;
-    
-    const activeKey = state.currentDate || "";
-    if (!isPastSessionDate(activeKey)) {
-        indicator.classList.add("hidden");
-        return;
-    }
-    
-    indicator.classList.remove("hidden");
-    const rawDate = activeKey.split("_")[0];
-    const isUnlocked = pastEditUnlockedSessions[activeKey] || pastEditUnlockedSessions[rawDate];
-    
-    if (isUnlocked) {
-        indicator.style.backgroundColor = "rgba(46, 204, 113, 0.12)";
-        indicator.style.borderColor = "rgba(46, 204, 113, 0.4)";
-        indicator.style.color = "var(--color-present)";
-        indicator.innerHTML = `
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-            </svg>
-            Pasado Desbloqueado
-        `;
-        indicator.setAttribute("title", "Edición autorizada con contraseña para esta sesión");
-    } else {
-        indicator.style.backgroundColor = "rgba(231, 76, 60, 0.12)";
-        indicator.style.borderColor = "rgba(231, 76, 60, 0.4)";
-        indicator.style.color = "var(--color-absent)";
-        indicator.innerHTML = `
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-            Pasado Protegido
-        `;
-        indicator.setAttribute("title", "Se requiere contraseña para modificar este ensayo pasado");
-    }
-}
-
 function updateMusicianAttendance(id, status) {
-    const date = state.currentDate;
-    checkPastEditPermission(date, () => {
-        executeUpdateMusicianAttendance(id, status);
-    });
-}
-
-function executeUpdateMusicianAttendance(id, status) {
     const date = state.currentDate;
     ensureAttendanceRecord(date, id);
     const record = state.attendance[date][id];
@@ -3206,29 +3007,24 @@ function executeUpdateMusicianAttendance(id, status) {
     dbSaveAttendance(date, id, record);
     
     const card = document.getElementById(`card-${id}`);
-    if (!card) return;
     const absenceContainer = card.querySelector(".absence-details-container");
     
     card.classList.remove("is-present", "is-absent", "is-justified");
     
     if (status === "present") {
         card.classList.add("is-present");
-        if (absenceContainer) absenceContainer.classList.add("hidden");
+        absenceContainer.classList.add("hidden");
     } else {
         card.classList.add("is-absent");
-        if (absenceContainer) absenceContainer.classList.remove("hidden");
-        const chk = card.querySelector(".chk-justified");
-        if (chk) chk.checked = false;
-        const inp = card.querySelector(".input-reason");
-        if (inp) inp.value = "";
+        absenceContainer.classList.remove("hidden");
+        card.querySelector(".chk-justified").checked = false;
+        card.querySelector(".input-reason").value = "";
         card.querySelectorAll(".quick-reason-pill").forEach(p => p.classList.remove("active"));
         
-        if (absenceContainer) {
-            absenceContainer.classList.remove("show-summary");
-            absenceContainer.classList.add("show-form");
-        }
-        const reasonGrp = card.querySelector(".reason-input-group");
-        if (reasonGrp) reasonGrp.classList.add("hidden");
+        // Reset a vista formulario al marcar como ausente de cero
+        absenceContainer.classList.remove("show-summary");
+        absenceContainer.classList.add("show-form");
+        card.querySelector(".reason-input-group").classList.add("hidden");
     }
 
     updateAttendanceStatsRibbon();
@@ -3237,20 +3033,12 @@ function executeUpdateMusicianAttendance(id, status) {
 
 function updateMusicianJustification(id, isJustified) {
     const date = state.currentDate;
-    checkPastEditPermission(date, () => {
-        executeUpdateMusicianJustification(id, isJustified);
-    });
-}
-
-function executeUpdateMusicianJustification(id, isJustified) {
-    const date = state.currentDate;
     ensureAttendanceRecord(date, id);
     state.attendance[date][id].justified = isJustified;
     
     dbSaveAttendance(date, id, state.attendance[date][id]);
     
     const card = document.getElementById(`card-${id}`);
-    if (!card) return;
     const reasonInputGroup = card.querySelector(".reason-input-group");
     const absenceContainer = card.querySelector(".absence-details-container");
     
@@ -3261,12 +3049,13 @@ function executeUpdateMusicianJustification(id, isJustified) {
         card.classList.remove("is-justified");
         if (reasonInputGroup) reasonInputGroup.classList.add("hidden");
         
+        // Limpiar motivo
         state.attendance[date][id].reason = "";
         dbSaveAttendance(date, id, state.attendance[date][id]);
-        const inp = card.querySelector(".input-reason");
-        if (inp) inp.value = "";
+        card.querySelector(".input-reason").value = "";
         card.querySelectorAll(".quick-reason-pill").forEach(p => p.classList.remove("active"));
         
+        // Volver a vista formulario
         if (absenceContainer) {
             absenceContainer.classList.remove("show-summary");
             absenceContainer.classList.add("show-form");
@@ -3277,13 +3066,6 @@ function executeUpdateMusicianJustification(id, isJustified) {
 }
 
 function updateMusicianReason(id, reasonText) {
-    const date = state.currentDate;
-    checkPastEditPermission(date, () => {
-        executeUpdateMusicianReason(id, reasonText);
-    });
-}
-
-function executeUpdateMusicianReason(id, reasonText) {
     const date = state.currentDate;
     ensureAttendanceRecord(date, id);
     state.attendance[date][id].reason = reasonText.trim();
