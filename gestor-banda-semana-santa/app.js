@@ -10849,10 +10849,11 @@ function renderComponenteCalendario() {
     const totalDays = new Date(year, month + 1, 0).getDate();
     const prevMonthTotalDays = new Date(year, month, 0).getDate();
 
-    // Fecha de hoy para destacar
+    // Fecha de hoy para destacar y comparar días pasados
     const today = new Date();
     const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
     const todayDay = today.getDate();
+    const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     // Array para acumular las celdas de días
     const cells = [];
@@ -10911,6 +10912,8 @@ function renderComponenteCalendario() {
             const indicatorContainer = document.createElement("div");
             indicatorContainer.className = "comp-calendar-indicator-container";
 
+            const isPastDay = dateKey < todayDateKey;
+
             daySessions.forEach(session => {
                 const dot = document.createElement("span");
                 dot.className = "comp-calendar-dot";
@@ -10920,19 +10923,24 @@ function renderComponenteCalendario() {
                 if (record) {
                     if (record.status === "present") {
                         dot.classList.add("present");
-                        dot.title = `${session.name || 'Convocatoria'}: Asistiré`;
+                        dot.title = `${session.name || 'Convocatoria'}: ${isPastDay ? 'Asistió' : 'Asistiré'}`;
                     } else if (record.status === "absent") {
                         if (record.justified) {
                             dot.classList.add("justified");
                             dot.title = `${session.name || 'Convocatoria'}: Ausencia Justificada`;
                         } else {
                             dot.classList.add("absent");
-                            dot.title = `${session.name || 'Convocatoria'}: Ausencia`;
+                            dot.title = `${session.name || 'Convocatoria'}: ${isPastDay ? 'No asistió' : 'Ausencia'}`;
                         }
                     }
                 } else {
-                    dot.classList.add("pending");
-                    dot.title = `${session.name || 'Convocatoria'}: Pendiente`;
+                    if (isPastDay) {
+                        dot.classList.add("absent");
+                        dot.title = `${session.name || 'Convocatoria'}: No asistió (Sin preaviso)`;
+                    } else {
+                        dot.classList.add("pending");
+                        dot.title = `${session.name || 'Convocatoria'}: Pendiente`;
+                    }
                 }
                 indicatorContainer.appendChild(dot);
             });
