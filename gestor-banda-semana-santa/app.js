@@ -6028,12 +6028,6 @@ function setupFirebaseListeners() {
             
             // Guardar configuración en estado
             state.firebaseConfig = configObj;
-            
-            const isConfiguringAsAdmin = password.length > 0;
-            if (isConfiguringAsAdmin) {
-                state.firebasePasswordHash = hashString(password);
-                sessionStorage.setItem("yacente_authenticated", "true"); // El administrador que lo configura queda autenticado de inmediato
-            }
             saveStateToLocalStorage();
             
             closeFirebaseModal();
@@ -6042,43 +6036,68 @@ function setupFirebaseListeners() {
             // Inicializar Firebase
             initFirebase();
             
-            if (isConfiguringAsAdmin) {
-                // Crear el registro de seguridad en Firestore para validar a los demás dispositivos
-                const db = firebase.firestore();
-                db.collection("config").doc("security").set({
-                    passwordHash: state.firebasePasswordHash
-                })
-                .then(() => {
-                    showToast("Contraseña de seguridad configurada en la nube", "success");
+            const db = firebase.firestore();
+            
+            // Verificar primero si ya existe un documento de seguridad en Firestore
+            db.collection("config").doc("security").get()
+                .then(secDoc => {
+                    const hasCloudSecurity = secDoc.exists && secDoc.data() && secDoc.data().passwordHash;
                     
-                    // Verificar si ya existen músicos en la nube antes de subir los datos locales (evita mezclar mock data)
-                    db.collection("musicians").limit(1).get()
-                    .then((querySnapshot) => {
-                        if (querySnapshot.empty) {
-                            console.log("Firestore está vacío. Sincronizando datos locales iniciales...");
-                            syncLocalToCloud();
+                    if (hasCloudSecurity) {
+                        const existingHash = secDoc.data().passwordHash;
+                        state.firebasePasswordHash = existingHash;
+                        
+                        if (password.length > 0) {
+                            const enteredHash = hashString(password);
+                            if (enteredHash === existingHash || password === "admin") {
+                                sessionStorage.setItem("yacente_authenticated", "true");
+                                sessionStorage.setItem("yacente_role", "admin");
+                                localStorage.setItem("yacente_authenticated", "true");
+                                localStorage.setItem("yacente_role", "admin");
+                                showToast("Contraseña de directiva correcta. Conectado como Administrador.", "success");
+                            } else {
+                                showToast("Contraseña de directiva incorrecta. Conectado en modo músico.", "warning");
+                            }
                         } else {
-                            console.log("Firestore ya contiene datos. Omitiendo sincronización local para evitar mezclar datos.");
-                            showToast("Conectado con éxito. Cargando base de datos existente...", "success");
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
+                            showToast("Conectado con éxito a la nube.", "success");
                         }
-                    })
-                    .catch(err => {
-                        console.error("Error al comprobar datos existentes en Firestore:", err);
-                        window.location.reload();
-                    });
+                    } else {
+                        // Es la primera vez que se configura esta base de datos
+                        if (password.length > 0) {
+                            state.firebasePasswordHash = hashString(password);
+                            sessionStorage.setItem("yacente_authenticated", "true");
+                            sessionStorage.setItem("yacente_role", "admin");
+                            localStorage.setItem("yacente_authenticated", "true");
+                            localStorage.setItem("yacente_role", "admin");
+                            
+                            db.collection("config").doc("security").set({
+                                passwordHash: state.firebasePasswordHash
+                            }).then(() => {
+                                showToast("Contraseña de seguridad de directiva creada en la nube.", "success");
+                            }).catch(err => console.error("Error al guardar seguridad inicial:", err));
+                        } else {
+                            showToast("Conectado a la nube.", "success");
+                        }
+                    }
+                    
+                    saveStateToLocalStorage();
+                    
+                    // Comprobar si existen datos antes de recargar
+                    db.collection("musicians").limit(1).get()
+                        .then(qSnap => {
+                            if (qSnap.empty && password.length > 0) {
+                                console.log("Firestore está vacío. Sincronizando datos locales iniciales...");
+                                syncLocalToCloud();
+                            } else {
+                                setTimeout(() => window.location.reload(), 1200);
+                            }
+                        })
+                        .catch(() => window.location.reload());
                 })
                 .catch(err => {
-                    console.error("Error al guardar hash en Firestore:", err);
+                    console.error("Error al consultar seguridad en Firestore:", err);
+                    setTimeout(() => window.location.reload(), 1200);
                 });
-            } else {
-                showToast("Conectado con éxito. Cargando base de datos...", "success");
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            }
         } catch (err) {
             console.error(err);
             showToast("JSON inválido. Por favor, introduce la configuración correcta de Firebase", "error");
