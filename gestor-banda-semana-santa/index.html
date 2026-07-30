@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=303">
+    <link rel="stylesheet" href="style.css?v=304">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1089,13 +1089,30 @@
                         </div>
                     </div>
 
-                    <!-- Cambio de Contraseña de Directiva -->
+                    <!-- Cambio de Contraseña de Directiva y Bloqueo de Pasado -->
                     <div class="card settings-card">
                         <h3>Contraseña de Directiva</h3>
                         <p class="text-muted" style="margin-bottom: 20px;">Modifica la contraseña utilizada para acceder al panel de administración y autorizar operaciones de seguridad.</p>
                         
                         <div class="settings-buttons">
                             <button id="btn-open-change-password-modal" class="btn btn-primary">Cambiar Contraseña</button>
+                        </div>
+
+                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+                            <div>
+                                <h4 style="margin: 0 0 4px 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                    <span>🔒</span> Bloqueo de Pasado
+                                </h4>
+                                <p class="text-muted" style="margin: 0; font-size: 0.82rem; max-width: 460px;">
+                                    Impide modificar listas de asistencia y eliminar ensayos o actuaciones cuyas fechas ya hayan pasado. Requiere clave de seguridad.
+                                </p>
+                            </div>
+                            <label class="switch" title="Activar/Desactivar Bloqueo de Pasado">
+                                <input type="checkbox" id="toggle-past-lock">
+                                <span class="slider round"></span>
+                            </label>
                         </div>
                     </div>
 
@@ -2058,6 +2075,31 @@
         </div>
     </div>
 
+    <!-- Modal: Autorización Bloqueo de Pasado -->
+    <div id="modal-past-lock-auth" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px; width: 90%;">
+            <div class="modal-header">
+                <h3 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                    <span>🔒</span> Bloqueo de Pasado
+                </h3>
+                <button class="modal-close" id="btn-close-past-lock-modal">&times;</button>
+            </div>
+            <form id="form-past-lock-auth">
+                <p class="text-muted" style="font-size: 0.88rem; margin-bottom: 16px;">
+                    Introduce la contraseña clave para cambiar el estado del bloqueo de pasado:
+                </p>
+                <div class="form-group">
+                    <label for="past-lock-password">Contraseña Clave</label>
+                    <input type="password" id="past-lock-password" placeholder="Introduce la contraseña clave" required style="width: 100%;">
+                </div>
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-past-lock-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Resumen Semanal -->
     <div id="modal-weekly-report" class="modal-overlay">
         <div class="modal-card" style="max-width: 580px; width: 90%;">
@@ -2890,12 +2932,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=303"></script>
+    <script src="app.js?v=304"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=303")
+                navigator.serviceWorker.register("sw.js?v=304")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })

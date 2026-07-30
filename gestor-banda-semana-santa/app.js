@@ -230,11 +230,12 @@ function initApp() {
     state.formacionDesfile = parseDesfileFormacion(storedDesfile);
     state.directorConcierto = localStorage.getItem("yacente_director_concierto") || null;
 
-    // Cargar credenciales de Firebase
+    // Cargar credenciales de Firebase y Bloqueo de Pasado
     const storedFbConfig = localStorage.getItem("yacente_firebase_config");
     const storedFbHash = localStorage.getItem("yacente_firebase_hash");
     state.firebaseConfig = storedFbConfig ? JSON.parse(storedFbConfig) : null;
     state.firebasePasswordHash = storedFbHash || "";
+    state.pastLockEnabled = localStorage.getItem("yacente_past_lock_enabled") === "true";
 
     if (storedMusicians && storedAttendance) {
         state.musicians = JSON.parse(storedMusicians);
@@ -476,6 +477,18 @@ function hashString(str) {
 // Comprobación de estado de la nube
 function isCloudActive() {
     return state.firebaseConfig !== null;
+}
+
+// Bloqueo de Pasado (Inamovible)
+const PAST_LOCK_MASTER_PASS = "arquero7777";
+
+function isPastLockBlocked(dateStr) {
+    if (!state.pastLockEnabled) return false;
+    const targetDate = dateStr || state.currentDate;
+    if (!targetDate) return false;
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+    return targetDate < todayStr;
 }
 
 let unsubMusicians = null;
@@ -1039,6 +1052,7 @@ function dbDeleteMusician(id) {
 }
 
 function dbSaveAttendance(date, musicianId, recordObj) {
+    if (isPastLockBlocked(date)) return;
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("attendance").doc(date).set({
@@ -1051,6 +1065,7 @@ function dbSaveAttendance(date, musicianId, recordObj) {
 }
 
 function dbSaveSessionType(date, sessionTypeObj) {
+    if (isPastLockBlocked(date)) return;
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("sessionTypes").doc(date).set(sessionTypeObj)
@@ -1061,6 +1076,7 @@ function dbSaveSessionType(date, sessionTypeObj) {
 }
 
 function dbDeleteSession(date) {
+    if (isPastLockBlocked(date)) return;
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("attendance").doc(date).delete()
@@ -1637,6 +1653,11 @@ function setupEventListeners() {
         document.querySelectorAll(".instrument-section").forEach(sec => sec.classList.remove("collapsed"));
     });
     document.getElementById("btn-reset-attendance").addEventListener("click", () => {
+        const date = state.currentDate;
+        if (isPastLockBlocked(date)) {
+            showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+            return;
+        }
         if (confirm("¿Resetear la lista? Todos los componentes se marcarán como ausentes.")) {
             const date = state.currentDate;
             if (!state.sessionTypes[date]) {
@@ -2073,6 +2094,59 @@ function setupEventListeners() {
         });
     }
 
+    // Bloqueo de Pasado (Interruptor y Modal de Seguridad)
+    const togglePastLock = document.getElementById("toggle-past-lock");
+    const modalPastLock = document.getElementById("modal-past-lock-auth");
+    const formPastLock = document.getElementById("form-past-lock-auth");
+    const closePastLockBtn = document.getElementById("btn-close-past-lock-modal");
+    const cancelPastLockBtn = document.getElementById("btn-cancel-past-lock-modal");
+
+    if (togglePastLock) {
+        togglePastLock.checked = !!state.pastLockEnabled;
+
+        togglePastLock.addEventListener("click", (e) => {
+            e.preventDefault();
+            const passInput = document.getElementById("past-lock-password");
+            if (passInput) passInput.value = "";
+            if (modalPastLock) modalPastLock.classList.add("active");
+        });
+    }
+
+    const closePastLockModal = () => {
+        if (modalPastLock) modalPastLock.classList.remove("active");
+    };
+
+    if (closePastLockBtn) closePastLockBtn.addEventListener("click", closePastLockModal);
+    if (cancelPastLockBtn) cancelPastLockBtn.addEventListener("click", closePastLockModal);
+
+    if (formPastLock) {
+        formPastLock.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const passInput = document.getElementById("past-lock-password").value.trim();
+
+            if (passInput === PAST_LOCK_MASTER_PASS) {
+                state.pastLockEnabled = !state.pastLockEnabled;
+                localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+
+                if (togglePastLock) {
+                    togglePastLock.checked = state.pastLockEnabled;
+                }
+
+                if (isCloudActive()) {
+                    const db = firebase.firestore();
+                    db.collection("config").doc("security").set({
+                        pastLockEnabled: state.pastLockEnabled
+                    }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
+                }
+
+                showToast(state.pastLockEnabled ? "Bloqueo de pasado activado." : "Bloqueo de pasado desactivado.", "success");
+                closePastLockModal();
+            } else {
+                showToast("Contraseña de bloqueo de pasado incorrecta", "error");
+            }
+        });
+    }
+
     // ==========================================
     // REPERTORIO Y MARCHAS
     // ==========================================
@@ -2225,10 +2299,8 @@ function setupEventListeners() {
         const date = state.activeDetailDate;
         if (!date) return;
         
-        const rawDate = date.split("_")[0];
-        const today = new Date().toISOString().split("T")[0];
-        if (rawDate < today) {
-            showToast("No puedes eliminar ensayos pasados desde el calendario", "warning");
+        if (isPastLockBlocked(date)) {
+            showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
             return;
         }
         
@@ -3104,6 +3176,10 @@ function ensureAttendanceRecord(date, id) {
 
 function updateMusicianAttendance(id, status) {
     const date = state.currentDate;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
     ensureAttendanceRecord(date, id);
     const record = state.attendance[date][id];
     
@@ -3142,6 +3218,15 @@ function updateMusicianAttendance(id, status) {
 
 function updateMusicianJustification(id, isJustified) {
     const date = state.currentDate;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        const card = document.getElementById(`card-${id}`);
+        if (card) {
+            const chk = card.querySelector(".chk-justified");
+            if (chk) chk.checked = !isJustified;
+        }
+        return;
+    }
     ensureAttendanceRecord(date, id);
     state.attendance[date][id].justified = isJustified;
     
@@ -3176,6 +3261,10 @@ function updateMusicianJustification(id, isJustified) {
 
 function updateMusicianReason(id, reasonText) {
     const date = state.currentDate;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
     ensureAttendanceRecord(date, id);
     state.attendance[date][id].reason = reasonText.trim();
     dbSaveAttendance(date, id, state.attendance[date][id]);
@@ -3439,6 +3528,10 @@ function renderEnsayosList() {
 
         tr.querySelector(".delete-rehearsal-btn").addEventListener("click", (e) => {
             e.stopPropagation();
+            if (isPastLockBlocked(date)) {
+                showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+                return;
+            }
             if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
                 delete state.attendance[date];
                 delete state.sessionTypes[date];
@@ -3824,6 +3917,10 @@ function renderActuacionesList() {
 
         tr.querySelector(".delete-actuacion-btn").addEventListener("click", (e) => {
             e.stopPropagation();
+            if (isPastLockBlocked(date)) {
+                showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+                return;
+            }
             const actuacionName = sessionInfo.name || formatDateSpanish(date);
             if (confirm(`¿Estás seguro de que quieres eliminar la actuación "${actuacionName}" del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
                 delete state.attendance[date];
@@ -6157,6 +6254,12 @@ function setupFirebaseListeners() {
                         const existingHash = secDoc.data().passwordHash;
                         state.firebasePasswordHash = existingHash;
                         localStorage.setItem("yacente_firebase_hash", existingHash);
+                        if (typeof secDoc.data().pastLockEnabled === "boolean") {
+                            state.pastLockEnabled = secDoc.data().pastLockEnabled;
+                            localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+                            const togglePastLock = document.getElementById("toggle-past-lock");
+                            if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
+                        }
                         
                         if (password.length > 0) {
                             const enteredHash = hashString(password);
@@ -6279,10 +6382,18 @@ function setupFirebaseListeners() {
                 db.collection("config").doc("security").get()
                     .then(doc => {
                         let validHash = state.firebasePasswordHash; // fallback local
-                        if (doc.exists && doc.data().passwordHash) {
-                            validHash = doc.data().passwordHash;
-                            state.firebasePasswordHash = validHash;
-                            localStorage.setItem("yacente_firebase_hash", validHash);
+                        if (doc.exists && doc.data()) {
+                            if (doc.data().passwordHash) {
+                                validHash = doc.data().passwordHash;
+                                state.firebasePasswordHash = validHash;
+                                localStorage.setItem("yacente_firebase_hash", validHash);
+                            }
+                            if (typeof doc.data().pastLockEnabled === "boolean") {
+                                state.pastLockEnabled = doc.data().pastLockEnabled;
+                                localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+                                const togglePastLock = document.getElementById("toggle-past-lock");
+                                if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
+                            }
                         }
                         
                         if (enteredHash === validHash || (!validHash && enteredPassword === "admin")) {
