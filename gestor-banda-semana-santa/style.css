@@ -1655,8 +1655,9 @@ svg.chevron {
         display: none !important;
     }
 
-    /* Ocultar la sección de Ajustes en la versión móvil del Director */
-    .nav-item[data-target="section-ajustes"] {
+    /* Ocultar la sección de Ajustes y el botón Más en la versión móvil */
+    .nav-item[data-target="section-ajustes"],
+    .nav-item-more-mobile {
         display: none !important;
     }
 
@@ -1718,6 +1719,12 @@ svg.chevron {
         display: inline-block !important;
     }
 
+    /* Ocultar en la sidebar desplegable móvil (Drawer) las páginas no deseadas */
+    .sidebar.open .nav-item[data-target="section-calendario"],
+    .sidebar.open .nav-item[data-target="section-marchas"],
+    .sidebar.open .nav-item[data-target="section-ajustes"],
+    .sidebar.open #btn-logout-nav-admin,
+    .sidebar.open #btn-logout-sidebar-admin,
     .sidebar.open .nav-item-more-mobile {
         display: none !important;
     }
