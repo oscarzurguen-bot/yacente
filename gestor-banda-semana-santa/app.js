@@ -2547,22 +2547,35 @@ function setupMarchasDragAndDrop() {
     setupPreavisoEvents();
     setupProfilePhotoEvents();
 
-    // Notificaciones de Músicos
+    // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
+    const notifModal = document.getElementById("modal-component-notifications");
+    const closeNotifBtn = document.getElementById("btn-close-comp-notif-modal");
+
     if (btnNotifBell) {
         btnNotifBell.addEventListener("click", (e) => {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
             }
-            renderActiveSection("section-componente-notificaciones");
+            renderComponentNotificationsList();
+            if (notifModal) {
+                notifModal.classList.add("active");
+            }
         });
     }
 
-    const btnBackNotif = document.getElementById("btn-back-from-notif");
-    if (btnBackNotif) {
-        btnBackNotif.addEventListener("click", () => {
-            renderActiveSection("section-componente-ficha");
+    if (closeNotifBtn) {
+        closeNotifBtn.addEventListener("click", () => {
+            if (notifModal) notifModal.classList.remove("active");
+        });
+    }
+
+    if (notifModal) {
+        notifModal.addEventListener("click", (e) => {
+            if (e.target === notifModal) {
+                notifModal.classList.remove("active");
+            }
         });
     }
 
