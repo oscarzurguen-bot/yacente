@@ -1685,14 +1685,18 @@ svg.chevron {
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
 
-    .sidebar.open .sidebar-header,
-    .sidebar.open .sidebar-footer {
+    .sidebar.open .sidebar-header {
         display: flex !important;
     }
 
-    .sidebar.open .logo-text,
-    .sidebar.open .theme-toggle-label {
+    .sidebar.open .logo-text {
         display: block !important;
+    }
+
+    /* Ocultar pie de la sidebar y conmutador de modo claro/oscuro en el Drawer móvil */
+    .sidebar.open .sidebar-footer,
+    .sidebar.open .theme-toggle {
+        display: none !important;
     }
 
     .sidebar.open .sidebar-nav {
