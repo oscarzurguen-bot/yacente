@@ -1729,6 +1729,12 @@ svg.chevron {
         display: inline-block !important;
     }
 
+    /* Ocultar los botones de Salir y Cerrar Sesión dentro de la Sidebar desplegable móvil */
+    .sidebar.open #btn-logout-sidebar-admin,
+    .sidebar.open #btn-logout-nav-admin {
+        display: none !important;
+    }
+
     .main-content {
         margin-left: 0;
         margin-bottom: 60px; /* Space for the bottom menu */

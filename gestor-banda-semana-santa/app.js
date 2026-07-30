@@ -10502,15 +10502,32 @@ function renderComponenteRanking() {
         };
     });
 
-    // Ordenar de mayor a menor porcentaje de asistencia, y luego por insignias/racha como criterio de desempate
+    // Ordenar de mayor a menor porcentaje de asistencia.
+    // Solo en caso de empate en el porcentaje de asistencia, se prioriza al músico con más insignias acumuladas.
     rankingData.sort((a, b) => {
-        if (Math.round(b.attendancePct) !== Math.round(a.attendancePct)) {
-            return b.attendancePct - a.attendancePct;
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) {
+            return roundDiff;
         }
+
+        // 1. Criterio de desempate por empate en % de asistencia: Mayor número de insignias acumuladas
         if (b.badgesCount !== a.badgesCount) {
             return b.badgesCount - a.badgesCount;
         }
-        return b.streak - a.streak;
+
+        // 2. Si empatan también en insignias, comparar el porcentaje decimal exacto
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) {
+            return exactDiff;
+        }
+
+        // 3. Tercer desempate: Mayor racha de asistencia
+        if (b.streak !== a.streak) {
+            return b.streak - a.streak;
+        }
+
+        // 4. Cuarto desempate: Orden alfabético por nombre
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
     });
 
     // Quedarse con los 25 mejores
