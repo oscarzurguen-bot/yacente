@@ -2000,7 +2000,7 @@ function setupEventListeners() {
     }
 
     if (formChangeAdminPass) {
-        formChangeAdminPass.addEventListener("submit", (e) => {
+        formChangeAdminPass.addEventListener("submit", async (e) => {
             e.preventDefault();
             const oldPass = document.getElementById("admin-pass-old").value.trim();
             const newPass = document.getElementById("admin-pass-new").value.trim();
@@ -2016,12 +2016,28 @@ function setupEventListeners() {
                 return;
             }
             
-            // Validar contraseña actual
             const oldHash = hashString(oldPass);
-            let isValid = false;
+            let targetHash = state.firebasePasswordHash || localStorage.getItem("yacente_firebase_hash") || "";
+
+            // Si la nube está activa, obtener la contraseña real de la directiva guardada en Firestore
+            if (isCloudActive()) {
+                try {
+                    const db = firebase.firestore();
+                    const secDoc = await db.collection("config").doc("security").get();
+                    if (secDoc.exists && secDoc.data() && secDoc.data().passwordHash) {
+                        targetHash = secDoc.data().passwordHash;
+                        state.firebasePasswordHash = targetHash;
+                        localStorage.setItem("yacente_firebase_hash", targetHash);
+                    }
+                } catch (err) {
+                    console.error("Error al verificar contraseña actual en Firestore:", err);
+                }
+            }
             
-            if (state.firebasePasswordHash) {
-                isValid = (oldHash === state.firebasePasswordHash);
+            // Validar contraseña actual
+            let isValid = false;
+            if (targetHash) {
+                isValid = (oldHash === targetHash);
             } else {
                 isValid = (oldPass === "admin");
             }
@@ -6140,6 +6156,7 @@ function setupFirebaseListeners() {
                     if (hasCloudSecurity) {
                         const existingHash = secDoc.data().passwordHash;
                         state.firebasePasswordHash = existingHash;
+                        localStorage.setItem("yacente_firebase_hash", existingHash);
                         
                         if (password.length > 0) {
                             const enteredHash = hashString(password);
@@ -6264,6 +6281,8 @@ function setupFirebaseListeners() {
                         let validHash = state.firebasePasswordHash; // fallback local
                         if (doc.exists && doc.data().passwordHash) {
                             validHash = doc.data().passwordHash;
+                            state.firebasePasswordHash = validHash;
+                            localStorage.setItem("yacente_firebase_hash", validHash);
                         }
                         
                         if (enteredHash === validHash || (!validHash && enteredPassword === "admin")) {
