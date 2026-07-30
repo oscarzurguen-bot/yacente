@@ -1259,11 +1259,64 @@ function setupEventListeners() {
         });
     }
 
+    // Helper functions para menú desplegable lateral móvil (Drawer)
+    window.openMobileSidebar = function() {
+        const sidebar = document.querySelector(".sidebar");
+        const backdrop = document.getElementById("sidebar-backdrop");
+        if (sidebar) sidebar.classList.add("open");
+        if (backdrop) backdrop.classList.add("active");
+    };
+
+    window.closeMobileSidebar = function() {
+        const sidebar = document.querySelector(".sidebar");
+        const backdrop = document.getElementById("sidebar-backdrop");
+        if (sidebar) sidebar.classList.remove("open");
+        if (backdrop) backdrop.classList.remove("active");
+    };
+
+    window.toggleMobileSidebar = function() {
+        const sidebar = document.querySelector(".sidebar");
+        if (sidebar && sidebar.classList.contains("open")) {
+            window.closeMobileSidebar();
+        } else {
+            window.openMobileSidebar();
+        }
+    };
+
+    const btnToggleMobileSidebar = document.getElementById("btn-toggle-mobile-sidebar");
+    const btnOpenMoreMenu = document.getElementById("btn-open-more-menu");
+    const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+    if (btnToggleMobileSidebar) {
+        btnToggleMobileSidebar.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.toggleMobileSidebar();
+        });
+    }
+
+    if (btnOpenMoreMenu) {
+        btnOpenMoreMenu.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openMobileSidebar();
+        });
+    }
+
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener("click", () => {
+            window.closeMobileSidebar();
+        });
+    }
+
     // Navegación Sidebar
     document.querySelectorAll(".nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             const targetId = item.getAttribute("data-target");
+            
+            window.closeMobileSidebar();
+
             if (!targetId) return;
             
             document.querySelectorAll(".nav-item").forEach(nav => nav.classList.remove("active"));
@@ -2569,6 +2622,11 @@ function renderActiveSection(sectionId, forcedDirection) {
     const activeRole = getAuthRole();
     if (activeRole === "component" && !sectionId.startsWith("section-componente-")) {
         sectionId = "section-componente-ficha";
+    }
+
+    // En móvil, la sección de Ajustes no es accesible y se redirige a Pasar Lista
+    if (window.innerWidth <= 768 && sectionId === "section-ajustes") {
+        sectionId = "section-pasar-lista";
     }
 
     const previousActive = document.querySelector(".app-section.active");
@@ -10396,7 +10454,7 @@ function renderComponentFicha() {
     // Actualizar badge de notificaciones
     updateNotificationsBadge();
 
-    // Renderizar ranking de los 10 mejores
+    // Renderizar ranking de los 25 mejores
     renderComponenteRanking();
 }
 
@@ -10455,10 +10513,10 @@ function renderComponenteRanking() {
         return b.streak - a.streak;
     });
 
-    // Quedarse con los 10 mejores
-    const top10 = rankingData.slice(0, 10);
+    // Quedarse con los 25 mejores
+    const top25 = rankingData.slice(0, 25);
 
-    top10.forEach((item, index) => {
+    top25.forEach((item, index) => {
         const card = document.createElement("div");
         card.className = "comp-ranking-card";
         
