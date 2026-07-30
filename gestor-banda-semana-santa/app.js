@@ -1675,6 +1675,29 @@ function setupEventListeners() {
     document.getElementById("btn-close-modal").addEventListener("click", closeModalMusician);
     document.getElementById("btn-cancel-modal").addEventListener("click", closeModalMusician);
 
+    // Event listeners para el modal de racha
+    const streakModal = document.getElementById("modal-streak-info");
+    const closeStreakBtn = document.getElementById("btn-close-streak-modal");
+    const okStreakBtn = document.getElementById("btn-streak-modal-ok");
+
+    if (closeStreakBtn) {
+        closeStreakBtn.addEventListener("click", () => {
+            if (streakModal) streakModal.classList.remove("active");
+        });
+    }
+    if (okStreakBtn) {
+        okStreakBtn.addEventListener("click", () => {
+            if (streakModal) streakModal.classList.remove("active");
+        });
+    }
+    if (streakModal) {
+        streakModal.addEventListener("click", (e) => {
+            if (e.target === streakModal) {
+                streakModal.classList.remove("active");
+            }
+        });
+    }
+
     document.getElementById("form-musician").addEventListener("submit", (e) => {
         e.preventDefault();
         const id = document.getElementById("musician-id").value;
@@ -10232,6 +10255,75 @@ function calculateMusicianStreak(musicianId) {
     return streak;
 }
 
+function calculateMusicianBestStreak(musicianId) {
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+    const dates = Object.keys(state.attendance)
+        .filter(d => {
+            if (d > todayStr) return false; // Excluir futuros
+
+            const session = state.sessionTypes[d];
+            if (session && session.type !== "ensayo") return false;
+
+            const record = state.attendance[d] ? state.attendance[d][musicianId] : null;
+            if (!record) return false;
+
+            return true;
+        })
+        .sort((a, b) => a.localeCompare(b)); // Orden cronológico ascendente
+
+    let maxStreak = 0;
+    let currentRun = 0;
+
+    for (const date of dates) {
+        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
+        if (record && record.status === "present") {
+            currentRun++;
+            if (currentRun > maxStreak) {
+                maxStreak = currentRun;
+            }
+        } else {
+            currentRun = 0;
+        }
+    }
+    return maxStreak;
+}
+
+function openStreakInfoModal() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const currentStreak = calculateMusicianStreak(musicianId);
+    const historicalBest = calculateMusicianBestStreak(musicianId);
+    const bestStreak = Math.max(currentStreak, historicalBest);
+
+    const countEl = document.getElementById("modal-streak-count-big");
+    const msgEl = document.getElementById("modal-streak-message");
+    const bestEl = document.getElementById("modal-streak-best-val");
+    const modal = document.getElementById("modal-streak-info");
+
+    if (countEl) countEl.innerText = currentStreak;
+    if (bestEl) bestEl.innerText = bestStreak;
+
+    if (msgEl) {
+        if (currentStreak === 0) {
+            msgEl.innerText = "¡Comienza tu racha hoy! Cada ensayo cuenta para sumar en la banda. ¡Te esperamos en el próximo!";
+        } else if (currentStreak <= 3) {
+            const ensayoPlural = currentStreak === 1 ? "ensayo" : "ensayos";
+            msgEl.innerText = `¡Buen comienzo! Llevas ${currentStreak} ${ensayoPlural} seguidos asistiendo. Mantén el ritmo, tu esfuerzo se nota.`;
+        } else if (currentStreak <= 9) {
+            msgEl.innerText = `¡Enhorabuena! Llevas ${currentStreak} ensayos seguidos asistiendo. Tu presencia es muy importante para que el grupo avance y la banda suene bien.`;
+        } else {
+            msgEl.innerText = `¡Compromiso de hierro! 🏆 Llevas ${currentStreak} ensayos consecutivos sin faltar. Eres un pilar indispensable para la banda.`;
+        }
+    }
+
+    if (modal) {
+        modal.classList.add("active");
+    }
+}
+
 
 
 function renderComponentFicha() {
@@ -10273,6 +10365,12 @@ function renderComponentFicha() {
     
     const currentStreak = calculateMusicianStreak(musicianId);
     document.getElementById("comp-streak-val").innerText = currentStreak;
+    
+    const streakBadge = document.getElementById("comp-streak-badge");
+    if (streakBadge) {
+        streakBadge.style.cursor = "pointer";
+        streakBadge.onclick = () => openStreakInfoModal();
+    }
     
     let totalConvocated = 0;
     let attended = 0;

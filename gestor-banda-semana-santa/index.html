@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=300">
+    <link rel="stylesheet" href="style.css?v=301">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1782,6 +1782,43 @@
         </div>
     </div>
 
+    <!-- Modal de Explicación de Racha de Asistencia -->
+    <div id="modal-streak-info" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px; text-align: center; padding: 24px 20px;">
+            <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">
+                    <span>🔥</span> Racha de Asistencia
+                </h3>
+                <button class="modal-close" id="btn-close-streak-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Indicador Racha en Grande -->
+                <div style="margin: 10px 0 16px 0;">
+                    <div style="font-size: 3.5rem; font-weight: 800; font-family: 'Cinzel', serif; color: #E67E22; line-height: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>🔥</span>
+                        <span id="modal-streak-count-big">0</span>
+                    </div>
+                    <div style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-top: 6px;">
+                        Ensayos Consecutivos
+                    </div>
+                </div>
+
+                <!-- Mensaje Motivacional Dinámico -->
+                <div id="modal-streak-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 18px; text-align: center;">
+                    Cargando mensaje...
+                </div>
+
+                <!-- Récord Personal de Racha -->
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 16px;">
+                    <span>🏆</span> Récord Personal: <span id="modal-streak-best-val" style="font-weight: 700;">0</span> ensayos seguidos
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 8px;">
+                <button class="btn btn-primary" id="btn-streak-modal-ok" style="width: 100%; justify-content: center; padding: 10px 16px;">¡Entendido!</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Modal: Crear Ensayo -->
     <div id="modal-rehearsal" class="modal-overlay">
@@ -2856,12 +2893,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=300"></script>
+    <script src="app.js?v=301"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=300")
+                navigator.serviceWorker.register("sw.js?v=301")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
