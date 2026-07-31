@@ -11245,8 +11245,8 @@ function renderComponentHistorial() {
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
-        const timeText = session.time ? ` • 🕒 ${session.time}` : "";
-        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `🕒 ${session.time}` : typeLabel);
+        const timeText = session.time ? ` • ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
         row.className = "comp-session-row";
@@ -11380,8 +11380,8 @@ function renderComponentEventos() {
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
-        const timeText = session.time ? ` • 🕒 ${session.time}` : "";
-        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `🕒 ${session.time}` : typeLabel);
+        const timeText = session.time ? ` • ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
         row.className = "comp-session-row";
