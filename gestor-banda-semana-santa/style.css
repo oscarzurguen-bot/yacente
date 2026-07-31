@@ -3622,41 +3622,41 @@ body.component-portal #candle-tribute-container {
     opacity: 0.4;
 }
 
-/* Insignias anuladas cuando 'Volver... a ensayar' está activa */
+/* Insignias conseguidas pero anuladas cuando 'Volver... a ensayar' está activa */
 .medal-card.annulled-medal {
-    opacity: 0.35 !important;
-    filter: grayscale(85%) !important;
-    border-color: rgba(231, 76, 60, 0.18) !important;
-    background: rgba(255, 255, 255, 0.01) !important;
+    opacity: 0.85 !important;
+    border-color: rgba(184, 151, 48, 0.35) !important;
+    background: linear-gradient(135deg, rgba(184, 151, 48, 0.04), rgba(0, 0, 0, 0.3)) !important;
     box-shadow: none !important;
     position: relative;
 }
 
 .medal-card.annulled-medal .medal-title {
-    color: var(--text-muted) !important;
+    color: #b89730 !important; /* Amarillo apagado */
     text-decoration: line-through;
-    opacity: 0.75;
+    opacity: 0.9;
 }
 
 .medal-card.annulled-medal .medal-icon-wrapper {
+    background-color: rgba(184, 151, 48, 0.1) !important;
+    border-color: #b89730 !important;
     box-shadow: none !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    background-color: rgba(255, 255, 255, 0.02) !important;
-    filter: grayscale(1) !important;
-    opacity: 0.3 !important;
+    filter: none !important;
+    opacity: 0.75 !important;
 }
 
 .medal-card.annulled-medal .medal-progress-bar .progress {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: #b89730 !important;
+    opacity: 0.7;
 }
 
 .medal-card.annulled-medal .medal-progress-text {
-    color: rgba(255, 255, 255, 0.3) !important;
+    color: #b89730 !important;
+    opacity: 0.85;
 }
 
 .medal-card.annulled-medal .medal-stars {
-    opacity: 0.3 !important;
-    filter: grayscale(1) !important;
+    opacity: 0.55 !important;
 }
 
 /* Estilos para el sistema de estrellas progresivo en insignias */
@@ -4164,9 +4164,9 @@ body.component-portal #candle-tribute-container {
 }
 
 #btn-open-announcement-modal:hover {
-    background: rgba(212, 175, 55, 0.18) !important;
-    border-color: rgba(212, 175, 55, 0.45) !important;
-    transform: scale(1.05);
+    background: linear-gradient(135deg, #ffd700 0%, #d4af37 100%) !important;
+    transform: scale(1.06);
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.5) !important;
 }
 #btn-open-announcement-modal:active {
     transform: scale(0.95);

@@ -10899,15 +10899,15 @@ function renderComponentFicha() {
                 if (medal.unlocked && medal.stars > 0) {
                     activeClasses += ` unlocked-${medal.stars}star`;
                 }
-                if (hasVolverEnsayar) {
+                if (hasVolverEnsayar && medal.unlocked) {
                     activeClasses += ` annulled-medal`;
                 }
                 medalCard.className = activeClasses;
             }
             const descEl = medalCard.querySelector(".medal-desc");
             if (descEl && medal.desc) {
-                descEl.innerText = (hasVolverEnsayar && !medal.isNegative)
-                    ? "Insignia anulada temporalmente debido a la alerta de baja asistencia (Volver... a ensayar)."
+                descEl.innerText = (hasVolverEnsayar && medal.unlocked && !medal.isNegative)
+                    ? "Insignia conseguida anulada temporalmente debido a la alerta de baja asistencia (Volver... a ensayar)."
                     : medal.desc;
             }
             const progressEl = medalCard.querySelector(".progress");
