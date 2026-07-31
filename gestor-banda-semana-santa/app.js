@@ -2105,10 +2105,27 @@ function setupEventListeners() {
         togglePastLock.checked = !!state.pastLockEnabled;
 
         togglePastLock.addEventListener("click", (e) => {
-            e.preventDefault();
-            const passInput = document.getElementById("past-lock-password");
-            if (passInput) passInput.value = "";
-            if (modalPastLock) modalPastLock.classList.add("active");
+            if (!state.pastLockEnabled) {
+                // ACTIVAR directamente sin pedir contraseña
+                state.pastLockEnabled = true;
+                togglePastLock.checked = true;
+                localStorage.setItem("yacente_past_lock_enabled", "true");
+
+                if (isCloudActive()) {
+                    const db = firebase.firestore();
+                    db.collection("config").doc("security").set({
+                        pastLockEnabled: true
+                    }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
+                }
+
+                showToast("Bloqueo de pasado activado.", "success");
+            } else {
+                // DESACTIVAR requiere contraseña
+                e.preventDefault();
+                const passInput = document.getElementById("past-lock-password");
+                if (passInput) passInput.value = "";
+                if (modalPastLock) modalPastLock.classList.add("active");
+            }
         });
     }
 
@@ -2125,21 +2142,21 @@ function setupEventListeners() {
             const passInput = document.getElementById("past-lock-password").value.trim();
 
             if (passInput === PAST_LOCK_MASTER_PASS) {
-                state.pastLockEnabled = !state.pastLockEnabled;
-                localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+                state.pastLockEnabled = false;
+                localStorage.setItem("yacente_past_lock_enabled", "false");
 
                 if (togglePastLock) {
-                    togglePastLock.checked = state.pastLockEnabled;
+                    togglePastLock.checked = false;
                 }
 
                 if (isCloudActive()) {
                     const db = firebase.firestore();
                     db.collection("config").doc("security").set({
-                        pastLockEnabled: state.pastLockEnabled
+                        pastLockEnabled: false
                     }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
                 }
 
-                showToast(state.pastLockEnabled ? "Bloqueo de pasado activado." : "Bloqueo de pasado desactivado.", "success");
+                showToast("Bloqueo de pasado desactivado.", "success");
                 closePastLockModal();
             } else {
                 showToast("Contraseña de bloqueo de pasado incorrecta", "error");
