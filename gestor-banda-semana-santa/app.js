@@ -3629,7 +3629,9 @@ function getSessionPrevision(date) {
 
         const dayRecord = state.attendance[date];
         const r = dayRecord ? dayRecord[m.id] : null;
-        if (r && r.status === "absent") {
+        // Solo cuenta como preaviso de no asistencia si el músico ha hecho un preaviso explícito (ausencia justificada o con motivo)
+        const isExplicitPreavisoFalta = r && r.status === "absent" && (r.justified === true || (r.reason && r.reason.trim().length > 0));
+        if (isExplicitPreavisoFalta) {
             preavisoAbsences++;
             voicePrevision[voice].absent++;
         }
