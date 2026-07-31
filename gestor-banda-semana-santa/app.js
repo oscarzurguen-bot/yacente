@@ -3514,7 +3514,7 @@ function renderEnsayosList() {
                 badgeColor = "#f1c40f";
                 badgeIcon = "🟡";
             }
-            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 7px;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
+            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
         }
 
         const tr = document.createElement("tr");
@@ -4011,7 +4011,7 @@ function renderActuacionesList() {
                 badgeColor = "#f1c40f";
                 badgeIcon = "🟡";
             }
-            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 7px;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
+            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
         }
 
         const tr = document.createElement("tr");
