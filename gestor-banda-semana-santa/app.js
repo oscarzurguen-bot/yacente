@@ -3494,6 +3494,29 @@ function renderEnsayosList() {
         }
 
         const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
+        
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+        let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total}`;
+        if (rawDate >= todayStr) {
+            const prev = getSessionPrevision(date);
+            let badgeBg = "rgba(46, 204, 113, 0.15)";
+            let badgeColor = "#2ecc71";
+            let badgeIcon = "🟢";
+            if (prev.estimatedPct < 60) {
+                badgeBg = "rgba(231, 76, 60, 0.15)";
+                badgeColor = "#e74c3c";
+                badgeIcon = "⚠️";
+            } else if (prev.estimatedPct < 80) {
+                badgeBg = "rgba(241, 196, 15, 0.15)";
+                badgeColor = "#f1c40f";
+                badgeIcon = "🟡";
+            }
+            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 7px;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
+        }
+
         const tr = document.createElement("tr");
         tr.classList.add("clickable-row");
         tr.innerHTML = `
@@ -3510,7 +3533,7 @@ function renderEnsayosList() {
                 ${typeLabel}
             </td>
             <td>
-                <span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total}
+                ${presentsCellHTML}
             </td>
             <td style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
@@ -3580,6 +3603,48 @@ function renderEnsayosList() {
 
         tbody.appendChild(tr);
     });
+}
+
+function getSessionPrevision(date) {
+    const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
+    const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
+    const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
+    
+    let totalConvocated = 0;
+    let preavisoAbsences = 0;
+    const voicePrevision = {};
+
+    const musiciansList = (state && state.musicians) || [];
+    musiciansList.forEach(m => {
+        if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+            return;
+        }
+
+        totalConvocated++;
+        const voice = m.instrument || "Otros";
+        if (!voicePrevision[voice]) {
+            voicePrevision[voice] = { total: 0, absent: 0 };
+        }
+        voicePrevision[voice].total++;
+
+        const dayRecord = state.attendance[date];
+        const r = dayRecord ? dayRecord[m.id] : null;
+        if (r && r.status === "absent") {
+            preavisoAbsences++;
+            voicePrevision[voice].absent++;
+        }
+    });
+
+    const estimatedCount = Math.max(0, totalConvocated - preavisoAbsences);
+    const estimatedPct = totalConvocated > 0 ? Math.round((estimatedCount / totalConvocated) * 100) : 100;
+
+    return {
+        totalConvocated,
+        preavisoAbsences,
+        estimatedCount,
+        estimatedPct,
+        voicePrevision
+    };
 }
 
 function openRehearsalDetailModal(date) {
@@ -3694,6 +3759,42 @@ function openRehearsalDetailModal(date) {
     document.getElementById("badge-detail-sinjustificar-count").innerText = absentCount;
 
     document.getElementById("rehearsal-detail-ratio").innerText = `${ratio}%`;
+
+    // Previsión de Asistencia
+    const prevision = getSessionPrevision(date);
+    const estimatedEl = document.getElementById("rehearsal-detail-estimated-count");
+    if (estimatedEl) {
+        estimatedEl.innerText = `${prevision.estimatedCount}/${prevision.totalConvocated}`;
+    }
+
+    const alertBanner = document.getElementById("rehearsal-detail-prevision-alert");
+    if (alertBanner) {
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+        
+        if (rawDate >= todayStr) {
+            alertBanner.classList.remove("hidden");
+            if (prevision.estimatedPct < 60) {
+                alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
+                alertBanner.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+                alertBanner.style.color = "#e74c3c";
+                alertBanner.innerHTML = `<span>⚠️ <strong>Previsión Baja (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Riesgo de alta falta de asistencia (${prevision.preavisoAbsences} preavisos registrados).</span>`;
+            } else if (prevision.estimatedPct < 80) {
+                alertBanner.style.backgroundColor = "rgba(241, 196, 15, 0.15)";
+                alertBanner.style.border = "1px solid rgba(241, 196, 15, 0.4)";
+                alertBanner.style.color = "#f1c40f";
+                alertBanner.innerHTML = `<span>🟡 <strong>Previsión Aceptable (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> ${prevision.preavisoAbsences} preavisos registrados.</span>`;
+            } else {
+                alertBanner.style.backgroundColor = "rgba(46, 204, 113, 0.15)";
+                alertBanner.style.border = "1px solid rgba(46, 204, 113, 0.4)";
+                alertBanner.style.color = "#2ecc71";
+                alertBanner.innerHTML = `<span>🟢 <strong>Convocatoria Confirmada (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Alta previsión de asistencia.</span>`;
+            }
+        } else {
+            alertBanner.classList.add("hidden");
+        }
+    }
 
     // Render lists grouped by voice
     const hasPresents = renderGroupedList(presentsList, listPresent);
@@ -3889,6 +3990,28 @@ function renderActuacionesList() {
 
         const ratio = total > 0 ? Math.round((present / total) * 100) : 0;
 
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+        let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos`;
+        if (rawDate >= todayStr) {
+            const prev = getSessionPrevision(date);
+            let badgeBg = "rgba(46, 204, 113, 0.15)";
+            let badgeColor = "#2ecc71";
+            let badgeIcon = "🟢";
+            if (prev.estimatedPct < 60) {
+                badgeBg = "rgba(231, 76, 60, 0.15)";
+                badgeColor = "#e74c3c";
+                badgeIcon = "⚠️";
+            } else if (prev.estimatedPct < 80) {
+                badgeBg = "rgba(241, 196, 15, 0.15)";
+                badgeColor = "#f1c40f";
+                badgeIcon = "🟡";
+            }
+            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 7px;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
+        }
+
         const tr = document.createElement("tr");
         tr.classList.add("clickable-row");
         tr.innerHTML = `
@@ -3899,7 +4022,7 @@ function renderActuacionesList() {
                 <span style="font-weight: 600; color: var(--color-gold);">${sessionInfo.name || "Sin nombre"}</span>
             </td>
             <td>
-                <span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos
+                ${presentsCellHTML}
             </td>
             <td style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
@@ -4060,6 +4183,42 @@ function openActuacionDetailModal(date) {
     document.getElementById("badge-actuacion-detail-sinjustificar-count").innerText = absentCount;
 
     document.getElementById("actuacion-detail-ratio").innerText = `${ratio}%`;
+
+    // Previsión de Asistencia
+    const prevision = getSessionPrevision(date);
+    const estimatedEl = document.getElementById("actuacion-detail-estimated-count");
+    if (estimatedEl) {
+        estimatedEl.innerText = `${prevision.estimatedCount}/${prevision.totalConvocated}`;
+    }
+
+    const alertBanner = document.getElementById("actuacion-detail-prevision-alert");
+    if (alertBanner) {
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+        
+        if (rawDate >= todayStr) {
+            alertBanner.classList.remove("hidden");
+            if (prevision.estimatedPct < 60) {
+                alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
+                alertBanner.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+                alertBanner.style.color = "#e74c3c";
+                alertBanner.innerHTML = `<span>⚠️ <strong>Previsión Baja (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Riesgo de alta falta de asistencia (${prevision.preavisoAbsences} preavisos registrados).</span>`;
+            } else if (prevision.estimatedPct < 80) {
+                alertBanner.style.backgroundColor = "rgba(241, 196, 15, 0.15)";
+                alertBanner.style.border = "1px solid rgba(241, 196, 15, 0.4)";
+                alertBanner.style.color = "#f1c40f";
+                alertBanner.innerHTML = `<span>🟡 <strong>Previsión Aceptable (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> ${prevision.preavisoAbsences} preavisos registrados.</span>`;
+            } else {
+                alertBanner.style.backgroundColor = "rgba(46, 204, 113, 0.15)";
+                alertBanner.style.border = "1px solid rgba(46, 204, 113, 0.4)";
+                alertBanner.style.color = "#2ecc71";
+                alertBanner.innerHTML = `<span>🟢 <strong>Convocatoria Confirmada (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Alta previsión de asistencia.</span>`;
+            }
+        } else {
+            alertBanner.classList.add("hidden");
+        }
+    }
 
     // Render lists grouped by voice
     const hasPresents = renderGroupedList(presentsList, listPresent);
