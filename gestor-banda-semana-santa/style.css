@@ -3655,6 +3655,11 @@ body.component-portal #candle-tribute-container {
     opacity: 0.85;
 }
 
+.medal-card.annulled-medal .medal-progress-text .annulled-status-text {
+    color: var(--color-absent, #e74c3c) !important;
+    font-weight: 700 !important;
+}
+
 .medal-card.annulled-medal .medal-stars {
     opacity: 0.55 !important;
 }

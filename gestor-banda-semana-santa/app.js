@@ -501,6 +501,36 @@ let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
 let unsubAnnouncements = null;
+let unsubDeletedNotifs = null;
+
+function getDeletedNotificationIds(musicianId) {
+    if (!musicianId) return [];
+    try {
+        return JSON.parse(localStorage.getItem("yacente_deleted_notifications_" + musicianId) || "[]");
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveDeletedNotificationId(musicianId, notifId) {
+    if (!musicianId || !notifId) return;
+    const deletedKey = "yacente_deleted_notifications_" + musicianId;
+    const deleted = getDeletedNotificationIds(musicianId);
+    if (!deleted.includes(notifId)) {
+        deleted.push(notifId);
+        localStorage.setItem(deletedKey, JSON.stringify(deleted));
+    }
+    if (isCloudActive()) {
+        try {
+            const db = firebase.firestore();
+            db.collection("musician_deleted_notifs").doc(musicianId).set({
+                deletedIds: firebase.firestore.FieldValue.arrayUnion(notifId)
+            }, { merge: true }).catch(err => console.error("Error al guardar notificación eliminada en Firestore:", err));
+        } catch (e) {
+            console.error("Error al guardar en Firestore:", e);
+        }
+    }
+}
 
 
 // Inicializa Firebase
@@ -722,18 +752,21 @@ function startCloudSync() {
                             
                             // Save to local storage notifications list
                             const notifId = `${sessionDate}-${sessionData.type}`;
-                            const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-                            if (!notifs.some(n => n.id === notifId)) {
-                                notifs.unshift({
-                                    id: notifId,
-                                    title: title,
-                                    body: body,
-                                    date: new Date().toISOString(),
-                                    seen: false
-                                });
-                                localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
-                                updateNotificationsBadge();
-                                sendBrowserNotification(title, body);
+                            const deletedIds = getDeletedNotificationIds(musicianId);
+                            if (!deletedIds.includes(notifId)) {
+                                const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+                                if (!notifs.some(n => n.id === notifId)) {
+                                    notifs.unshift({
+                                        id: notifId,
+                                        title: title,
+                                        body: body,
+                                        date: new Date().toISOString(),
+                                        seen: false
+                                    });
+                                    localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                                    updateNotificationsBadge();
+                                    sendBrowserNotification(title, body);
+                                }
                             }
                         }
                     }
@@ -905,16 +938,20 @@ function startCloudSync() {
                 const musicianId = getAuthMusicianId();
                 if (!musicianId) return;
 
+                const targetId = data.id || docId;
+                const deletedIds = getDeletedNotificationIds(musicianId);
+                if (deletedIds.includes(targetId)) return;
+
                 const musician = (state.musicians || []).find(m => m.id === musicianId);
                 const instrument = musician ? musician.instrument : null;
 
                 if (data.targetSection === "all" || (instrument && data.targetSection === instrument)) {
                     const key = "yacente_notifications_" + musicianId;
                     const notifs = JSON.parse(localStorage.getItem(key) || "[]");
-                    const exists = notifs.some(n => n.id === (data.id || docId));
+                    const exists = notifs.some(n => n.id === targetId);
                     if (!exists) {
                         const newItem = {
-                            id: data.id || docId,
+                            id: targetId,
                             title: data.title,
                             body: data.body,
                             date: data.date || new Date().toISOString(),
@@ -935,6 +972,32 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync comunicados:", err);
     });
+
+    // Escucha de notificaciones eliminadas por el músico
+    const currentMusId = getAuthMusicianId();
+    if (currentMusId) {
+        unsubDeletedNotifs = db.collection("musician_deleted_notifs").doc(currentMusId).onSnapshot(doc => {
+            if (doc.exists && doc.data() && doc.data().deletedIds) {
+                const cloudDeletedIds = doc.data().deletedIds || [];
+                const deletedKey = "yacente_deleted_notifications_" + currentMusId;
+                const localDeletedIds = JSON.parse(localStorage.getItem(deletedKey) || "[]");
+                const merged = Array.from(new Set([...localDeletedIds, ...cloudDeletedIds]));
+                localStorage.setItem(deletedKey, JSON.stringify(merged));
+
+                const notifKey = "yacente_notifications_" + currentMusId;
+                const localNotifs = JSON.parse(localStorage.getItem(notifKey) || "[]");
+                const filteredNotifs = localNotifs.filter(n => !merged.includes(n.id));
+                if (filteredNotifs.length !== localNotifs.length) {
+                    localStorage.setItem(notifKey, JSON.stringify(filteredNotifs));
+                    updateNotificationsBadge();
+                    const notifModal = document.getElementById("modal-component-notifications");
+                    if (notifModal && notifModal.classList.contains("active")) {
+                        renderComponentNotificationsList();
+                    }
+                }
+            }
+        }, err => console.error("Error sync deleted notifs:", err));
+    }
 }
 
 // Detiene escuchas en tiempo real
@@ -949,7 +1012,7 @@ function stopCloudSync() {
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
     if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
-
+    if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -10913,7 +10976,13 @@ function renderComponentFicha() {
             const progressEl = medalCard.querySelector(".progress");
             if (progressEl) progressEl.style.width = `${medal.progressPct}%`;
             const textEl = medalCard.querySelector(".medal-progress-text");
-            if (textEl) textEl.innerText = medal.progressText;
+            if (textEl) {
+                if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+                    textEl.innerHTML = '<span class="annulled-status-text" style="color: var(--color-absent); font-weight: 700;">Anulada</span>';
+                } else {
+                    textEl.innerText = medal.progressText;
+                }
+            }
 
             // Render stars if the medal supports them
             let starsContainer = medalCard.querySelector(".medal-stars");
@@ -12296,7 +12365,11 @@ function updateNotificationsBadge() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    const deletedIds = getDeletedNotificationIds(musicianId);
+    let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    if (deletedIds.length > 0) {
+        notifs = notifs.filter(n => !deletedIds.includes(n.id));
+    }
     const unseenCount = notifs.filter(n => !n.seen).length;
     
     const badge = document.getElementById("comp-notifications-badge-count");
@@ -12314,7 +12387,16 @@ function renderComponentNotificationsList() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
-    const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    const deletedIds = getDeletedNotificationIds(musicianId);
+    let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    if (deletedIds.length > 0) {
+        const filtered = notifs.filter(n => !deletedIds.includes(n.id));
+        if (filtered.length !== notifs.length) {
+            notifs = filtered;
+            localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+        }
+    }
+
     const container = document.getElementById("comp-notif-list-container");
     const countLabel = document.getElementById("comp-notif-count-label");
     
@@ -12416,8 +12498,11 @@ function renderComponentNotificationsList() {
                     setTimeout(() => {
                         const index = notifs.findIndex(n => n.id === notif.id);
                         if (index !== -1) {
+                            const deletedId = notif.id;
                             notifs.splice(index, 1);
                             localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                            saveDeletedNotificationId(musicianId, deletedId);
+
                             renderComponentNotificationsList();
                             updateNotificationsBadge();
                             showToast("Notificación eliminada", "info");
