@@ -5199,6 +5199,19 @@ function renderMusicianDetailContent() {
         }
     });
 
+    const detailInsigniasBox = document.getElementById("detail-insignias-box");
+    if (detailInsigniasBox) {
+        if (hasVolverEnsayar) {
+            detailInsigniasBox.style.opacity = "0.4";
+            detailInsigniasBox.style.filter = "grayscale(80%)";
+            detailInsigniasBox.title = "Insignias anuladas debido a baja asistencia (Volver... a ensayar activa)";
+        } else {
+            detailInsigniasBox.style.opacity = "1";
+            detailInsigniasBox.style.filter = "none";
+            detailInsigniasBox.title = "";
+        }
+    }
+
 
 
     const rutaTripsInput = document.getElementById("detail-badge-ruta-trips");
@@ -10874,6 +10887,8 @@ function renderComponentFicha() {
     
     // --- EVALUAR MEDALLAS / INSIGNIAS ---
     const medalsData = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+
     medalsData.forEach(medal => {
         const medalCard = document.getElementById(`medal-${medal.id}`);
         if (medalCard) {
@@ -10884,11 +10899,16 @@ function renderComponentFicha() {
                 if (medal.unlocked && medal.stars > 0) {
                     activeClasses += ` unlocked-${medal.stars}star`;
                 }
+                if (hasVolverEnsayar) {
+                    activeClasses += ` annulled-medal`;
+                }
                 medalCard.className = activeClasses;
             }
             const descEl = medalCard.querySelector(".medal-desc");
             if (descEl && medal.desc) {
-                descEl.innerText = medal.desc;
+                descEl.innerText = (hasVolverEnsayar && !medal.isNegative)
+                    ? "Insignia anulada temporalmente debido a la alerta de baja asistencia (Volver... a ensayar)."
+                    : medal.desc;
             }
             const progressEl = medalCard.querySelector(".progress");
             if (progressEl) progressEl.style.width = `${medal.progressPct}%`;
@@ -10932,7 +10952,6 @@ function renderComponentFicha() {
     });
 
     // Contabilizar insignias positivas desbloqueadas, donde cada estrella cuenta como una insignia
-    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
     const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
         if (!m.unlocked || m.isNegative) return acc;
         return acc + (m.stars || 1);
@@ -11225,9 +11244,9 @@ function renderComponentHistorial() {
         }
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
-        if (session.type === "ensayo" && session.time) {
-            sessionTitle += ` ${session.time}`;
-        }
+        const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
+        const timeText = session.time ? ` • 🕒 ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `🕒 ${session.time}` : typeLabel);
         
         const row = document.createElement("div");
         row.className = "comp-session-row";
@@ -11253,7 +11272,7 @@ function renderComponentHistorial() {
                 <div class="comp-session-meta">
                     <h4 class="comp-session-title">${sessionTitle}</h4>
                     <div class="comp-session-details">
-                        ${session.type === "ensayo" ? `<span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${session.location || "Parking"}</span>` : `<span class="comp-session-type ${typeClass}">${typeLabel}</span>`}
+                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
                     </div>
                 </div>
                 <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
@@ -11360,9 +11379,9 @@ function renderComponentEventos() {
         }
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
-        if (session.type === "ensayo" && session.time) {
-            sessionTitle += ` ${session.time}`;
-        }
+        const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
+        const timeText = session.time ? ` • 🕒 ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `🕒 ${session.time}` : typeLabel);
         
         const row = document.createElement("div");
         row.className = "comp-session-row";
@@ -11388,7 +11407,7 @@ function renderComponentEventos() {
                 <div class="comp-session-meta">
                     <h4 class="comp-session-title">${sessionTitle}</h4>
                     <div class="comp-session-details">
-                        ${session.type === "ensayo" ? `<span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${session.location || "Parking"}</span>` : `<span class="comp-session-type ${typeClass}">${typeLabel}</span>`}
+                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
                     </div>
                 </div>
                 <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">

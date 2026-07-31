@@ -3622,6 +3622,43 @@ body.component-portal #candle-tribute-container {
     opacity: 0.4;
 }
 
+/* Insignias anuladas cuando 'Volver... a ensayar' está activa */
+.medal-card.annulled-medal {
+    opacity: 0.35 !important;
+    filter: grayscale(85%) !important;
+    border-color: rgba(231, 76, 60, 0.18) !important;
+    background: rgba(255, 255, 255, 0.01) !important;
+    box-shadow: none !important;
+    position: relative;
+}
+
+.medal-card.annulled-medal .medal-title {
+    color: var(--text-muted) !important;
+    text-decoration: line-through;
+    opacity: 0.75;
+}
+
+.medal-card.annulled-medal .medal-icon-wrapper {
+    box-shadow: none !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    filter: grayscale(1) !important;
+    opacity: 0.3 !important;
+}
+
+.medal-card.annulled-medal .medal-progress-bar .progress {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.medal-card.annulled-medal .medal-progress-text {
+    color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.medal-card.annulled-medal .medal-stars {
+    opacity: 0.3 !important;
+    filter: grayscale(1) !important;
+}
+
 /* Estilos para el sistema de estrellas progresivo en insignias */
 .unlocked-1star {
     background: rgba(205, 127, 50, 0.02) !important;
@@ -4123,6 +4160,15 @@ body.component-portal #candle-tribute-container {
     transform: scale(1.05);
 }
 .btn-notifications-bell:active {
+    transform: scale(0.95);
+}
+
+#btn-open-announcement-modal:hover {
+    background: rgba(212, 175, 55, 0.18) !important;
+    border-color: rgba(212, 175, 55, 0.45) !important;
+    transform: scale(1.05);
+}
+#btn-open-announcement-modal:active {
     transform: scale(0.95);
 }
 
