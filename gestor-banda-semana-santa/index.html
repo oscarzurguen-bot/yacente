@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=304">
+    <link rel="stylesheet" href="style.css?v=305">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1089,30 +1089,23 @@
                         </div>
                     </div>
 
-                    <!-- Cambio de Contraseña de Directiva y Bloqueo de Pasado -->
+                    <!-- Cambio de Contraseña de Directiva -->
                     <div class="card settings-card">
                         <h3>Contraseña de Directiva</h3>
                         <p class="text-muted" style="margin-bottom: 20px;">Modifica la contraseña utilizada para acceder al panel de administración y autorizar operaciones de seguridad.</p>
                         
-                        <div class="settings-buttons">
+                        <div class="settings-buttons" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                             <button id="btn-open-change-password-modal" class="btn btn-primary">Cambiar Contraseña</button>
-                        </div>
-
-                        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 20px 0;">
-
-                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
-                            <div>
-                                <h4 style="margin: 0 0 4px 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                                    <span>🔒</span> Bloqueo de Pasado
-                                </h4>
-                                <p class="text-muted" style="margin: 0; font-size: 0.82rem; max-width: 460px;">
-                                    Impide modificar listas de asistencia y eliminar ensayos o actuaciones cuyas fechas ya hayan pasado. Requiere clave de seguridad.
-                                </p>
+                            
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <span>🔒</span> Bloqueo de pasado:
+                                </span>
+                                <label class="switch" title="Activar/Desactivar Bloqueo de Pasado">
+                                    <input type="checkbox" id="toggle-past-lock">
+                                    <span class="slider round"></span>
+                                </label>
                             </div>
-                            <label class="switch" title="Activar/Desactivar Bloqueo de Pasado">
-                                <input type="checkbox" id="toggle-past-lock">
-                                <span class="slider round"></span>
-                            </label>
                         </div>
                     </div>
 
@@ -2932,12 +2925,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=304"></script>
+    <script src="app.js?v=305"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=304")
+                navigator.serviceWorker.register("sw.js?v=305")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
