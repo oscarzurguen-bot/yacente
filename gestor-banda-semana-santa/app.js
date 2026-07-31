@@ -500,6 +500,7 @@ let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
+let unsubAnnouncements = null;
 
 
 // Inicializa Firebase
@@ -895,7 +896,45 @@ function startCloudSync() {
         console.error("Error sync formación desfile:", err);
     });
 
+    // Escucha de comunicados de la directiva
+    unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const docId = change.doc.id;
+                const musicianId = getAuthMusicianId();
+                if (!musicianId) return;
 
+                const musician = (state.musicians || []).find(m => m.id === musicianId);
+                const instrument = musician ? musician.instrument : null;
+
+                if (data.targetSection === "all" || (instrument && data.targetSection === instrument)) {
+                    const key = "yacente_notifications_" + musicianId;
+                    const notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    const exists = notifs.some(n => n.id === (data.id || docId));
+                    if (!exists) {
+                        const newItem = {
+                            id: data.id || docId,
+                            title: data.title,
+                            body: data.body,
+                            date: data.date || new Date().toISOString(),
+                            seen: false,
+                            type: "announcement"
+                        };
+                        notifs.unshift(newItem);
+                        localStorage.setItem(key, JSON.stringify(notifs));
+                        updateNotificationsBadge();
+                        if (document.body.classList.contains("component-portal")) {
+                            sendBrowserNotification(data.title, data.body);
+                            renderComponentNotificationsList();
+                        }
+                    }
+                }
+            }
+        });
+    }, err => {
+        console.error("Error sync comunicados:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -909,6 +948,7 @@ function stopCloudSync() {
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
+    if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
 
 }
 
@@ -2666,9 +2706,10 @@ function setupMarchasDragAndDrop() {
         });
     });
     
-    // Inicializar eventos de preaviso y foto de perfil
+    // Inicializar eventos de preaviso, foto de perfil y comunicados
     setupPreavisoEvents();
     setupProfilePhotoEvents();
+    setupAnnouncementEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -12287,7 +12328,11 @@ function renderComponentNotificationsList() {
             -webkit-user-select: none;
         `;
 
+        const isAnnouncement = notif.type === "announcement" || (notif.title && notif.title.includes("📢"));
+        const announcementBadge = isAnnouncement ? `<span style="display: inline-block; font-size: 0.65rem; background: rgba(212,175,55,0.2); color: var(--color-gold); border: 1px solid var(--color-gold); padding: 1px 6px; border-radius: 10px; font-weight: 700; margin-bottom: 4px; align-self: flex-start; pointer-events: none;">Aviso Directiva</span>` : '';
+
         itemDiv.innerHTML = `
+            ${announcementBadge}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none;">
                 <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: ${notif.seen ? 'var(--text-primary)' : 'var(--color-gold)'};">${notif.title}</h4>
                 <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(notif.date).toLocaleDateString('es-ES', {hour: '2-digit', minute:'2-digit'})}</span>
@@ -12408,6 +12453,103 @@ function renderComponentNotificationsList() {
 
         container.appendChild(itemDiv);
     });
+}
+
+function setupAnnouncementEvents() {
+    const btnOpen = document.getElementById("btn-open-announcement-modal");
+    const modal = document.getElementById("modal-send-announcement");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-announcement-modal");
+    const btnCancel = document.getElementById("btn-cancel-announcement-modal");
+    const form = document.getElementById("form-send-announcement");
+    const titleInput = document.getElementById("announcement-title-input");
+    const bodyInput = document.getElementById("announcement-body-input");
+    const targetSelect = document.getElementById("announcement-target-select");
+    const quickPills = document.querySelectorAll("#announcement-quick-pills .quick-announcement-pill");
+
+    const openModal = () => {
+        if (titleInput) titleInput.value = "";
+        if (bodyInput) bodyInput.value = "";
+        if (targetSelect) targetSelect.value = "all";
+        modal.classList.add("active");
+    };
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnOpen) btnOpen.addEventListener("click", openModal);
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    quickPills.forEach(pill => {
+        pill.addEventListener("click", () => {
+            const pTitle = pill.getAttribute("data-title");
+            const pBody = pill.getAttribute("data-body");
+            if (titleInput && pTitle) titleInput.value = pTitle;
+            if (bodyInput && pBody) bodyInput.value = pBody;
+        });
+    });
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const rawTitle = titleInput ? titleInput.value.trim() : "";
+            const body = bodyInput ? bodyInput.value.trim() : "";
+            const targetSection = targetSelect ? targetSelect.value : "all";
+
+            if (!rawTitle || !body) {
+                showToast("Por favor, rellena el título y el mensaje del comunicado.", "error");
+                return;
+            }
+
+            const title = rawTitle.startsWith("📢") ? rawTitle : `📢 ${rawTitle}`;
+
+            const annObj = {
+                id: "ann_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+                title: title,
+                body: body,
+                targetSection: targetSection,
+                date: new Date().toISOString(),
+                seen: false,
+                type: "announcement"
+            };
+
+            // 1. Guardar en Firestore si la nube está activa
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("announcements").add(annObj)
+                    .then(() => {
+                        showToast("Comunicado enviado y publicado en la nube para la banda.", "success");
+                    })
+                    .catch(err => {
+                        console.error("Error al enviar comunicado a Firestore:", err);
+                        showToast("Comunicado enviado en modo local (offline)", "warning");
+                    });
+            } else {
+                showToast("Comunicado enviado localmente a la banda", "success");
+            }
+
+            // 2. Distribuir a las notificaciones locales de los músicos convocados
+            const musicians = state.musicians || [];
+            musicians.forEach(m => {
+                if (targetSection === "all" || m.instrument === targetSection) {
+                    const key = "yacente_notifications_" + m.id;
+                    const notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    notifs.unshift(annObj);
+                    localStorage.setItem(key, JSON.stringify(notifs));
+                }
+            });
+
+            // 3. Notificación del navegador si aplica
+            sendBrowserNotification(annObj.title, annObj.body);
+
+            closeModal();
+            updateNotificationsBadge();
+            renderComponentNotificationsList();
+        });
+    }
 }
 
 

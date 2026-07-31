@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=310">
+    <link rel="stylesheet" href="style.css?v=311">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -345,6 +345,9 @@
                             <path d="M12 20h9"></path>
                             <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
+                    </button>
+                    <button id="btn-open-announcement-modal" class="btn btn-primary btn-sm admin-only-element" style="height: 38px; border-radius: 6px; background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; border: none; font-weight: 700; gap: 6px; padding: 0 14px; box-shadow: var(--shadow-sm); display: inline-flex; align-items: center;" title="Enviar aviso o comunicado a los músicos">
+                        <span style="font-size: 1.05rem;">📢</span> Comunicado
                     </button>
                 </div>
             </header>
@@ -1832,6 +1835,63 @@
         </div>
     </div>
 
+    <!-- Modal: Enviar Comunicado / Notificación a la Banda (Directiva) -->
+    <div id="modal-send-announcement" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                    <span>📢</span> Enviar Comunicado a la Banda
+                </h3>
+                <button class="modal-close" id="btn-close-announcement-modal">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="form-send-announcement">
+                <!-- Plantillas Rápidas -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">Mensajes Rápidos Frecuentes</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="announcement-quick-pills">
+                        <button type="button" class="quick-announcement-pill" data-title="Recordatorio de Cuotas" data-body="Recordad que podéis realizar el pago de la cuotas a la directiva o mediante Bizum." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">📢 Cuotas</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Aviso de Linterna" data-body="Para la convocatoria de hoy no olvidéis traer la linterna para la lectura de partituras." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">🔦 Linterna</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Uniformidad y Gorra" data-body="Recordatorio de llevar el uniforme completo revisado incluyendo la gorra y guantes." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">🧢 Gorra / Uniforme</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Horario de Salida de Autobús" data-body="El autobús para la actuación saldrá puntualmente a la hora citada desde la sede. Sed puntuales." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">🚌 Autobús</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Revisión de Partituras" data-body="Recordad llevar las partituras ordenadas en la carpeta antes del ensayo." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">📄 Partituras</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="announcement-title-input" style="font-size: 0.85rem; font-weight: 600;">Título del Comunicado</label>
+                    <input type="text" id="announcement-title-input" required placeholder="Ej: Recordatorio de Uniformidad" style="width: 100%; padding: 8px 12px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="announcement-target-select" style="font-size: 0.85rem; font-weight: 600;">Destinatarios</label>
+                    <select id="announcement-target-select" style="width: 100%; padding: 8px 12px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+                        <option value="all" selected>🎺 Toda la Banda (Todos los músicos)</option>
+                        <option value="Trompetas 1ª">Trompetas 1ª</option>
+                        <option value="Bajos">Bajos</option>
+                        <option value="Trompetas 2ª y 3ª">Trompetas 2ª y 3ª</option>
+                        <option value="Cornetas">Cornetas</option>
+                        <option value="Percusión">Percusión</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="announcement-body-input" style="font-size: 0.85rem; font-weight: 600;">Mensaje / Indicación</label>
+                    <textarea id="announcement-body-input" required placeholder="Escribe aquí el mensaje detallado para la banda..." style="width: 100%; height: 110px; resize: vertical; padding: 10px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: inherit; font-size: 0.88rem; box-sizing: border-box;"></textarea>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 0;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-announcement-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; font-weight: 700;">📢 Enviar Notificación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <!-- Modal: Crear Ensayo -->
     <div id="modal-rehearsal" class="modal-overlay">
@@ -2947,12 +3007,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=310"></script>
+    <script src="app.js?v=311"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=310")
+                navigator.serviceWorker.register("sw.js?v=311")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
