@@ -2873,9 +2873,19 @@ function renderActiveSection(sectionId, forcedDirection) {
     const dateContainer = document.getElementById("header-date-container");
     const sessionBadge = document.getElementById("attendance-session-badge");
     const configBtn = document.getElementById("btn-configure-session");
+    const announcementBtn = document.getElementById("btn-open-announcement-modal");
 
     if (sessionBadge) sessionBadge.style.display = "none";
     if (configBtn) configBtn.style.display = "none";
+
+    // Visibilidad del botón de comunicado (Solo Director y NO en la sección de Ajustes)
+    if (announcementBtn) {
+        if (activeRole !== "component" && sectionId !== "section-ajustes") {
+            announcementBtn.style.display = "inline-flex";
+        } else {
+            announcementBtn.style.display = "none";
+        }
+    }
 
     // Manejo del contenedor de tributo (vela)
     const tributeContainer = document.getElementById("candle-tribute-container");
@@ -12469,6 +12479,10 @@ function setupAnnouncementEvents() {
     const quickPills = document.querySelectorAll("#announcement-quick-pills .quick-announcement-pill");
 
     const openModal = () => {
+        if (getAuthRole() === "component") {
+            showToast("Solo la dirección puede emitir comunicados.", "error");
+            return;
+        }
         if (titleInput) titleInput.value = "";
         if (bodyInput) bodyInput.value = "";
         if (targetSelect) targetSelect.value = "all";
