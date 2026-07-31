@@ -1412,6 +1412,24 @@ function setupEventListeners() {
         renderStatistics();
     });
 
+    const btnToggleEnsayadas = document.getElementById("btn-toggle-all-marchas-ensayadas");
+    if (btnToggleEnsayadas) {
+        btnToggleEnsayadas.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAllMarchasEnsayadas = !showAllMarchasEnsayadas;
+            renderStatistics();
+        });
+    }
+
+    const btnToggleOlvidadas = document.getElementById("btn-toggle-all-marchas-olvidadas");
+    if (btnToggleOlvidadas) {
+        btnToggleOlvidadas.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAllMarchasOlvidadas = !showAllMarchasOlvidadas;
+            renderStatistics();
+        });
+    }
+
     // Alternancia en Visión General (Estadísticas)
     const btnOvYears = document.getElementById("btn-stats-ov-years");
     const btnOvMonths = document.getElementById("btn-stats-ov-months");
@@ -4495,6 +4513,9 @@ function renderStatistics() {
     renderGeneralOverviewChart();
 }
 
+let showAllMarchasEnsayadas = false;
+let showAllMarchasOlvidadas = false;
+
 function renderStatsMarchasTop10(filteredDates) {
     const playCounts = {};
     if (state.playedMarchas) {
@@ -4506,19 +4527,26 @@ function renderStatsMarchasTop10(filteredDates) {
         });
     }
 
-    const topMarchas = (state.marchas || [])
+    const allMarchas = (state.marchas || [])
         .map(m => ({
             ...m,
             count: playCounts[m.id] || 0
         }))
-        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'es'))
-        .slice(0, 10);
+        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'es'));
+
+    const displayMarchas = showAllMarchasEnsayadas ? allMarchas : allMarchas.slice(0, 5);
+
+    const toggleBtn = document.getElementById("btn-toggle-all-marchas-ensayadas");
+    if (toggleBtn) {
+        toggleBtn.innerText = showAllMarchasEnsayadas ? "−" : "+";
+        toggleBtn.title = showAllMarchasEnsayadas ? "Mostrar Top 5" : `Ver todas las marchas (${allMarchas.length})`;
+    }
 
     const tbody = document.getElementById("stats-marchas-table-body");
     if (!tbody) return;
 
     tbody.innerHTML = "";
-    if (topMarchas.length === 0) {
+    if (displayMarchas.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="text-center text-muted" style="padding: 20px;">
@@ -4527,7 +4555,7 @@ function renderStatsMarchasTop10(filteredDates) {
             </tr>
         `;
     } else {
-        topMarchas.forEach((m, idx) => {
+        displayMarchas.forEach((m, idx) => {
             let statusLabel = "";
             if (m.status === "green") {
                 statusLabel = `<span style="color: var(--color-present); font-weight: 600;">🟢 Bien</span>`;
@@ -4607,9 +4635,15 @@ function renderStatsMarchasOlvidadas() {
         return b.days - a.days || a.title.localeCompare(b.title, 'es');
     });
 
-    const top10 = olvidadas.slice(0, 10);
+    const displayOlvidadas = showAllMarchasOlvidadas ? olvidadas : olvidadas.slice(0, 5);
 
-    if (top10.length === 0) {
+    const toggleBtn = document.getElementById("btn-toggle-all-marchas-olvidadas");
+    if (toggleBtn) {
+        toggleBtn.innerText = showAllMarchasOlvidadas ? "−" : "+";
+        toggleBtn.title = showAllMarchasOlvidadas ? "Mostrar Top 5" : `Ver todas las marchas (${olvidadas.length})`;
+    }
+
+    if (displayOlvidadas.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="text-center text-muted" style="padding: 20px;">
@@ -4620,7 +4654,7 @@ function renderStatsMarchasOlvidadas() {
         return;
     }
 
-    top10.forEach((m, idx) => {
+    displayOlvidadas.forEach((m, idx) => {
         let statusLabel = "";
         if (m.status === "green") {
             statusLabel = `<span style="color: var(--color-present); font-weight: 600;">🟢 Bien</span>`;
