@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=329">
+    <link rel="stylesheet" href="style.css?v=330">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2958,6 +2958,27 @@
         </div>
     </div>
 
+    <!-- Modal: Previsualización de Foto de Perfil en Grande -->
+    <div id="modal-photo-preview" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px; width: 90%; text-align: center; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-photo-preview" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <h3 id="photo-preview-name" style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 1.15rem;">Nombre del Músico</h3>
+            <p id="photo-preview-instrument" class="text-muted" style="margin: 0 0 18px 0; font-size: 0.85rem;">Instrumento • Rol</p>
+            
+            <div id="photo-preview-container" style="width: 250px; height: 250px; margin: 0 auto; border-radius: 50%; overflow: hidden; border: 3px solid var(--color-gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.35); background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
+                <img id="photo-preview-img" src="" alt="Foto de Perfil" style="width: 100%; height: 100%; object-fit: cover;">
+                <div id="photo-preview-initials" class="hidden" style="font-size: 4.5rem; font-weight: 800; color: var(--color-gold); font-family: 'Cinzel', serif;"></div>
+            </div>
+            
+            <button type="button" class="btn btn-secondary" id="btn-close-photo-preview-footer" style="margin-top: 20px; width: 100%;">Cerrar</button>
+        </div>
+    </div>
+
     <!-- Modal: Preaviso (RSVP) Músicos -->
     <div id="modal-componente-preaviso" class="modal-overlay">
         <div class="modal-card" style="max-width: 400px; width: 90%;">
@@ -3064,12 +3085,12 @@
         </a>
     </nav>
 
-    <script src="app.js?v=329"></script>
+    <script src="app.js?v=330"></script>
     <script>
         // Registro del Service Worker para funcionamiento offline y notificaciones push
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=329")
+                navigator.serviceWorker.register("sw.js?v=330")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })

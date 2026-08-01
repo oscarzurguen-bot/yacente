@@ -1840,6 +1840,22 @@ function setupEventListeners() {
         });
     }
 
+    // Modal de previsualización de foto de perfil
+    const closePhotoPreview = () => {
+        const modal = document.getElementById("modal-photo-preview");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnClosePhoto = document.getElementById("btn-close-photo-preview");
+    const btnClosePhotoFooter = document.getElementById("btn-close-photo-preview-footer");
+    const modalPhoto = document.getElementById("modal-photo-preview");
+    if (btnClosePhoto) btnClosePhoto.addEventListener("click", closePhotoPreview);
+    if (btnClosePhotoFooter) btnClosePhotoFooter.addEventListener("click", closePhotoPreview);
+    if (modalPhoto) {
+        modalPhoto.addEventListener("click", (e) => {
+            if (e.target === modalPhoto) closePhotoPreview();
+        });
+    }
+
     document.getElementById("form-musician").addEventListener("submit", (e) => {
         e.preventDefault();
         const id = document.getElementById("musician-id").value;
@@ -4517,10 +4533,20 @@ function renderPlantillaTable() {
         const tbody = groupSection.querySelector("tbody");
 
         musiciansInVoice.forEach(musician => {
+            const initials = getInitials(musician.name);
+            const avatarMarkup = musician.photo
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 50%; display: block; border: 1.5px solid var(--color-gold); box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);">`
+                : `<div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
+
             const tr = document.createElement("tr");
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">
-                    <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="musician-avatar-clickable" data-id="${musician.id}" style="cursor: pointer; flex-shrink: 0; transition: transform 0.2s ease;" title="Ver foto en grande">
+                            ${avatarMarkup}
+                        </div>
+                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                    </div>
                 </td>
                 <td style="white-space: nowrap;">
                     <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
@@ -4561,6 +4587,11 @@ function renderPlantillaTable() {
                     </div>
                 </td>
             `;
+
+            tr.querySelector(".musician-avatar-clickable").addEventListener("click", (e) => {
+                e.stopPropagation();
+                openPhotoPreviewModal(musician.id);
+            });
 
             tr.querySelector(".musician-name-clickable").addEventListener("click", () => {
                 openMusicianDetailStats(musician.id);
@@ -4614,6 +4645,32 @@ function renderPlantillaTable() {
             </div>
         `;
     }
+}
+
+function openPhotoPreviewModal(musicianId) {
+    const musician = state.musicians.find(m => m.id === musicianId);
+    if (!musician) return;
+
+    const modal = document.getElementById("modal-photo-preview");
+    if (!modal) return;
+
+    document.getElementById("photo-preview-name").innerText = musician.name;
+    document.getElementById("photo-preview-instrument").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
+
+    const imgEl = document.getElementById("photo-preview-img");
+    const initialsEl = document.getElementById("photo-preview-initials");
+
+    if (musician.photo) {
+        imgEl.src = musician.photo;
+        imgEl.classList.remove("hidden");
+        initialsEl.classList.add("hidden");
+    } else {
+        imgEl.classList.add("hidden");
+        initialsEl.innerText = getInitials(musician.name);
+        initialsEl.classList.remove("hidden");
+    }
+
+    modal.classList.add("active");
 }
 
 function openEditMusicianModal(id) {
