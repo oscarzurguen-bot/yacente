@@ -3138,7 +3138,7 @@ svg.chevron {
     display: none !important;
 }
 
-/* Barra de Navegación Inferior Móvil */
+/* Barra de Navegación Inferior Móvil para Músicos */
 .component-mobile-nav {
     position: fixed !important;
     bottom: 0 !important;
@@ -3149,25 +3149,40 @@ svg.chevron {
     width: 100% !important;
     max-width: 800px !important;
     height: 62px !important;
-    background: rgba(26, 10, 14, 0.95) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border-top: 1px solid rgba(212, 175, 55, 0.25) !important;
+    background: rgba(26, 10, 14, 0.96) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-top: 1px solid rgba(212, 175, 55, 0.3) !important;
     display: flex !important;
     justify-content: space-around !important;
     align-items: center !important;
-    z-index: 999999 !important;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6) !important;
+    z-index: 9999999 !important;
+    box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.8) !important;
     box-sizing: border-box !important;
-    border-top-left-radius: 12px !important;
-    border-top-right-radius: 12px !important;
+    border-top-left-radius: 14px !important;
+    border-top-right-radius: 14px !important;
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
+    transform: translateZ(0) !important;
+    will-change: transform !important;
 }
+
+body.component-portal #component-mobile-nav {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.component-portal #component-mobile-nav.hidden {
+    display: none !important;
+    visibility: hidden !important;
+}
+
 .component-mobile-nav:not(.hidden) {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
 }
+
 .component-mobile-nav.hidden {
     display: none !important;
     visibility: hidden !important;

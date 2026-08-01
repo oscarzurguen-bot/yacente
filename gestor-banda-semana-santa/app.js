@@ -135,15 +135,18 @@ let preavisoSelectedStatus = null;
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 21; // ~131.95
 
 function getAuthToken() {
-    return sessionStorage.getItem("yacente_authenticated") === "true" || localStorage.getItem("yacente_authenticated") === "true";
+    return sessionStorage.getItem("yacente_authenticated") === "true" || 
+           localStorage.getItem("yacente_authenticated") === "true" ||
+           Boolean(sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id"));
 }
 function getAuthRole() {
     const role = sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
-    if (role) return role;
-    if (sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id")) {
+    if (role === "admin") return "admin";
+    const musId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
+    if (musId || role === "component" || role === "musico" || role === "musician" || role === "componente") {
         return "component";
     }
-    return null;
+    return role || null;
 }
 function getAuthMusicianId() {
     return sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
