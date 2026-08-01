@@ -3153,7 +3153,7 @@ svg.chevron {
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
     border-top: 1px solid rgba(212, 175, 55, 0.3) !important;
-    display: flex !important;
+    display: none !important;
     justify-content: space-around !important;
     align-items: center !important;
     z-index: 9999999 !important;
@@ -3166,12 +3166,15 @@ svg.chevron {
     will-change: transform !important;
 }
 
+/* SI LA SESIÓN ES DE MÚSICO (body.component-portal), SE MUESTRA SIEMPRE */
+body.component-portal .component-mobile-nav,
 body.component-portal #component-mobile-nav {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
 }
 
+body.component-portal .component-mobile-nav.hidden,
 body.component-portal #component-mobile-nav.hidden {
     display: none !important;
     visibility: hidden !important;
