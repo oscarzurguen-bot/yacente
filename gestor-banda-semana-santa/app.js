@@ -142,6 +142,10 @@ function getAuthToken() {
 function getAuthRole() {
     const musId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
     if (musId) return "component";
+    const activeSec = document.querySelector(".app-section.active");
+    if (activeSec && activeSec.id && activeSec.id.startsWith("section-componente-")) {
+        return "component";
+    }
     const role = sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
     if (role === "admin") return "admin";
     if (role === "component" || role === "musico" || role === "musician" || role === "componente") {
@@ -2937,7 +2941,10 @@ function setupComponentSwipeNavigation() {
 function renderActiveSection(sectionId, forcedDirection) {
     const activeRole = getAuthRole();
     const mobNav = document.getElementById("component-mobile-nav");
-    if (activeRole === "component") {
+    if (sectionId && sectionId.startsWith("section-componente-")) {
+        document.body.classList.add("component-portal");
+        if (mobNav) mobNav.classList.remove("hidden");
+    } else if (activeRole === "component") {
         document.body.classList.add("component-portal");
         if (mobNav) mobNav.classList.remove("hidden");
         if (!sectionId.startsWith("section-componente-")) {

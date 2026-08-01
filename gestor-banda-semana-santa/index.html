@@ -95,15 +95,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=343">
+    <link rel="stylesheet" href="style.css?v=344">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+                for (var r of regs) { r.unregister(); }
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(keys) {
+                keys.forEach(function(key) { caches.delete(key); });
+            });
+        }
+    </script>
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
-
-<body class="mobile-simplified-active">
+</head>
     <script>
         (function() {
             var musId = localStorage.getItem("yacente_musician_id") || sessionStorage.getItem("yacente_musician_id");
@@ -3139,13 +3150,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=343"></script>
+    <script src="app.js?v=344"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=343
+        // Purga de caché antigua y registro del Service Worker v=344
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v343") {
+                    if (key !== "yacente-v344") {
                         console.log("[PWA] Purgando caché antigua:", key);
                         caches.delete(key);
                     }
@@ -3159,15 +3170,15 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=343")
+                navigator.serviceWorker.register("sw.js?v=344")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v343 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v344 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
                                 installingWorker.onstatechange = () => {
                                     if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        console.log("[PWA] Nueva versión v343 detectada, recargando...");
+                                        console.log("[PWA] Nueva versión v344 detectada, recargando...");
                                         window.location.reload();
                                     }
                                 };

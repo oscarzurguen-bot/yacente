@@ -3167,29 +3167,22 @@ svg.chevron {
     pointer-events: auto !important;
 }
 
-/* SI LA SESIÓN ES DE MÚSICO (body.component-portal), SE MUESTRA SIEMPRE */
+/* REGLA ABSOLUTA DE VISIBILIDAD DE LA BARRA INFERIOR DE MÚSICOS */
 body.component-portal .component-mobile-nav,
-body.component-portal #component-mobile-nav {
+body.component-portal #component-mobile-nav,
+body.component-portal .component-mobile-nav.hidden,
+body.component-portal #component-mobile-nav.hidden {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-}
-
-body.component-portal .component-mobile-nav.hidden,
-body.component-portal #component-mobile-nav.hidden {
-    display: none !important;
-    visibility: hidden !important;
+    z-index: 99999999 !important;
+    pointer-events: auto !important;
 }
 
 .component-mobile-nav:not(.hidden) {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-}
-
-.component-mobile-nav.hidden {
-    display: none !important;
-    visibility: hidden !important;
 }
 .mobile-nav-item {
     display: flex;
