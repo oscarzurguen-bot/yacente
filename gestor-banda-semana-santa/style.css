@@ -1381,9 +1381,10 @@ svg.chevron {
     transition: opacity var(--transition-normal), visibility var(--transition-normal);
 }
 .modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: all;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: all !important;
+    z-index: 10000000 !important;
 }
 
 .modal-card {
@@ -3160,13 +3161,14 @@ svg.chevron {
     border-top-right-radius: 12px;
     padding-bottom: env(safe-area-inset-bottom, 0);
 }
-body.component-portal .component-mobile-nav:not(.hidden) {
+.component-mobile-nav:not(.hidden) {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
 }
 .component-mobile-nav.hidden {
     display: none !important;
+    visibility: hidden !important;
 }
 .mobile-nav-item {
     display: flex;
