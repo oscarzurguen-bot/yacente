@@ -3149,21 +3149,22 @@ svg.chevron {
     width: 100% !important;
     max-width: 800px !important;
     height: 62px !important;
-    background: rgba(26, 10, 14, 0.96) !important;
+    background: rgba(26, 10, 14, 0.98) !important;
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
-    border-top: 1px solid rgba(212, 175, 55, 0.3) !important;
+    border-top: 1px solid rgba(212, 175, 55, 0.4) !important;
     display: none !important;
     justify-content: space-around !important;
     align-items: center !important;
-    z-index: 9999999 !important;
-    box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.8) !important;
+    z-index: 99999999 !important;
+    box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.9) !important;
     box-sizing: border-box !important;
     border-top-left-radius: 14px !important;
     border-top-right-radius: 14px !important;
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
     transform: translateZ(0) !important;
     will-change: transform !important;
+    pointer-events: auto !important;
 }
 
 /* SI LA SESIÓN ES DE MÚSICO (body.component-portal), SE MUESTRA SIEMPRE */

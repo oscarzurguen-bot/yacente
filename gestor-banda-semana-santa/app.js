@@ -140,10 +140,11 @@ function getAuthToken() {
            Boolean(sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id"));
 }
 function getAuthRole() {
+    const musId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
+    if (musId) return "component";
     const role = sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
     if (role === "admin") return "admin";
-    const musId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
-    if (musId || role === "component" || role === "musico" || role === "musician" || role === "componente") {
+    if (role === "component" || role === "musico" || role === "musician" || role === "componente") {
         return "component";
     }
     return role || null;
@@ -1289,15 +1290,16 @@ function setupEventListeners() {
     
     // Barra de navegación inferior móvil
     document.querySelectorAll(".mobile-nav-item").forEach(item => {
-        item.addEventListener("click", (e) => {
-            e.preventDefault();
+        const handleNav = (e) => {
+            if (e.cancelable) e.preventDefault();
             if (item.classList.contains("btn-logout-component")) {
                 logoutComponent();
             } else {
                 const target = item.getAttribute("data-target");
                 if (target) renderActiveSection(target);
             }
-        });
+        };
+        item.addEventListener("click", handleNav);
     });
     // Navegación táctil por deslizamiento (Swipe Gestures) para el portal de músicos
     setupComponentSwipeNavigation();
