@@ -1312,7 +1312,7 @@ function setupEventListeners() {
                 return;
             }
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
             
             musician.pin = newPin;
@@ -1664,7 +1664,7 @@ function setupEventListeners() {
                 const musicianId = currentDetailMusicianId;
                 if (!musicianId) return;
                 
-                const musician = state.musicians.find(m => m.id === musicianId);
+                const musician = state.musicians.find(m => String(m.id) === String(musicianId));
                 if (!musician) return;
                 
                 musician[badge.field] = e.target.checked;
@@ -1697,7 +1697,7 @@ function setupEventListeners() {
             if (getAuthRole() !== "admin") {
                 e.preventDefault();
                 const musicianId = currentDetailMusicianId;
-                const musician = state.musicians.find(m => m.id === musicianId);
+                const musician = state.musicians.find(m => String(m.id) === String(musicianId));
                 rutaInputListener.value = musician ? (musician.badgeRutaTrips || 0) : 0;
                 showToast("Solo la dirección puede asignar estas insignias", "error");
                 return;
@@ -1705,7 +1705,7 @@ function setupEventListeners() {
             const musicianId = currentDetailMusicianId;
             if (!musicianId) return;
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
             
             const val = parseInt(e.target.value, 10);
@@ -1736,7 +1736,7 @@ function setupEventListeners() {
             if (getAuthRole() !== "admin") {
                 e.preventDefault();
                 const musicianId = currentDetailMusicianId;
-                const musician = state.musicians.find(m => m.id === musicianId);
+                const musician = state.musicians.find(m => String(m.id) === String(musicianId));
                 hermandadInputListener.value = musician ? (musician.badgeHermandadEvents || 0) : 0;
                 showToast("Solo la dirección puede asignar estas insignias", "error");
                 return;
@@ -1744,7 +1744,7 @@ function setupEventListeners() {
             const musicianId = currentDetailMusicianId;
             if (!musicianId) return;
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
             
             const val = parseInt(e.target.value, 10);
@@ -3543,7 +3543,7 @@ function updateMusicianReason(id, reasonText) {
 }
 
 function updateSectionHeaderRatio(musicianId) {
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
     
     const sectionName = musician.instrument;
@@ -4688,7 +4688,7 @@ function renderPlantillaTable() {
 }
 
 function openPhotoPreviewModal(musicianId) {
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     const modal = document.getElementById("modal-photo-preview");
@@ -5361,7 +5361,7 @@ let showAllDetailAbsences = false;
 function openMusicianDetailStats(musicianId) {
     currentDetailMusicianId = musicianId;
     showAllDetailAbsences = false;
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     document.getElementById("detail-musician-name").innerText = musician.name;
@@ -5380,7 +5380,7 @@ function renderMusicianDetailContent() {
     const musicianId = currentDetailMusicianId;
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     const currentStreak = calculateMusicianStreak(musicianId);
@@ -5775,7 +5775,7 @@ function downloadMusicianPDFReport() {
     const musicianId = currentDetailMusicianId;
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     const yearFilter = document.getElementById("detail-filter-year").value;
@@ -5993,7 +5993,7 @@ function downloadRepertoirePDFReport() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     if (!state.marchas || state.marchas.length === 0) {
@@ -6997,7 +6997,7 @@ function setupFirebaseListeners() {
                 return;
             }
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) {
                 showToast("Músico no encontrado", "error");
                 return;
@@ -9061,7 +9061,7 @@ function renderSimulatorRoster() {
 }
 
 function createParadeSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) {
-    const m = state.musicians.find(mus => mus.id === musicianId);
+    const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
     if (!m) return;
     
     const seat = document.createElement("div");
@@ -9160,7 +9160,7 @@ function createParadeSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) 
 }
 
 function createConcertSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) {
-    const m = state.musicians.find(mus => mus.id === musicianId);
+    const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
     if (!m) return;
     
     const seat = document.createElement("div");
@@ -9281,7 +9281,7 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
     seat.style.height = "36px";
     
     if (musicianId) {
-        const m = state.musicians.find(mus => mus.id === musicianId);
+        const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
         if (m) {
             seat.classList.add("occupied");
             const shortName = getShortName(m.name);
@@ -9366,7 +9366,7 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
     if (musicianId) {
         seat.addEventListener("click", (e) => {
             e.stopPropagation();
-            const m = state.musicians.find(mus => mus.id === musicianId);
+            const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
             if (m && confirm(`¿Deseas quitar a ${m.name} del puesto de director?`)) {
                 state.directorConcierto = null;
                 renderSimulatorSeats();
@@ -9643,7 +9643,7 @@ function createSeatDOM(seatId, seatNumber, x, y, container, formationMap) {
     
     // Comprobar ocupación
     const musicianId = formationMap[seatId];
-    const m = musicianId ? state.musicians.find(x => x.id === musicianId) : null;
+    const m = musicianId ? state.musicians.find(x => String(x.id) === String(musicianId)) : null;
     
     // Si es desfile, aplicar diseño más compacto para que quepa en pantalla
     if (simActiveMode === "desfile") {
@@ -10180,7 +10180,7 @@ function downloadSimulatorImage() {
         const canvas_dir_w = 75;
         const canvas_dir_h = 39;
         
-        const directorMus = state.directorConcierto ? state.musicians.find(m => m.id === state.directorConcierto) : null;
+        const directorMus = state.directorConcierto ? state.musicians.find(m => String(m.id) === String(state.directorConcierto)) : null;
         if (directorMus) {
             const colors = SECTION_COLORS[directorMus.instrument] || { bg: "#d4af37", border: "#ffe893", text: "#000000" };
             ctx.fillStyle = colors.bg;
@@ -10297,7 +10297,7 @@ function downloadSimulatorImage() {
 
 function drawCanvasSeat(ctx, x, y, seatId, seatNumber, formationMap, smallerRadius) {
     const musicianId = formationMap[seatId];
-    const m = musicianId ? state.musicians.find(x => x.id === musicianId) : null;
+    const m = musicianId ? state.musicians.find(x => String(x.id) === String(musicianId)) : null;
     
     const r = smallerRadius ? 14 : 18;
     
@@ -10340,7 +10340,7 @@ function drawCanvasSeat(ctx, x, y, seatId, seatNumber, formationMap, smallerRadi
 }
 
 function drawCanvasParadeSeat(ctx, x, y, musicianId, smallerRadius) {
-    const m = state.musicians.find(x => x.id === musicianId);
+    const m = state.musicians.find(x => String(x.id) === String(musicianId));
     const r = smallerRadius ? 14 : 18;
     
     ctx.beginPath();
@@ -10433,7 +10433,7 @@ function populateLoginMusicians() {
 }
 
 function getMusicianMedalsData(musicianId) {
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return [];
 
     const dNow = new Date();
@@ -11691,7 +11691,7 @@ function renderComponentEventos() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
     
 
@@ -11839,7 +11839,7 @@ function renderComponenteCalendario() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     // Inicializar fecha del calendario si no está definida
@@ -12429,7 +12429,7 @@ function setupProfilePhotoEvents() {
             const musicianId = getAuthMusicianId();
             if (!musicianId) return;
 
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
 
             const reader = new FileReader();
@@ -13017,7 +13017,7 @@ function getRehearsalSubtypeText(sub) {
 
 function isMusicianConvocated(musicianId, sessionInfo) {
     if (!sessionInfo) return false;
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return false;
 
     // Check if it is a section rehearsal
