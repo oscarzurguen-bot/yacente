@@ -10994,7 +10994,7 @@ function renderComponentFicha() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
     
     const parts = musician.name.trim().split(" ");
@@ -11390,7 +11390,7 @@ function renderComponentHistorial() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
     
     const filterType = document.getElementById("filter-history-type").value;
@@ -11600,15 +11600,16 @@ function openCompRehearsalDetailModal(date) {
 
     const musiciansList = (state && state.musicians) || [];
     musiciansList.forEach(m => {
-        if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+        if (!m) return;
+        if (isSpecialRehearsal && (!m.instrument || !convocated.includes(m.instrument))) {
             return;
         }
         totalConvocated++;
-        const r = dayRecord ? dayRecord[m.id] : null;
+        const r = dayRecord ? (dayRecord[m.id] || dayRecord[String(m.id)]) : null;
         if (r) {
             if (r.status === "present") {
                 presentCount++;
-            } else if (r.justified) {
+            } else if (r.justified || r.status === "justified") {
                 justifiedCount++;
             } else {
                 absentCount++;
