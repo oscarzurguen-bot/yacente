@@ -140,17 +140,7 @@ function getAuthToken() {
            Boolean(sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id"));
 }
 function getAuthRole() {
-    const musId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
-    if (musId) return "component";
-    const activeSec = document.querySelector(".app-section.active");
-    if (activeSec && activeSec.id && activeSec.id.startsWith("section-componente-")) {
-        return "component";
-    }
     const role = sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
-    if (role === "admin") return "admin";
-    if (role === "component" || role === "musico" || role === "musician" || role === "componente") {
-        return "component";
-    }
     return role || null;
 }
 function getAuthMusicianId() {
@@ -2941,10 +2931,7 @@ function setupComponentSwipeNavigation() {
 function renderActiveSection(sectionId, forcedDirection) {
     const activeRole = getAuthRole();
     const mobNav = document.getElementById("component-mobile-nav");
-    if (sectionId && sectionId.startsWith("section-componente-")) {
-        document.body.classList.add("component-portal");
-        if (mobNav) mobNav.classList.remove("hidden");
-    } else if (activeRole === "component") {
+    if (activeRole === "component") {
         document.body.classList.add("component-portal");
         if (mobNav) mobNav.classList.remove("hidden");
         if (!sectionId.startsWith("section-componente-")) {
@@ -11004,10 +10991,18 @@ function openStreakInfoModal() {
 
 function renderComponentFicha() {
     const musicianId = getAuthMusicianId();
-    if (!musicianId) return;
+    if (!musicianId) {
+        showToast("Músico no encontrado. Iniciando cierre de sesión.", "error");
+        logoutComponent();
+        return;
+    }
     
-    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
-    if (!musician) return;
+    const musician = state.musicians.find(m => m.id == musicianId);
+    if (!musician) {
+        showToast("Músico no encontrado. Iniciando cierre de sesión.", "error");
+        logoutComponent();
+        return;
+    }
     
     const parts = musician.name.trim().split(" ");
     const initials = parts.map(p => p[0]).slice(0, 2).join("").toUpperCase();

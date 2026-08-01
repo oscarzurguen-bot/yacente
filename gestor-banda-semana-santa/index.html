@@ -95,35 +95,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=344">
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-                for (var r of regs) { r.unregister(); }
-            });
-        }
-        if ('caches' in window) {
-            caches.keys().then(function(keys) {
-                keys.forEach(function(key) { caches.delete(key); });
-            });
-        }
-    </script>
+    <link rel="stylesheet" href="style.css?v=333">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
 </head>
-    <script>
-        (function() {
-            var musId = localStorage.getItem("yacente_musician_id") || sessionStorage.getItem("yacente_musician_id");
-            var role = localStorage.getItem("yacente_role") || sessionStorage.getItem("yacente_role");
-            if (musId || (role && role !== "admin")) {
-                document.body.classList.add("component-portal");
-            }
-        })();
-    </script>
+<body class="mobile-simplified-active">
     <!-- Pantalla de Bloqueo: Contraseña de Directiva -->
     <div id="lock-screen" class="lock-screen-overlay hidden">
         <div class="lock-card">
@@ -3108,7 +3087,7 @@
     <div id="toast-container" class="toast-container"></div>
  
     <!-- Barra de Navegación Inferior Móvil para Componentes (Solo visible para rol componente) -->
-    <nav id="component-mobile-nav" class="component-mobile-nav">
+    <nav id="component-mobile-nav" class="component-mobile-nav hidden">
         <a href="#" class="mobile-nav-item active" data-target="section-componente-ficha">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
