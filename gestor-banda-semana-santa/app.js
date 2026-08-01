@@ -3122,6 +3122,8 @@ function renderAttendance() {
         });
         const sectionRatio = Math.round((presents / musiciansInSection.length) * 100) || 0;
 
+        const allPresent = presents === musiciansInSection.length && musiciansInSection.length > 0;
+
         const headerDiv = document.createElement("div");
         headerDiv.className = "instrument-header";
         headerDiv.innerHTML = `
@@ -3129,7 +3131,13 @@ function renderAttendance() {
                 <h3>${sectionName}</h3>
                 <span class="musician-count-badge">${musiciansInSection.length}</span>
             </div>
-            <div class="instrument-header-actions">
+            <div class="instrument-header-actions" style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn-mark-section-present ${allPresent ? 'all-present' : ''}" title="Marcar todos los de ${sectionName} como presentes" style="background: ${allPresent ? 'rgba(46, 204, 113, 0.25)' : 'rgba(46, 204, 113, 0.12)'}; color: #2ecc71; border: 1px solid ${allPresent ? '#2ecc71' : 'rgba(46, 204, 113, 0.35)'}; padding: 4px 10px; border-radius: 14px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>${allPresent ? '100% Presentes' : 'Marcar Todos'}</span>
+                </button>
                 <span class="section-attendance-ratio">${sectionRatio}% Asistencia</span>
                 <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -3137,6 +3145,14 @@ function renderAttendance() {
             </div>
         `;
         
+        const btnMarkSection = headerDiv.querySelector(".btn-mark-section-present");
+        if (btnMarkSection) {
+            btnMarkSection.addEventListener("click", (e) => {
+                e.stopPropagation();
+                markAllMusiciansInVoicePresent(musiciansInSection, sectionName);
+            });
+        }
+
         headerDiv.addEventListener("click", () => {
             sectionDiv.classList.toggle("collapsed");
         });
@@ -3304,6 +3320,42 @@ function showAbsenceSummary(card, reasonText) {
     absenceContainer.querySelector(".summary-reason-text").innerText = reasonText;
     absenceContainer.classList.remove("show-form");
     absenceContainer.classList.add("show-summary");
+}
+
+function markAllMusiciansInVoicePresent(musiciansInSection, sectionName) {
+    const date = state.currentDate;
+    if (!date) return;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
+
+    if (!state.attendance[date]) {
+        state.attendance[date] = {};
+    }
+
+    const updates = {};
+    musiciansInSection.forEach(m => {
+        state.attendance[date][m.id] = {
+            status: "present",
+            justified: false,
+            reason: ""
+        };
+        updates[m.id] = { status: "present", justified: false, reason: "" };
+    });
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("attendance").doc(date).set(updates, { merge: true })
+            .catch(err => console.error("Error al marcar presencia masiva en la nube:", err));
+    } else {
+        saveStateToLocalStorage();
+    }
+
+    updateAttendanceStatsRibbon();
+    renderAttendance();
+    renderStatistics();
+    showToast(`Músicos de ${sectionName || 'la voz'} marcados como presentes`, "success");
 }
 
 function ensureAttendanceRecord(date, id) {
@@ -4786,6 +4838,7 @@ function renderStatistics() {
     renderStatsStreaks(filteredDates);
     renderStatsMarchasOlvidadas();
     renderGeneralOverviewChart();
+    renderSectionAttendanceComparisonChart();
 }
 
 let showAllMarchasEnsayadas = false;
@@ -12319,6 +12372,356 @@ function renderGeneralOverviewChart() {
         </div>
         <div style="height: 25px; width: 100%;"></div>
     `;
+}
+
+const SECTION_CHART_COLORS = {
+    "Trompetas 1ª": "#f39c12",
+    "Fliscornos": "#2ecc71",
+    "Trompetas 2ª": "#e67e22",
+    "Trompetas 3ª": "#d35400",
+    "Trompas": "#1abc9c",
+    "Trombones": "#3498db",
+    "Bombardinos": "#9b59b6",
+    "Tubas": "#607d8b",
+    "Cornetas": "#e74c3c",
+    "Tambores": "#00bcd4",
+    "Bombos": "#8e44ad",
+    "Platos": "#ff4081"
+};
+
+function renderSectionAttendanceComparisonChart() {
+    const container = document.getElementById("stats-section-line-chart-container");
+    const pillsContainer = document.getElementById("stats-section-pills-container");
+    const summaryGrid = document.getElementById("stats-section-summary-grid");
+    if (!container || !pillsContainer) return;
+
+    if (!window.statsSectionChartEventsBound) {
+        window.statsSectionChartEventsBound = true;
+        const btnAll = document.getElementById("btn-stats-sec-select-all");
+        const btnMetals = document.getElementById("btn-stats-sec-select-metals");
+        const btnPerc = document.getElementById("btn-stats-sec-select-percussion");
+        const btnClear = document.getElementById("btn-stats-sec-clear-all");
+        const timeSelect = document.getElementById("stats-section-time-select");
+
+        if (btnAll) btnAll.addEventListener("click", () => {
+            state.selectedSectionsForChart = SECCIONES_ORDEN.filter(s => s !== "Dirección");
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (btnMetals) btnMetals.addEventListener("click", () => {
+            state.selectedSectionsForChart = ["Trompetas 1ª", "Fliscornos", "Trompetas 2ª", "Trompetas 3ª", "Trompas", "Trombones", "Bombardinos", "Tubas", "Cornetas"];
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (btnPerc) btnPerc.addEventListener("click", () => {
+            state.selectedSectionsForChart = ["Tambores", "Bombos", "Platos"];
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (btnClear) btnClear.addEventListener("click", () => {
+            state.selectedSectionsForChart = [];
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (timeSelect) timeSelect.addEventListener("change", () => {
+            renderSectionAttendanceComparisonChart();
+        });
+    }
+
+    // Default selected sections if empty
+    if (!state.selectedSectionsForChart) {
+        state.selectedSectionsForChart = ["Trompetas 1ª", "Cornetas", "Trombones", "Tambores"];
+    }
+
+    const timeFilter = document.getElementById("stats-section-time-select") ? document.getElementById("stats-section-time-select").value : "season";
+
+    // Filter past dates
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+    
+    let allDates = Object.keys(state.attendance).filter(dateKey => dateKey <= todayStr).sort((a, b) => a.localeCompare(b));
+
+    // Time filtering
+    if (timeFilter === "last3m") {
+        const d3m = new Date();
+        d3m.setMonth(d3m.getMonth() - 3);
+        const minStr = `${d3m.getFullYear()}-${String(d3m.getMonth() + 1).padStart(2, '0')}-01`;
+        allDates = allDates.filter(d => d >= minStr);
+    } else if (timeFilter === "last6m") {
+        const d6m = new Date();
+        d6m.setMonth(d6m.getMonth() - 6);
+        const minStr = `${d6m.getFullYear()}-${String(d6m.getMonth() + 1).padStart(2, '0')}-01`;
+        allDates = allDates.filter(d => d >= minStr);
+    } else if (timeFilter === "season") {
+        const currYear = dNow.getFullYear();
+        const currMonth = dNow.getMonth() + 1;
+        const seasonStartYear = currMonth >= 9 ? currYear : currYear - 1;
+        const minStr = `${seasonStartYear}-09-01`;
+        allDates = allDates.filter(d => d >= minStr);
+    }
+
+    // Group dates by Month
+    const monthGroups = {};
+    const monthsAbbr = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+
+    allDates.forEach(date => {
+        const parts = date.split("-");
+        const monthKey = `${parts[0]}-${parts[1]}`;
+        if (!monthGroups[monthKey]) {
+            const mIdx = parseInt(parts[1], 10) - 1;
+            monthGroups[monthKey] = {
+                key: monthKey,
+                label: `${monthsAbbr[mIdx]} '${parts[0].slice(2)}`,
+                dates: []
+            };
+        }
+        monthGroups[monthKey].dates.push(date);
+    });
+
+    const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => a.localeCompare(b));
+
+    // Valid sections excluding Dirección
+    const validSections = SECCIONES_ORDEN.filter(sec => sec !== "Dirección");
+
+    // Compute monthly attendance % per section
+    const sectionMonthlyData = {};
+    const sectionOverallStats = {};
+
+    validSections.forEach(sec => {
+        sectionMonthlyData[sec] = [];
+        sectionOverallStats[sec] = { totalPresents: 0, totalConvocated: 0, bestMonthPct: 0 };
+
+        // Musicians in this section
+        const secMusicians = state.musicians.filter(m => m.instrument === sec);
+
+        sortedMonthKeys.forEach(mKey => {
+            const mData = monthGroups[mKey];
+            let secTotalConvocated = 0;
+            let secPresents = 0;
+
+            mData.dates.forEach(date => {
+                const dayRecord = state.attendance[date] || {};
+                const sessionInfo = state.sessionTypes[date];
+                const isSpecial = sessionInfo && sessionInfo.type === "ensayo" && sessionInfo.subtype !== "general" && sessionInfo.convocatedVoices && sessionInfo.convocatedVoices.length > 0;
+                
+                if (isSpecial && !sessionInfo.convocatedVoices.includes(sec)) {
+                    return;
+                }
+
+                secMusicians.forEach(m => {
+                    const r = dayRecord[m.id];
+                    if (r) {
+                        secTotalConvocated++;
+                        if (r.status === "present") {
+                            secPresents++;
+                        }
+                    }
+                });
+            });
+
+            const pct = secTotalConvocated > 0 ? Math.round((secPresents / secTotalConvocated) * 100) : null;
+            sectionMonthlyData[sec].push({
+                monthKey: mKey,
+                label: mData.label,
+                pct: pct,
+                presents: secPresents,
+                total: secTotalConvocated
+            });
+
+            if (pct !== null) {
+                sectionOverallStats[sec].totalPresents += secPresents;
+                sectionOverallStats[sec].totalConvocated += secTotalConvocated;
+                if (pct > sectionOverallStats[sec].bestMonthPct) {
+                    sectionOverallStats[sec].bestMonthPct = pct;
+                }
+            }
+        });
+    });
+
+    // 1. Render Selector Pills
+    pillsContainer.innerHTML = "";
+    validSections.forEach(sec => {
+        const musCount = state.musicians.filter(m => m.instrument === sec).length;
+        if (musCount === 0) return; // Skip sections with no musicians
+
+        const stats = sectionOverallStats[sec];
+        const overallPct = stats.totalConvocated > 0 ? Math.round((stats.totalPresents / stats.totalConvocated) * 100) : 0;
+        const isActive = state.selectedSectionsForChart.includes(sec);
+        const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
+
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = `quick-sec-chart-pill ${isActive ? 'active' : ''}`;
+        pill.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: ${isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)'};
+            border: 1px solid ${isActive ? color : 'var(--border-color)'};
+            color: ${isActive ? '#FFF' : 'var(--text-muted)'};
+            opacity: ${isActive ? '1' : '0.6'};
+            box-shadow: ${isActive ? `0 0 10px ${color}33` : 'none'};
+        `;
+
+        pill.innerHTML = `
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color}; display: inline-block;"></span>
+            <span>${sec}</span>
+            <span style="font-size: 0.7rem; font-weight: 700; color: ${color}; margin-left: 2px;">${overallPct}%</span>
+        `;
+
+        pill.addEventListener("click", () => {
+            if (isActive) {
+                state.selectedSectionsForChart = state.selectedSectionsForChart.filter(s => s !== sec);
+            } else {
+                state.selectedSectionsForChart.push(sec);
+            }
+            renderSectionAttendanceComparisonChart();
+        });
+
+        pillsContainer.appendChild(pill);
+    });
+
+    // 2. Render SVG Line Chart
+    if (sortedMonthKeys.length === 0 || state.selectedSectionsForChart.length === 0) {
+        container.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 260px; text-align: center; color: var(--text-muted); border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); font-size: 0.88rem;">
+                ${state.selectedSectionsForChart.length === 0 ? 'Selecciona al menos una cuerda para comparar.' : 'No hay datos de sesiones para el período seleccionado.'}
+            </div>
+        `;
+        if (summaryGrid) summaryGrid.innerHTML = "";
+        return;
+    }
+
+    const svgWidth = 800;
+    const svgHeight = 280;
+    const paddingLeft = 45;
+    const paddingRight = 25;
+    const paddingTop = 25;
+    const paddingBottom = 40;
+    const chartWidth = svgWidth - paddingLeft - paddingRight;
+    const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+    const numMonths = sortedMonthKeys.length;
+    const stepX = numMonths > 1 ? chartWidth / (numMonths - 1) : chartWidth / 2;
+
+    // Build SVG Y Gridlines
+    let gridLinesSVG = "";
+    [100, 75, 50, 25, 0].forEach(val => {
+        const y = paddingTop + (1 - val / 100) * chartHeight;
+        gridLinesSVG += `
+            <line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - paddingRight}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4,4" stroke-width="1" />
+            <text x="${paddingLeft - 8}" y="${y + 4}" fill="var(--text-muted)" font-size="10" text-anchor="end" font-family="'Outfit', sans-serif">${val}%</text>
+        `;
+    });
+
+    // Build SVG X Labels
+    let xLabelsSVG = "";
+    sortedMonthKeys.forEach((mKey, idx) => {
+        const x = numMonths > 1 ? paddingLeft + idx * stepX : paddingLeft + chartWidth / 2;
+        const label = monthGroups[mKey].label;
+        xLabelsSVG += `
+            <text x="${x}" y="${svgHeight - 12}" fill="var(--text-color)" font-size="11" font-weight="600" text-anchor="middle" font-family="'Outfit', sans-serif">${label}</text>
+        `;
+    });
+
+    // Build Polylines & Nodes per selected section
+    let pathsSVG = "";
+    let nodesSVG = "";
+
+    state.selectedSectionsForChart.forEach(sec => {
+        const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
+        const mList = sectionMonthlyData[sec] || [];
+        const points = [];
+
+        mList.forEach((item, idx) => {
+            if (item.pct !== null) {
+                const x = numMonths > 1 ? paddingLeft + idx * stepX : paddingLeft + chartWidth / 2;
+                const y = paddingTop + (1 - item.pct / 100) * chartHeight;
+                points.push({ x, y, pct: item.pct, label: item.label, presents: item.presents, total: item.total, sec });
+            }
+        });
+
+        if (points.length > 0) {
+            // Path stroke
+            if (points.length === 1) {
+                pathsSVG += `<circle cx="${points[0].x}" cy="${points[0].y}" r="5" fill="${color}" />`;
+            } else {
+                const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(" ");
+                pathsSVG += `
+                    <path d="${pathD}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 6px ${color}66);" />
+                `;
+            }
+
+            // Interactive Circle Nodes
+            points.forEach(p => {
+                const tooltipText = `${sec} (${p.label}): ${p.pct}% (${p.presents}/${p.total})`;
+                nodesSVG += `
+                    <circle class="chart-line-node" cx="${p.x}" cy="${p.y}" r="5.5" fill="var(--bg-card)" stroke="${color}" stroke-width="3" style="cursor: pointer; transition: transform 0.2s;" data-tooltip="${tooltipText}">
+                        <title>${tooltipText}</title>
+                    </circle>
+                `;
+            });
+        }
+    });
+
+    container.innerHTML = `
+        <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width: 100%; height: 100%; overflow: visible; font-family: 'Outfit', sans-serif;">
+            ${gridLinesSVG}
+            ${xLabelsSVG}
+            ${pathsSVG}
+            ${nodesSVG}
+        </svg>
+    `;
+
+    // 3. Render Summary Grid
+    if (summaryGrid) {
+        summaryGrid.innerHTML = "";
+        state.selectedSectionsForChart.forEach(sec => {
+            const stats = sectionOverallStats[sec];
+            if (!stats) return;
+            const avgPct = stats.totalConvocated > 0 ? Math.round((stats.totalPresents / stats.totalConvocated) * 100) : 0;
+            const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
+
+            let statusLabel = "Excelente";
+            let statusColor = "var(--color-present)";
+            if (avgPct < 70) {
+                statusLabel = "Atención";
+                statusColor = "var(--color-absent)";
+            } else if (avgPct < 85) {
+                statusLabel = "Aceptable";
+                statusColor = "var(--color-justified)";
+            }
+
+            const card = document.createElement("div");
+            card.style.cssText = `
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-left: 4px solid ${color};
+                border-radius: 8px;
+                padding: 10px 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            `;
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${sec}</span>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: ${statusColor}; border: 1px solid ${statusColor}44; background: ${statusColor}15; padding: 1px 5px; border-radius: 4px;">${statusLabel}</span>
+                </div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: ${color}; font-family: 'Outfit', sans-serif;">${avgPct}%</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">Máx. Mes: <strong style="color: var(--text-color);">${stats.bestMonthPct}%</strong> | ${stats.totalPresents}/${stats.totalConvocated} asis.</div>
+            `;
+
+            summaryGrid.appendChild(card);
+        });
+    }
 }
 
 function getRehearsalSubtypeText(sub) {
