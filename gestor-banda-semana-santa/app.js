@@ -10983,11 +10983,7 @@ function renderComponentFicha() {
     if (!musicianId) return;
     
     const musician = state.musicians.find(m => m.id === musicianId);
-    if (!musician) {
-        showToast("Músico no encontrado. Iniciando cierre de sesión.", "error");
-        logoutComponent();
-        return;
-    }
+    if (!musician) return;
     
     const parts = musician.name.trim().split(" ");
     const initials = parts.map(p => p[0]).slice(0, 2).join("").toUpperCase();

@@ -3146,19 +3146,24 @@ svg.chevron {
     width: 100%;
     max-width: 800px;
     height: 62px;
-    background: rgba(26, 10, 14, 0.9);
+    background: rgba(26, 10, 14, 0.95);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid rgba(212, 175, 55, 0.25);
     display: flex;
     justify-content: space-around;
     align-items: center;
-    z-index: 9999;
+    z-index: 999999 !important;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
     box-sizing: border-box;
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
     padding-bottom: env(safe-area-inset-bottom, 0);
+}
+body.component-portal .component-mobile-nav:not(.hidden) {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 .component-mobile-nav.hidden {
     display: none !important;
