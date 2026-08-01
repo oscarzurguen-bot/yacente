@@ -11528,6 +11528,34 @@ function renderComponentHistorial() {
             </div>
         `;
         
+        let isTouchMoved = false;
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        row.addEventListener("touchstart", (e) => {
+            if (e.touches && e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                isTouchMoved = false;
+            }
+        }, { passive: true });
+
+        row.addEventListener("touchmove", (e) => {
+            if (e.touches && e.touches.length === 1) {
+                const moveX = Math.abs(e.touches[0].clientX - touchStartX);
+                const moveY = Math.abs(e.touches[0].clientY - touchStartY);
+                if (moveX > 10 || moveY > 10) {
+                    isTouchMoved = true;
+                }
+            }
+        }, { passive: true });
+
+        row.addEventListener("touchend", (e) => {
+            if (!isTouchMoved) {
+                openCompRehearsalDetailModal(date);
+            }
+        });
+
         row.addEventListener("click", () => {
             openCompRehearsalDetailModal(date);
         });

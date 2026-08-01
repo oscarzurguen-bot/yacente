@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=335">
+    <link rel="stylesheet" href="style.css?v=336">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3131,14 +3131,30 @@
         </a>
     </nav>
 
-    <script src="app.js?v=335"></script>
+    <script src="app.js?v=336"></script>
     <script>
-        // Registro del Service Worker para funcionamiento offline y notificaciones push
+        // Registro del Service Worker para funcionamiento offline y notificaciones push con auto-actualización inmediata
         if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let registration of registrations) {
+                    registration.update();
+                }
+            });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=335")
+                navigator.serviceWorker.register("sw.js?v=336")
                     .then((registration) => {
                         console.log("[PWA] Service Worker registrado correctamente:", registration);
+                        registration.onupdatefound = () => {
+                            const installingWorker = registration.installing;
+                            if (installingWorker) {
+                                installingWorker.onstatechange = () => {
+                                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        console.log("[PWA] Nueva versión detectada, recargando aplicación...");
+                                        window.location.reload();
+                                    }
+                                };
+                            }
+                        };
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
