@@ -3132,11 +3132,19 @@ function renderAttendance() {
                 <span class="musician-count-badge">${musiciansInSection.length}</span>
             </div>
             <div class="instrument-header-actions" style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="btn-mark-section-present ${allPresent ? 'all-present' : ''}" title="Marcar todos los de ${sectionName} como presentes" style="background: ${allPresent ? 'rgba(46, 204, 113, 0.25)' : 'rgba(46, 204, 113, 0.12)'}; color: #2ecc71; border: 1px solid ${allPresent ? '#2ecc71' : 'rgba(46, 204, 113, 0.35)'}; padding: 4px 10px; border-radius: 14px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    <span>${allPresent ? '100% Presentes' : 'Marcar Todos'}</span>
+                <button type="button" class="btn-mark-section-present ${allPresent ? 'all-present' : ''}" title="${allPresent ? 'Desmarcar a todos los componentes de ' + sectionName : 'Marcar a todos los componentes de ' + sectionName + ' como presentes'}">
+                    ${allPresent ? `
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        <span>Desmarcar todos</span>
+                    ` : `
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span>Marcar todos</span>
+                    `}
                 </button>
                 <span class="section-attendance-ratio">${sectionRatio}% Asistencia</span>
                 <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3149,7 +3157,7 @@ function renderAttendance() {
         if (btnMarkSection) {
             btnMarkSection.addEventListener("click", (e) => {
                 e.stopPropagation();
-                markAllMusiciansInVoicePresent(musiciansInSection, sectionName);
+                toggleVoiceAttendance(musiciansInSection, sectionName, !allPresent);
             });
         }
 
@@ -3322,7 +3330,7 @@ function showAbsenceSummary(card, reasonText) {
     absenceContainer.classList.add("show-summary");
 }
 
-function markAllMusiciansInVoicePresent(musiciansInSection, sectionName) {
+function toggleVoiceAttendance(musiciansInSection, sectionName, shouldMarkPresent) {
     const date = state.currentDate;
     if (!date) return;
     if (isPastLockBlocked(date)) {
@@ -3335,19 +3343,21 @@ function markAllMusiciansInVoicePresent(musiciansInSection, sectionName) {
     }
 
     const updates = {};
+    const newStatus = shouldMarkPresent ? "present" : "absent";
+
     musiciansInSection.forEach(m => {
         state.attendance[date][m.id] = {
-            status: "present",
+            status: newStatus,
             justified: false,
             reason: ""
         };
-        updates[m.id] = { status: "present", justified: false, reason: "" };
+        updates[m.id] = { status: newStatus, justified: false, reason: "" };
     });
 
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("attendance").doc(date).set(updates, { merge: true })
-            .catch(err => console.error("Error al marcar presencia masiva en la nube:", err));
+            .catch(err => console.error("Error al actualizar presencia masiva en la nube:", err));
     } else {
         saveStateToLocalStorage();
     }
@@ -3355,7 +3365,12 @@ function markAllMusiciansInVoicePresent(musiciansInSection, sectionName) {
     updateAttendanceStatsRibbon();
     renderAttendance();
     renderStatistics();
-    showToast(`Músicos de ${sectionName || 'la voz'} marcados como presentes`, "success");
+
+    if (shouldMarkPresent) {
+        showToast(`Músicos de ${sectionName || 'la voz'} marcados como presentes`, "success");
+    } else {
+        showToast(`Músicos de ${sectionName || 'la voz'} desmarcados`, "info");
+    }
 }
 
 function ensureAttendanceRecord(date, id) {
@@ -5317,13 +5332,12 @@ function renderMusicianDetailContent() {
 
     const detailInsigniasBox = document.getElementById("detail-insignias-box");
     if (detailInsigniasBox) {
+        detailInsigniasBox.style.opacity = "1";
+        detailInsigniasBox.style.filter = "none";
+        detailInsigniasBox.style.pointerEvents = "auto";
         if (hasVolverEnsayar) {
-            detailInsigniasBox.style.opacity = "0.4";
-            detailInsigniasBox.style.filter = "grayscale(80%)";
-            detailInsigniasBox.title = "Insignias anuladas debido a baja asistencia (Volver... a ensayar activa)";
+            detailInsigniasBox.title = "Las insignias concedidas o asignables figuran como anuladas debido a baja asistencia (Volver... a ensayar activa)";
         } else {
-            detailInsigniasBox.style.opacity = "1";
-            detailInsigniasBox.style.filter = "none";
             detailInsigniasBox.title = "";
         }
     }
@@ -5618,6 +5632,9 @@ function renderMusicianDetailContent() {
                     } else if (medal.unlocked && medal.stars > 0) {
                         cardClass += ` unlocked-${medal.stars}star`;
                     }
+                    if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+                        cardClass += ` annulled-medal`;
+                    }
                     
                     let starsHTML = "";
                     if (medal.stars !== undefined && medal.stars > 0) {
@@ -5631,6 +5648,11 @@ function renderMusicianDetailContent() {
                         }
                         starsHTML = `<div class="medal-stars" style="display: flex;">${starsSpanHTML}</div>`;
                     }
+
+                    const descHTML = (hasVolverEnsayar && medal.unlocked && !medal.isNegative)
+                        ? `<div style="font-size: 0.72rem; color: var(--color-absent); font-weight: 700;">Anulada</div>`
+                        : `<div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.desc}">${medal.desc}</div>`;
+
                     return `
                         <div class="medal-card ${cardClass}" style="padding: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; border-radius: 6px;">
                             <div class="medal-icon-wrapper" style="position: relative; width: 32px; height: 32px; font-size: 1.1rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -5639,7 +5661,7 @@ function renderMusicianDetailContent() {
                             </div>
                             <div style="flex: 1; min-width: 0; text-align: left;">
                                 <div style="font-weight: 700; color: #FFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.title}">${medal.title}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.desc}">${medal.desc}</div>
+                                ${descHTML}
                             </div>
                         </div>
                     `;

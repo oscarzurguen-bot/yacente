@@ -4177,3 +4177,37 @@ body.component-portal #candle-tribute-container {
     transform: scale(0.95);
 }
 
+/* Botón reversible "Marcar Todos / Desmarcar Todos" en pase de lista por voz */
+.btn-mark-section-present {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-muted, #a0a0a0) !important;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    user-select: none;
+}
+
+.btn-mark-section-present:hover {
+    transform: scale(1.06);
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: var(--text-primary, #ffffff) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.btn-mark-section-present:active {
+    transform: scale(0.95);
+}
+
+.btn-mark-section-present.all-present {
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
