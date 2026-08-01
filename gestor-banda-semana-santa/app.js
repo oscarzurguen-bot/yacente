@@ -138,7 +138,12 @@ function getAuthToken() {
     return sessionStorage.getItem("yacente_authenticated") === "true" || localStorage.getItem("yacente_authenticated") === "true";
 }
 function getAuthRole() {
-    return sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
+    const role = sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
+    if (role) return role;
+    if (sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id")) {
+        return "component";
+    }
+    return null;
 }
 function getAuthMusicianId() {
     return sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
@@ -6663,15 +6668,22 @@ function getInitials(name) {
 }
 
 function formatDateSpanish(dateStr) {
-    const cleanDateStr = dateStr.split("_")[0];
-    const parts = cleanDateStr.split("-");
-    const date = new Date(parts[0], parts[1] - 1, parts[2]);
-    return date.toLocaleDateString("es-ES", {
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric'
-    });
+    if (!dateStr) return "";
+    try {
+        const cleanDateStr = dateStr.split("_")[0];
+        const parts = cleanDateStr.split("-");
+        if (parts.length < 3) return dateStr;
+        const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (isNaN(date.getTime())) return dateStr;
+        return date.toLocaleDateString("es-ES", {
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric'
+        });
+    } catch (e) {
+        return dateStr;
+    }
 }
 
 function formatDateShortSpanish(dateStr) {
