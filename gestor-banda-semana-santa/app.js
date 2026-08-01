@@ -1856,6 +1856,22 @@ function setupEventListeners() {
         });
     }
 
+    // Modal de detalle de ensayo para músicos
+    const closeCompRehearsal = () => {
+        const modal = document.getElementById("modal-comp-rehearsal-detail");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnCloseCompRehearsal = document.getElementById("btn-close-comp-rehearsal-detail");
+    const btnCloseCompRehearsalFooter = document.getElementById("btn-close-comp-rehearsal-detail-footer");
+    const modalCompRehearsal = document.getElementById("modal-comp-rehearsal-detail");
+    if (btnCloseCompRehearsal) btnCloseCompRehearsal.addEventListener("click", closeCompRehearsal);
+    if (btnCloseCompRehearsalFooter) btnCloseCompRehearsalFooter.addEventListener("click", closeCompRehearsal);
+    if (modalCompRehearsal) {
+        modalCompRehearsal.addEventListener("click", (e) => {
+            if (e.target === modalCompRehearsal) closeCompRehearsal();
+        });
+    }
+
     document.getElementById("form-musician").addEventListener("submit", (e) => {
         e.preventDefault();
         const id = document.getElementById("musician-id").value;
@@ -11463,11 +11479,13 @@ function renderComponentHistorial() {
         const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
-        row.className = "comp-session-row";
+        row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
         row.style.gap = "10px";
         row.style.width = "100%";
+        row.style.cursor = "pointer";
+        row.title = "Ver asistencia general y marchas tocadas";
         
         const dateParts = date.split("-");
         const yr = dateParts[0];
@@ -11495,8 +11513,148 @@ function renderComponentHistorial() {
             </div>
         `;
         
+        row.addEventListener("click", () => {
+            openCompRehearsalDetailModal(date);
+        });
+
         container.appendChild(row);
     });
+}
+
+function openCompRehearsalDetailModal(date) {
+    const modal = document.getElementById("modal-comp-rehearsal-detail");
+    if (!modal) return;
+
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
+    const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
+    const rawDate = date.split("_")[0];
+    
+    // Safety check for played marches
+    const playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+
+    // Title and Subtitle
+    const titleEl = document.getElementById("comp-rehearsal-detail-title");
+    const subtitleEl = document.getElementById("comp-rehearsal-detail-subtitle");
+    
+    const formattedDate = formatDateSpanish(date);
+    if (titleEl) {
+        titleEl.innerText = sessionType === "actuacion" ? `Actuación del ${formattedDate}` : `Ensayo del ${formattedDate}`;
+    }
+
+    let subtypeText = sessionType === "actuacion" ? "Actuación Oficial" : "Ensayo General";
+    if (sessionInfo) {
+        if (sessionType === "ensayo" && sessionInfo.subtype && sessionInfo.subtype !== "general") {
+            const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
+            const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
+            subtypeText = `Ensayo por Voces (${convocated.join(", ")})`;
+        } else if (sessionInfo.name) {
+            subtypeText = sessionInfo.name;
+        }
+    }
+    const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking" : "");
+    const timeVal = sessionInfo && sessionInfo.time ? ` • ${sessionInfo.time}` : "";
+    const locTimeText = locationVal ? `${locationVal}${timeVal}` : timeVal;
+    
+    if (subtitleEl) {
+        subtitleEl.innerText = `${subtypeText}${locTimeText ? ' • ' + locTimeText : ''}`;
+    }
+
+    // Calculate attendance statistics
+    const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
+    const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
+    const dayRecord = state.attendance ? state.attendance[date] : null;
+
+    let presentCount = 0;
+    let justifiedCount = 0;
+    let absentCount = 0;
+    let totalConvocated = 0;
+
+    const musiciansList = (state && state.musicians) || [];
+    musiciansList.forEach(m => {
+        if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+            return;
+        }
+        totalConvocated++;
+        const r = dayRecord ? dayRecord[m.id] : null;
+        if (r) {
+            if (r.status === "present") {
+                presentCount++;
+            } else if (r.justified) {
+                justifiedCount++;
+            } else {
+                absentCount++;
+            }
+        } else {
+            absentCount++;
+        }
+    });
+
+    const pct = totalConvocated > 0 ? Math.round((presentCount / totalConvocated) * 100) : 0;
+
+    const pctEl = document.getElementById("comp-rehearsal-detail-pct");
+    const countsEl = document.getElementById("comp-rehearsal-detail-counts");
+    const badgePresent = document.getElementById("comp-rehearsal-badge-present");
+    const badgeJustified = document.getElementById("comp-rehearsal-badge-justified");
+    const badgeAbsent = document.getElementById("comp-rehearsal-badge-absent");
+
+    if (pctEl) {
+        pctEl.innerText = `${pct}%`;
+        if (pct >= 80) pctEl.style.color = "#2ecc71";
+        else if (pct >= 60) pctEl.style.color = "#f1c40f";
+        else pctEl.style.color = "#e74c3c";
+    }
+    if (countsEl) {
+        countsEl.innerText = `${presentCount} presentes de ${totalConvocated} convocados`;
+    }
+    if (badgePresent) badgePresent.innerText = `🟢 ${presentCount} Pres.`;
+    if (badgeJustified) badgeJustified.innerText = `🟡 ${justifiedCount} Just.`;
+    if (badgeAbsent) badgeAbsent.innerText = `🔴 ${absentCount} Aus.`;
+
+    // Render Played Marches List
+    const marchasContainer = document.getElementById("comp-rehearsal-detail-marchas");
+    if (marchasContainer) {
+        marchasContainer.innerHTML = "";
+        if (playedTodayIds.length === 0) {
+            marchasContainer.innerHTML = `
+                <div class="empty-state" style="padding: 16px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);">
+                    <p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">No hay registro de marchas tocadas en este ${sessionType}.</p>
+                </div>
+            `;
+        } else {
+            playedTodayIds.forEach(mId => {
+                const marchasArray = (state && state.marchas) || [];
+                const m = marchasArray.find(item => item.id === mId);
+                const itemDiv = document.createElement("div");
+                itemDiv.style.background = "rgba(212, 175, 55, 0.08)";
+                itemDiv.style.border = "1px solid rgba(212, 175, 55, 0.25)";
+                itemDiv.style.borderRadius = "8px";
+                itemDiv.style.padding = "10px 14px";
+                itemDiv.style.display = "flex";
+                itemDiv.style.alignItems = "center";
+                itemDiv.style.justifyContent = "space-between";
+                itemDiv.style.gap = "10px";
+
+                if (m) {
+                    itemDiv.innerHTML = `
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🎵 ${m.title}</div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">${m.composer || m.author || "Autor Desconocido"}</div>
+                        </div>
+                        ${m.difficulty ? `<span class="badge" style="background: rgba(255,255,255,0.06); color: var(--color-gold); font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(212, 175, 55, 0.3); font-weight: 600;">Nivel ${m.difficulty}</span>` : ""}
+                    `;
+                } else {
+                    itemDiv.innerHTML = `
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary);">🎵 Marcha (${mId})</div>
+                        </div>
+                    `;
+                }
+                marchasContainer.appendChild(itemDiv);
+            });
+        }
+    }
+
+    modal.classList.add("active");
 }
 
 function renderComponentEventos() {
