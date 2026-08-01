@@ -641,12 +641,23 @@ function showLockScreen() {
         document.getElementById("lock-password-input").value = "";
         document.getElementById("lock-error-msg").classList.add("hidden");
     }
+    const mobNav = document.getElementById("component-mobile-nav");
+    if (mobNav) mobNav.classList.add("hidden");
 }
 
 // Oculta la pantalla de bloqueo
 function hideLockScreen() {
     const lock = document.getElementById("lock-screen");
     if (lock) lock.classList.add("hidden");
+    const activeRole = getAuthRole();
+    const mobNav = document.getElementById("component-mobile-nav");
+    if (activeRole === "component") {
+        document.body.classList.add("component-portal");
+        if (mobNav) mobNav.classList.remove("hidden");
+    } else {
+        document.body.classList.remove("component-portal");
+        if (mobNav) mobNav.classList.add("hidden");
+    }
 }
 
 // Escucha en tiempo real de Firestore
@@ -2915,8 +2926,16 @@ function setupComponentSwipeNavigation() {
 
 function renderActiveSection(sectionId, forcedDirection) {
     const activeRole = getAuthRole();
-    if (activeRole === "component" && !sectionId.startsWith("section-componente-")) {
-        sectionId = "section-componente-ficha";
+    const mobNav = document.getElementById("component-mobile-nav");
+    if (activeRole === "component") {
+        document.body.classList.add("component-portal");
+        if (mobNav) mobNav.classList.remove("hidden");
+        if (!sectionId.startsWith("section-componente-")) {
+            sectionId = "section-componente-ficha";
+        }
+    } else {
+        document.body.classList.remove("component-portal");
+        if (mobNav) mobNav.classList.add("hidden");
     }
 
     // En móvil, la sección de Ajustes no es accesible y se redirige a Pasar Lista
@@ -3718,7 +3737,7 @@ function renderEnsayosList() {
             let badgeBg = "rgba(46, 204, 113, 0.15)";
             let badgeColor = "#2ecc71";
             let badgeIcon = "🟢";
-            if (prev.estimatedPct < 60) {
+            if (prev.estimatedPct < 50) {
                 badgeBg = "rgba(231, 76, 60, 0.15)";
                 badgeColor = "#e74c3c";
                 badgeIcon = "⚠️";
@@ -11600,7 +11619,7 @@ function openCompRehearsalDetailModal(date) {
     if (pctEl) {
         pctEl.innerText = `${pct}%`;
         if (pct >= 80) pctEl.style.color = "#2ecc71";
-        else if (pct >= 60) pctEl.style.color = "#f1c40f";
+        else if (pct >= 50) pctEl.style.color = "#f1c40f";
         else pctEl.style.color = "#e74c3c";
     }
     if (countsEl) {
