@@ -5358,6 +5358,9 @@ function renderMusicianDetailContent() {
 
     const detailAvatarEl = document.getElementById("detail-musician-avatar");
     if (detailAvatarEl) {
+        detailAvatarEl.style.cursor = "pointer";
+        detailAvatarEl.title = "Ver foto en grande";
+        detailAvatarEl.onclick = () => openPhotoPreviewModal(musicianId);
         if (musician.photo) {
             detailAvatarEl.innerHTML = `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
         } else {
@@ -10956,10 +10959,18 @@ function renderComponentFicha() {
     
     const avatarLettersEl = document.getElementById("comp-avatar-letters");
     const avatarImgEl = document.getElementById("comp-avatar-img");
+    const avatarWrapperEl = document.querySelector(".comp-profile-avatar-wrapper");
+    if (avatarWrapperEl) {
+        avatarWrapperEl.style.cursor = "pointer";
+        avatarWrapperEl.title = "Ver foto en grande";
+        avatarWrapperEl.onclick = () => openPhotoPreviewModal(musicianId);
+    }
     if (musician.photo) {
         if (avatarImgEl) {
             avatarImgEl.src = musician.photo;
             avatarImgEl.classList.remove("hidden");
+            avatarImgEl.style.cursor = "pointer";
+            avatarImgEl.onclick = () => openPhotoPreviewModal(musicianId);
         }
         if (avatarLettersEl) {
             avatarLettersEl.classList.add("hidden");
@@ -10968,6 +10979,8 @@ function renderComponentFicha() {
         if (avatarLettersEl) {
             avatarLettersEl.innerText = initials;
             avatarLettersEl.classList.remove("hidden");
+            avatarLettersEl.style.cursor = "pointer";
+            avatarLettersEl.onclick = () => openPhotoPreviewModal(musicianId);
         }
         if (avatarImgEl) {
             avatarImgEl.classList.add("hidden");

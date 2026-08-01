@@ -4211,3 +4211,13 @@ body.component-portal #candle-tribute-container {
     border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
+/* Animación y cursor clicable para fotos de perfil en grande */
+.musician-avatar-clickable:hover,
+#detail-musician-avatar:hover,
+.comp-profile-avatar-wrapper:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.45) !important;
+    cursor: pointer;
+}
+
+
