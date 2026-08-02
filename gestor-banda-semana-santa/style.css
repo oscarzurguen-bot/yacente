@@ -3153,36 +3153,28 @@ svg.chevron {
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
     border-top: 1px solid rgba(212, 175, 55, 0.4) !important;
-    display: none !important;
+    display: none;
     justify-content: space-around !important;
     align-items: center !important;
-    z-index: 99999999 !important;
+    z-index: 999999 !important;
     box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.9) !important;
     box-sizing: border-box !important;
     border-top-left-radius: 14px !important;
     border-top-right-radius: 14px !important;
     padding-bottom: env(safe-area-inset-bottom, 0) !important;
-    transform: translateZ(0) !important;
-    will-change: transform !important;
     pointer-events: auto !important;
 }
 
-/* REGLA ABSOLUTA DE VISIBILIDAD DE LA BARRA INFERIOR DE MÚSICOS */
 body.component-portal .component-mobile-nav,
-body.component-portal #component-mobile-nav,
-body.component-portal .component-mobile-nav.hidden,
-body.component-portal #component-mobile-nav.hidden {
+body.component-portal #component-mobile-nav {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-    z-index: 99999999 !important;
-    pointer-events: auto !important;
+    z-index: 9999999 !important;
 }
 
-.component-mobile-nav:not(.hidden) {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+body:not(.component-portal) .component-mobile-nav {
+    display: none !important;
 }
 .mobile-nav-item {
     display: flex;
