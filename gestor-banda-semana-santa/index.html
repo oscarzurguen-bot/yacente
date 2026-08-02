@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=333">
+    <link rel="stylesheet" href="style.css?v=340">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2975,6 +2975,7 @@
             
             <button type="button" class="btn btn-secondary" id="btn-close-photo-preview-footer" style="margin-top: 20px; width: 100%;">Cerrar</button>
         </div>
+    </div>
     <!-- Modal: Detalle de Ensayo / Actuación para Músicos -->
     <div id="modal-comp-rehearsal-detail" class="modal-overlay">
         <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 90vh; overflow-y: auto;">
@@ -3129,13 +3130,38 @@
         </a>
     </nav>
 
-    <script src="app.js?v=333"></script>
+    <script src="app.js?v=340"></script>
     <script>
+        // Purga de caché antigua y registro del Service Worker v=340
+        if ("caches" in window) {
+            caches.keys().then(keys => {
+                keys.forEach(key => {
+                    if (key !== "yacente-v340") {
+                        caches.delete(key);
+                    }
+                });
+            });
+        }
         if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let registration of registrations) {
+                    registration.update();
+                }
+            });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=333")
+                navigator.serviceWorker.register("sw.js?v=340")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v340 registrado correctamente:", registration);
+                        registration.onupdatefound = () => {
+                            const installingWorker = registration.installing;
+                            if (installingWorker) {
+                                installingWorker.onstatechange = () => {
+                                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        window.location.reload();
+                                    }
+                                };
+                            }
+                        };
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
