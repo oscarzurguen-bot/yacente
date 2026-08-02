@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vista Previa Interactiva - Transiciones de Página</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: #0d0608;
+            color: #f4e8c1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            color: #d4af37;
+            margin-bottom: 8px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        p.desc {
+            color: #a89f91;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        /* Selector de Estilo */
+        .style-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            max-width: 480px;
+            margin-bottom: 20px;
+        }
+
+        .btn-style {
+            background: rgba(212, 175, 55, 0.08);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            color: #d4af37;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-style.active {
+            background: #d4af37;
+            color: #0d0608;
+            border-color: #d4af37;
+            box-shadow: 0 0 12px rgba(212, 175, 55, 0.5);
+        }
+
+        /* Simulador Móvil */
+        .phone-frame {
+            width: 360px;
+            height: 600px;
+            background: #140b0e;
+            border: 2px solid rgba(212, 175, 55, 0.4);
+            border-radius: 28px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8), 0 0 20px rgba(212, 175, 55, 0.15);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .phone-header {
+            background: #1a0a0e;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .phone-header h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.1rem;
+            color: #d4af37;
+        }
+
+        .phone-screen {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #0d0608;
+        }
+
+        .page {
+            position: absolute;
+            inset: 0;
+            padding: 20px;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            background: #0d0608;
+        }
+
+        .page.active {
+            display: flex;
+        }
+
+        /* Tarjeta de Ejemplo */
+        .card {
+            background: linear-gradient(135deg, rgba(26, 10, 14, 0.8), rgba(15, 6, 9, 0.95));
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 14px;
+            padding: 16px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+
+        .card h3 {
+            color: #d4af37;
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+
+        .card p {
+            font-size: 0.85rem;
+            color: #c9bfb0;
+            line-height: 1.4;
+        }
+
+        /* Controles de Navegación */
+        .phone-nav {
+            background: #1a0a0e;
+            padding: 12px 16px;
+            border-top: 1px solid rgba(212, 175, 55, 0.2);
+            display: flex;
+            justify-content: space-around;
+        }
+
+        .nav-tab {
+            color: #8a8075;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .nav-tab.active {
+            color: #d4af37;
+        }
+
+        /* Botones laterales de prueba rápidos */
+        .test-controls {
+            display: flex;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .btn-action {
+            background: rgba(212, 175, 55, 0.15);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            color: #d4af37;
+            padding: 10px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .btn-action:hover {
+            background: rgba(212, 175, 55, 0.3);
+        }
+
+        /* ==================================== */
+        /* ANIMACIONES Y EFECTOS */
+        /* ==================================== */
+
+        /* 1. iOS Push */
+        .trans-ios-next { animation: iosNext 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+        .trans-ios-prev { animation: iosPrev 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+        @keyframes iosNext {
+            0% { opacity: 0.6; transform: translateX(100%); box-shadow: -15px 0 30px rgba(0,0,0,0.7); }
+            100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
+        }
+        @keyframes iosPrev {
+            0% { opacity: 0.6; transform: translateX(-100%); box-shadow: 15px 0 30px rgba(0,0,0,0.7); }
+            100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
+        }
+
+        /* 2. Glass Flow */
+        .trans-glass-next { animation: glassNext 0.28s ease-out forwards; }
+        .trans-glass-prev { animation: glassPrev 0.28s ease-out forwards; }
+        @keyframes glassNext {
+            0% { opacity: 0; filter: blur(10px); transform: translateX(50px); }
+            100% { opacity: 1; filter: blur(0px); transform: translateX(0); }
+        }
+        @keyframes glassPrev {
+            0% { opacity: 0; filter: blur(10px); transform: translateX(-50px); }
+            100% { opacity: 1; filter: blur(0px); transform: translateX(0); }
+        }
+
+        /* 3. Snappy Parallax */
+        .trans-snappy-next { animation: snappyNext 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
+        .trans-snappy-prev { animation: snappyPrev 0.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
+        @keyframes snappyNext {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(0); }
+        }
+        @keyframes snappyPrev {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(0); }
+        }
+
+        /* 4. Tarjeta 3D */
+        .trans-3d-next { animation: card3DNext 0.35s ease-out forwards; }
+        .trans-3d-prev { animation: card3DPrev 0.35s ease-out forwards; }
+        @keyframes card3DNext {
+            0% { opacity: 0.2; transform: perspective(800px) rotateY(-16deg) translateX(80px); }
+            100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+        }
+        @keyframes card3DPrev {
+            0% { opacity: 0.2; transform: perspective(800px) rotateY(16deg) translateX(-80px); }
+            100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Probador de Transiciones</h1>
+    <p class="desc">Selecciona un estilo y desliza o pulsa los botones de prueba para ver el efecto exacto.</p>
+
+    <!-- Selector de Estilos -->
+    <div class="style-selector">
+        <button class="btn-style active" onclick="setStyle('ios', this)">1. iOS Push</button>
+        <button class="btn-style" onclick="setStyle('glass', this)">2. Glass Flow</button>
+        <button class="btn-style" onclick="setStyle('snappy', this)">3. Snappy Fast</button>
+        <button class="btn-style" onclick="setStyle('3d', this)">4. Tarjeta 3D</button>
+    </div>
+
+    <!-- Móvil Simulado -->
+    <div class="phone-frame">
+        <div class="phone-header">
+            <h2 id="header-title">Mi Ficha</h2>
+            <span style="font-size:0.8rem; color:#d4af37;">🎺 Músico</span>
+        </div>
+
+        <div class="phone-screen" id="touch-area">
+            <!-- Página 1 -->
+            <div class="page active" id="page-0">
+                <div class="card">
+                    <h3>👤 Perfil del Músico</h3>
+                    <p>Voz 1ª Principal • Trompeta<br>Asistencia: 96% | Racha: 5 ensayosis</p>
+                </div>
+                <div class="card">
+                    <h3>🏆 Mis Insignias</h3>
+                    <p>🥇 Constancia de Oro<br>🎶 Asistente Perfecto</p>
+                </div>
+            </div>
+
+            <!-- Página 2 -->
+            <div class="page" id="page-1">
+                <div class="card">
+                    <h3>📅 Próximos Eventos</h3>
+                    <p><strong>Ensayo General</strong><br>Viernes 20:30 • Local de Ensayos</p>
+                </div>
+                <div class="card">
+                    <h3>✝️ Procesión de Lunes Santo</h3>
+                    <p>Lunes Santo 19:00 • Parroquia Central</p>
+                </div>
+            </div>
+
+            <!-- Página 3 -->
+            <div class="page" id="page-2">
+                <div class="card">
+                    <h3>📊 Mi Historial</h3>
+                    <p>Total Ensayos: 42<br>Asistidos: 40 | Faltas justificadas: 2</p>
+                </div>
+            </div>
+
+            <!-- Página 4 -->
+            <div class="page" id="page-3">
+                <div class="card">
+                    <h3>🎵 Repertorio Oficial</h3>
+                    <p>🟢 Mi Amargura<br>🟢 Saeta Sevillana<br>🟡 Mater Mea</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navegación Inferior -->
+        <div class="phone-nav">
+            <div class="nav-tab active" onclick="goToPage(0)">👤 Ficha</div>
+            <div class="nav-tab" onclick="goToPage(1)">📅 Eventos</div>
+            <div class="nav-tab" onclick="goToPage(2)">📊 Historial</div>
+            <div class="nav-tab" onclick="goToPage(3)">🎵 Repertorio</div>
+        </div>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div class="test-controls">
+        <button class="btn-action" onclick="navigate('prev')">◀ Página Anterior</button>
+        <button class="btn-action" onclick="navigate('next')">Página Siguiente ▶</button>
+    </div>
+
+    <script>
+        let currentStyle = 'ios';
+        let currentPage = 0;
+        const pageTitles = ["Mi Ficha", "Próximos Eventos", "Mi Historial", "Repertorio"];
+
+        function setStyle(style, btn) {
+            currentStyle = style;
+            document.querySelectorAll('.btn-style').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        function goToPage(targetPage, forcedDir = null) {
+            if (targetPage === currentPage) return;
+            const dir = forcedDir || (targetPage > currentPage ? 'next' : 'prev');
+            
+            const pages = document.querySelectorAll('.page');
+            const tabs = document.querySelectorAll('.nav-tab');
+
+            pages.forEach(p => {
+                p.className = 'page';
+            });
+
+            const animClass = `trans-${currentStyle}-${dir}`;
+            const targetEl = document.getElementById(`page-${targetPage}`);
+            targetEl.classList.add('active', animClass);
+
+            tabs.forEach((t, idx) => {
+                t.classList.toggle('active', idx === targetPage);
+            });
+
+            document.getElementById('header-title').innerText = pageTitles[targetPage];
+            currentPage = targetPage;
+        }
+
+        function navigate(dir) {
+            let nextP = dir === 'next' ? currentPage + 1 : currentPage - 1;
+            if (nextP > 3) nextP = 0;
+            if (nextP < 0) nextP = 3;
+            goToPage(nextP, dir);
+        }
+
+        // Soporte Swipe Táctil en la vista previa
+        let startX = 0;
+        const touchArea = document.getElementById('touch-area');
+        touchArea.addEventListener('touchstart', e => startX = e.touches[0].clientX, {passive: true});
+        touchArea.addEventListener('touchend', e => {
+            const deltaX = e.changedTouches[0].clientX - startX;
+            if (deltaX < -40) navigate('next');
+            if (deltaX > 40) navigate('prev');
+        }, {passive: true});
+    </script>
+</body>
+</html>

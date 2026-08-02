@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Previsualización de Informe de Temporada - Yacente</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-present: #2ECC71;
+            --color-absent: #E74C3C;
+            --color-justified: #E67E22;
+            --color-gold: #D4AF37;
+        }
+
+        body {
+            background-color: #1a1515;
+            color: #333;
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Floating action buttons for testing */
+        .preview-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #D4AF37, #AA7C11);
+            color: #FFF;
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+        }
+
+        /* Simulation of the A4 Printed Page */
+        .page-sheet {
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            box-sizing: border-box;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .print-header {
+            border-bottom: 2px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .print-brand {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .print-title {
+            font-family: 'Cinzel', serif;
+            font-size: 20pt;
+            font-weight: 800;
+            color: #000;
+            margin: 0;
+            letter-spacing: 1px;
+        }
+
+        .print-subtitle {
+            font-size: 9.5pt;
+            color: #555;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .print-meta {
+            font-size: 8.5pt;
+            text-align: right;
+            line-height: 1.5;
+            color: #444;
+        }
+
+        .print-section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 11pt;
+            font-weight: 700;
+            color: #000;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 4px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* KPIs widgets grid */
+        .print-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .print-stat-box {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .print-stat-title {
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .print-stat-value {
+            font-size: 16pt;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .print-stat-desc {
+            font-size: 8pt;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        /* Tables style */
+        .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .print-table th {
+            background-color: #f1f5f9;
+            border-bottom: 2px solid #cbd5e1;
+            color: #334155;
+            font-size: 8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 8px 10px;
+            text-align: left;
+        }
+
+        .print-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px 10px;
+            font-size: 8.5pt;
+            color: #334155;
+        }
+
+        .print-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+
+        /* Alerts list */
+        .alert-row td {
+            color: #e74c3c;
+            font-weight: 500;
+        }
+
+        /* Repertoire columns */
+        .repertoire-flex {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .repertoire-col {
+            flex: 1;
+        }
+
+        .repertoire-col-title {
+            font-size: 8.5pt;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 8px;
+            border-bottom: 1px dashed #cbd5e1;
+            padding-bottom: 4px;
+        }
+
+        .repertoire-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8pt;
+            padding: 3px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .repertoire-item strong {
+            color: #0f172a;
+        }
+
+        /* Footer */
+        .print-footer {
+            margin-top: 40px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+            font-size: 7.5pt;
+            text-align: center;
+            color: #94a3b8;
+        }
+
+        /* Print media query configuration */
+        @media print {
+            body {
+                background-color: #fff;
+                padding: 0;
+                margin: 0;
+            }
+            .preview-controls {
+                display: none !important;
+            }
+            .page-sheet {
+                box-shadow: none;
+                width: 100%;
+                min-height: auto;
+                padding: 0;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="preview-controls">
+        <button class="btn btn-primary" onclick="window.print()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Imprimir / Guardar como PDF
+        </button>
+    </div>
+
+    <div class="page-sheet">
+        <!-- Header -->
+        <div class="print-header">
+            <div class="print-brand">
+                <h1 class="print-title">YACENTE</h1>
+                <div class="print-subtitle">Asociación Musical Yacente • Informe de Temporada</div>
+            </div>
+            <div class="print-meta">
+                <strong>Temporada:</strong> 2026/2027<br>
+                <strong>Fecha de generación:</strong> 19/07/2026<br>
+                <strong>Generado por:</strong> Dirección
+            </div>
+        </div>
+
+        <!-- Section 1: KPI Widgets -->
+        <div class="print-section-title">1. Resumen General de la Temporada</div>
+        <div class="print-grid">
+            <div class="print-stat-box">
+                <div class="print-stat-title">Asistencia Media</div>
+                <div class="print-stat-value" style="color: var(--color-present);">84%</div>
+                <div class="print-stat-desc">Nivel Excelente (>=80%)</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Total Convocatorias</div>
+                <div class="print-stat-value">32</div>
+                <div class="print-stat-desc">24 Ensayos | 8 Actuaciones</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Incidencia de Faltas</div>
+                <div class="print-stat-value" style="color: var(--color-absent);">7.8%</div>
+                <div class="print-stat-desc">210 Faltas sin justificar</div>
+            </div>
+        </div>
+        <div class="print-grid" style="margin-top: -5px;">
+            <div class="print-stat-box">
+                <div class="print-stat-title">Asistencias Totales</div>
+                <div class="print-stat-value" style="color: var(--color-present); font-size: 13pt;">2,260 presencias</div>
+                <div class="print-stat-desc">84.1% del total general</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Faltas Justificadas</div>
+                <div class="print-stat-value" style="color: var(--color-justified); font-size: 13pt;">180 justificadas</div>
+                <div class="print-stat-desc">6.7% del total general</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Faltas Sin Justificar</div>
+                <div class="print-stat-value" style="color: var(--color-absent); font-size: 13pt;">210 injustificadas</div>
+                <div class="print-stat-desc">7.8% del total general</div>
+            </div>
+        </div>
+
+        <!-- Section 2: Attendance by Section -->
+        <div class="print-section-title">2. Asistencia por Secciones / Voces</div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Sección / Instrumento</th>
+                    <th style="text-align: center;">Presencias</th>
+                    <th style="text-align: center;">Faltas S.J.</th>
+                    <th style="text-align: center;">Faltas Just.</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Dirección</strong></td>
+                    <td style="text-align: center;">32</td>
+                    <td style="text-align: center;">0</td>
+                    <td style="text-align: center;">0</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">100%</td>
+                </tr>
+                <tr>
+                    <td><strong>Trompetas 1ª</strong></td>
+                    <td style="text-align: center;">128</td>
+                    <td style="text-align: center;">12</td>
+                    <td style="text-align: center;">10</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">85%</td>
+                </tr>
+                <tr>
+                    <td><strong>Cornetas</strong></td>
+                    <td style="text-align: center;">240</td>
+                    <td style="text-align: center;">22</td>
+                    <td style="text-align: center;">18</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">86%</td>
+                </tr>
+                <tr>
+                    <td><strong>Trombones</strong></td>
+                    <td style="text-align: center;">96</td>
+                    <td style="text-align: center;">14</td>
+                    <td style="text-align: center;">8</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-gold); font-weight: bold;">81%</td>
+                </tr>
+                <tr>
+                    <td><strong>Bajos (Tubas / Bombardinos)</strong></td>
+                    <td style="text-align: center;">112</td>
+                    <td style="text-align: center;">10</td>
+                    <td style="text-align: center;">12</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-gold); font-weight: bold;">83%</td>
+                </tr>
+                <tr>
+                    <td><strong>Percusión (Tambores / Bombos)</strong></td>
+                    <td style="text-align: center;">192</td>
+                    <td style="text-align: center;">16</td>
+                    <td style="text-align: center;">14</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">86%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Section 3: Performance Highlights -->
+        <div class="print-section-title">3. Compromiso y Rendimiento de Componentes</div>
+        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+            Top 3 Rachas de Asistencia de la Temporada
+        </div>
+        <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
+            <div class="print-stat-box" style="text-align: left; padding: 10px;">
+                <div class="print-stat-title">🥇 1º Puesto</div>
+                <div style="font-size: 9pt; font-weight: 700; color: #0f172a; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Jessica</div>
+                <div style="font-size: 7.5pt; color: #64748b;">Trompetas 1ª</div>
+                <div style="font-size: 11pt; font-weight: 800; color: #E67E22; margin-top: 4px;">18 🔥 <span style="font-size: 7pt; font-weight: 500; color: #64748b;">consecutivos</span></div>
+            </div>
+            <div class="print-stat-box" style="text-align: left; padding: 10px;">
+                <div class="print-stat-title">🥈 2º Puesto</div>
+                <div style="font-size: 9pt; font-weight: 700; color: #0f172a; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Francisco J. Ortiz</div>
+                <div style="font-size: 7.5pt; color: #64748b;">Dirección</div>
+                <div style="font-size: 11pt; font-weight: 800; color: #E67E22; margin-top: 4px;">15 🔥 <span style="font-size: 7pt; font-weight: 500; color: #64748b;">consecutivos</span></div>
+            </div>
+            <div class="print-stat-box" style="text-align: left; padding: 10px;">
+                <div class="print-stat-title">🥉 3º Puesto</div>
+                <div style="font-size: 9pt; font-weight: 700; color: #0f172a; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Alejandro Sanz</div>
+                <div style="font-size: 7.5pt; color: #64748b;">Percusión</div>
+                <div style="font-size: 11pt; font-weight: 800; color: #E67E22; margin-top: 4px;">12 🔥 <span style="font-size: 7pt; font-weight: 500; color: #64748b;">consecutivos</span></div>
+            </div>
+        </div>
+
+        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+            Top 5 Componentes con Mayor Asistencia
+        </div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Músico</th>
+                    <th>Sección</th>
+                    <th style="text-align: center;">Asistidas / Convocadas</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1º Francisco Javier Ortiz</strong></td>
+                    <td>Dirección</td>
+                    <td style="text-align: center;">32 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">100%</td>
+                </tr>
+                <tr>
+                    <td><strong>2º Jessica</strong></td>
+                    <td>Trompetas 1ª</td>
+                    <td style="text-align: center;">31 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">97%</td>
+                </tr>
+                <tr>
+                    <td><strong>3º Alejandro Sanz</strong></td>
+                    <td>Percusión</td>
+                    <td style="text-align: center;">30 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">94%</td>
+                </tr>
+                <tr>
+                    <td><strong>4º María Dolores Ruiz</strong></td>
+                    <td>Cornetas</td>
+                    <td style="text-align: center;">29 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">91%</td>
+                </tr>
+                <tr>
+                    <td><strong>5º Antonio Aguilar</strong></td>
+                    <td>Bajos</td>
+                    <td style="text-align: center;">29 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">91%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Section 4: Alerts -->
+        <div class="print-section-title">4. Componentes con Alerta de Asistencia (&lt;50%)</div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Músico</th>
+                    <th>Sección</th>
+                    <th style="text-align: center;">Asistidas / Convocadas</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="alert-row">
+                    <td><strong>Carlos Gómez</strong></td>
+                    <td>Trompetas 2ª</td>
+                    <td style="text-align: center;">12 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; font-weight: bold;">37%</td>
+                </tr>
+                <tr class="alert-row">
+                    <td><strong>Miguel Ángel Ruiz</strong></td>
+                    <td>Cornetas</td>
+                    <td style="text-align: center;">15 / 32</td>
+                    <td style="text-align: right; padding-right: 15px; font-weight: bold;">46%</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Section 5: Repertoire & Rehearsals -->
+        <div class="print-section-title">5. Trabajo de Repertorio de la Temporada</div>
+        <div class="print-grid">
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Marchas en Catálogo</div>
+                <div class="print-stat-value" style="font-size: 13pt;">75 marchas</div>
+            </div>
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Bien Trabajadas (🟢)</div>
+                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-present);">45 (60%)</div>
+            </div>
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Por Trabajar (🔴)</div>
+                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-absent);">10 (13.3%)</div>
+            </div>
+        </div>
+
+        <div class="repertoire-flex">
+            <div class="repertoire-col">
+                <div class="repertoire-col-title">Top 5 Marchas más Ensayadas</div>
+                <div class="repertoire-item">
+                    <span>1. <strong>Soleá dame la mano</strong></span>
+                    <span>12 ensayos</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>2. <strong>Consuelo Gitano</strong></span>
+                    <span>10 ensayos</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>3. <strong>Pescador de Hombres</strong></span>
+                    <span>9 ensayos</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>4. <strong>Oh Pecador</strong></span>
+                    <span>8 ensayos</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>5. <strong>Resucitó</strong></span>
+                    <span>8 ensayos</span>
+                </div>
+            </div>
+            <div class="repertoire-col">
+                <div class="repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
+                <div class="repertoire-item">
+                    <span>1. <strong>Amarguras</strong></span>
+                    <span style="color: var(--color-absent); font-weight: 500;">0 ensayos</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>2. <strong>Virgen de la Paz</strong></span>
+                    <span style="color: var(--color-absent); font-weight: 500;">0 ensayos</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>3. <strong>La Saeta</strong></span>
+                    <span>1 ensayo</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>4. <strong>Christus Vincit</strong></span>
+                    <span>1 ensayo</span>
+                </div>
+                <div class="repertoire-item">
+                    <span>5. <strong>Nazareno y Gitano</strong></span>
+                    <span>2 ensayos</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="print-footer">
+            Asociación Musical Yacente • Salamanca • Sistema de Asistencia e Informes Interno
+        </div>
+    </div>
+
+</body>
+</html>
