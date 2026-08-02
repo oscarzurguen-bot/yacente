@@ -289,11 +289,11 @@ function initApp() {
     if (isAuthenticated) {
         hideLockScreen();
         if (activeRole === "component") {
+            document.body.classList.remove("admin-authenticated");
             document.body.classList.add("component-portal");
-            const mobNav = document.getElementById("component-mobile-nav");
-            if (mobNav) mobNav.classList.remove("hidden");
             renderActiveSection("section-componente-ficha");
         } else {
+            document.body.classList.add("admin-authenticated");
             document.body.classList.remove("component-portal");
             renderActiveSection("section-pasar-lista");
         }
@@ -7015,6 +7015,7 @@ function setupFirebaseListeners() {
                 localStorage.setItem("yacente_authenticated", "true");
                 localStorage.setItem("yacente_role", "component");
                 localStorage.setItem("yacente_musician_id", musicianId);
+                document.body.classList.remove("admin-authenticated");
                 document.body.classList.add("component-portal");
                 hideLockScreen();
                 
