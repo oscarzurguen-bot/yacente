@@ -95,20 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=338">
-    <script>
-        // Purga agresiva de Service Worker y cachés antiguas para móviles
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for (let r of registrations) { r.unregister(); }
-            });
-        }
-        if ('caches' in window) {
-            caches.keys().then(function(keys) {
-                keys.forEach(function(k) { caches.delete(k); });
-            });
-        }
-    </script>
+    <link rel="stylesheet" href="style.css?v=333">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -116,17 +103,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
 <body class="mobile-simplified-active">
-    <script>
-        (function() {
-            var musId = localStorage.getItem("yacente_musician_id") || sessionStorage.getItem("yacente_musician_id");
-            var role = localStorage.getItem("yacente_role") || sessionStorage.getItem("yacente_role");
-            if (musId || (role && role !== "admin")) {
-                if (document.body) {
-                    document.body.classList.add("component-portal");
-                }
-            }
-        })();
-    </script>
     <!-- Pantalla de Bloqueo: Contraseña de Directiva -->
     <div id="lock-screen" class="lock-screen-overlay hidden">
         <div class="lock-card">
@@ -3111,7 +3087,7 @@
     <div id="toast-container" class="toast-container"></div>
  
     <!-- Barra de Navegación Inferior Móvil para Componentes (Solo visible para rol componente) -->
-    <nav id="component-mobile-nav" class="component-mobile-nav">
+    <nav id="component-mobile-nav" class="component-mobile-nav hidden">
         <a href="#" class="mobile-nav-item active" data-target="section-componente-ficha">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -3153,40 +3129,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=338"></script>
+    <script src="app.js?v=333"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=338
-        if ("caches" in window) {
-            caches.keys().then(keys => {
-                keys.forEach(key => {
-                    if (key !== "yacente-v338") {
-                        console.log("[PWA] Purgando caché antigua:", key);
-                        caches.delete(key);
-                    }
-                });
-            });
-        }
         if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.getRegistrations().then(registrations => {
-                for (let registration of registrations) {
-                    registration.update();
-                }
-            });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=338")
+                navigator.serviceWorker.register("sw.js?v=333")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v338 registrado correctamente:", registration);
-                        registration.onupdatefound = () => {
-                            const installingWorker = registration.installing;
-                            if (installingWorker) {
-                                installingWorker.onstatechange = () => {
-                                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        console.log("[PWA] Nueva versión v338 detectada, recargando...");
-                                        window.location.reload();
-                                    }
-                                };
-                            }
-                        };
+                        console.log("[PWA] Service Worker registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
