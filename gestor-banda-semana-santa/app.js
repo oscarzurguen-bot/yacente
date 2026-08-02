@@ -135,19 +135,10 @@ let preavisoSelectedStatus = null;
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 21; // ~131.95
 
 function getAuthToken() {
-    return sessionStorage.getItem("yacente_authenticated") === "true" || 
-           localStorage.getItem("yacente_authenticated") === "true" ||
-           Boolean(sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id"));
+    return sessionStorage.getItem("yacente_authenticated") === "true" || localStorage.getItem("yacente_authenticated") === "true";
 }
 function getAuthRole() {
-    const musId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
-    if (musId) return "component";
-    const role = sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
-    if (role === "admin") return "admin";
-    if (role === "component" || role === "musico" || role === "musician" || role === "componente") {
-        return "component";
-    }
-    return role || null;
+    return sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role") || null;
 }
 function getAuthMusicianId() {
     return sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
@@ -289,11 +280,11 @@ function initApp() {
     if (isAuthenticated) {
         hideLockScreen();
         if (activeRole === "component") {
-            document.body.classList.remove("admin-authenticated");
             document.body.classList.add("component-portal");
+            const mobNav = document.getElementById("component-mobile-nav");
+            if (mobNav) mobNav.classList.remove("hidden");
             renderActiveSection("section-componente-ficha");
         } else {
-            document.body.classList.add("admin-authenticated");
             document.body.classList.remove("component-portal");
             renderActiveSection("section-pasar-lista");
         }
@@ -7015,7 +7006,6 @@ function setupFirebaseListeners() {
                 localStorage.setItem("yacente_authenticated", "true");
                 localStorage.setItem("yacente_role", "component");
                 localStorage.setItem("yacente_musician_id", musicianId);
-                document.body.classList.remove("admin-authenticated");
                 document.body.classList.add("component-portal");
                 hideLockScreen();
                 
@@ -10997,11 +10987,13 @@ function openStreakInfoModal() {
 
 
 function renderComponentFicha() {
-    const musicianId = getAuthMusicianId();
-    if (!musicianId) return;
-    
-    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
-    if (!musician) return;
+    const musicianId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
+    const musician = state.musicians.find(m => m.id == musicianId);
+    if (!musician) {
+        showToast("Músico no encontrado. Iniciando cierre de sesión.", "error");
+        logoutComponent();
+        return;
+    }
     
     const parts = musician.name.trim().split(" ");
     const initials = parts.map(p => p[0]).slice(0, 2).join("").toUpperCase();
