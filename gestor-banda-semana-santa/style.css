@@ -966,6 +966,31 @@ input:checked + .slider:before {
     padding-right: 16px !important;
 }
 
+/* Quick Navigation Links for Statistics */
+.btn-stats-quick-link {
+    background: rgba(212, 175, 55, 0.08);
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+.btn-stats-quick-link:hover,
+.btn-stats-quick-link:active {
+    background: var(--color-gold);
+    color: #000;
+    border-color: var(--color-gold);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(212, 175, 55, 0.35);
+}
+
 /* ==========================================================================
    ATTENDANCE MODULE (THE CORE CHECKLIST)
    ========================================================================== */

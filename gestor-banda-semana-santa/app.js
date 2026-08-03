@@ -1363,6 +1363,21 @@ function setupEventListeners() {
         });
     }
 
+    // Navegación de Acceso Rápido a los paneles de Estadísticas
+    document.addEventListener("click", (e) => {
+        const quickBtn = e.target.closest(".btn-stats-quick-link");
+        if (quickBtn) {
+            const targetId = quickBtn.getAttribute("data-target");
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                if (targetEl.classList.contains("collapsed")) {
+                    targetEl.classList.remove("collapsed");
+                }
+                targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+    });
+
     // Helper functions para menú desplegable lateral móvil (Drawer)
     window.openMobileSidebar = function() {
         const sidebar = document.querySelector(".sidebar");
