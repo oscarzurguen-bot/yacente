@@ -1013,6 +1013,52 @@ input:checked + .slider:before {
     box-shadow: 0 3px 10px rgba(212, 175, 55, 0.35);
 }
 
+/* Floating Back to Top Button */
+.btn-back-to-top {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(63, 6, 17, 0.92), rgba(25, 4, 9, 0.96));
+    border: 1.5px solid var(--color-gold);
+    color: var(--color-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 12px rgba(212, 175, 55, 0.3);
+    z-index: 9999;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+.btn-back-to-top:hover {
+    background: var(--color-gold);
+    color: #000;
+    transform: scale(1.1) translateY(-2px);
+    box-shadow: 0 6px 22px rgba(212, 175, 55, 0.5);
+}
+.btn-back-to-top:active {
+    transform: scale(0.95);
+}
+.btn-back-to-top.hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transform: scale(0.7) translateY(12px) !important;
+    pointer-events: none !important;
+}
+@media (max-width: 768px) {
+    .btn-back-to-top {
+        bottom: 80px;
+        right: 18px;
+        width: 42px;
+        height: 42px;
+    }
+}
+
 /* ==========================================================================
    ATTENDANCE MODULE (THE CORE CHECKLIST)
    ========================================================================== */

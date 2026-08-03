@@ -1378,6 +1378,24 @@ function setupEventListeners() {
         }
     });
 
+    // Botón flotante 'Volver arriba' para la vista de estadísticas
+    const backToTopBtn = document.getElementById("btn-back-to-top");
+    if (backToTopBtn) {
+        window.addEventListener("scroll", () => {
+            const statsSection = document.getElementById("section-estadisticas");
+            const isStatsActive = statsSection && statsSection.classList.contains("active");
+            if (isStatsActive && window.scrollY > 250) {
+                backToTopBtn.classList.remove("hidden");
+            } else {
+                backToTopBtn.classList.add("hidden");
+            }
+        });
+
+        backToTopBtn.addEventListener("click", () => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+    }
+
     // Helper functions para menú desplegable lateral móvil (Drawer)
     window.openMobileSidebar = function() {
         const sidebar = document.querySelector(".sidebar");
