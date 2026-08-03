@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=340">
+    <link rel="stylesheet" href="style.css?v=341">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2958,7 +2958,7 @@
 
     <!-- Modal: Previsualización de Foto de Perfil en Grande -->
     <div id="modal-photo-preview" class="modal-overlay">
-        <div class="modal-card" style="max-width: 400px; width: 90%; text-align: center; padding: 24px; position: relative;">
+        <div class="modal-card" style="max-width: 440px; width: 92%; text-align: center; padding: 24px; position: relative;">
             <button class="modal-close" id="btn-close-photo-preview" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -2968,12 +2968,23 @@
             <h3 id="photo-preview-name" style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 1.15rem;">Nombre del Músico</h3>
             <p id="photo-preview-instrument" class="text-muted" style="margin: 0 0 18px 0; font-size: 0.85rem;">Instrumento • Rol</p>
             
-            <div id="photo-preview-container" style="width: 250px; height: 250px; margin: 0 auto; border-radius: 50%; overflow: hidden; border: 3px solid var(--color-gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.35); background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
-                <img id="photo-preview-img" src="" alt="Foto de Perfil" style="width: 100%; height: 100%; object-fit: cover;">
-                <div id="photo-preview-initials" class="hidden" style="font-size: 4.5rem; font-weight: 800; color: var(--color-gold); font-family: 'Cinzel', serif;"></div>
+            <div id="photo-preview-container" style="width: 100%; max-width: 320px; height: 320px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 3px solid var(--color-gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.35); background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
+                <img id="photo-preview-img" src="" alt="Foto de Perfil" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">
+                <div id="photo-preview-initials" class="hidden" style="font-size: 5rem; font-weight: 800; color: var(--color-gold); font-family: 'Cinzel', serif;"></div>
             </div>
             
-            <button type="button" class="btn btn-secondary" id="btn-close-photo-preview-footer" style="margin-top: 20px; width: 100%;">Cerrar</button>
+            <input type="file" id="modal-photo-file-input" accept="image/*" class="hidden">
+            
+            <div id="modal-photo-actions" style="margin-top: 18px; display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-primary hidden" id="btn-edit-photo-modal" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; background: linear-gradient(135deg, var(--color-gold), #b89628); color: #000; border: none; padding: 10px 16px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.92rem;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Cambiar foto de perfil</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-close-photo-preview-footer" style="width: 100%;">Cerrar</button>
+            </div>
         </div>
     </div>
     <!-- Modal: Detalle de Ensayo / Actuación para Músicos -->
@@ -3130,13 +3141,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=340"></script>
+    <script src="app.js?v=341"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=340
+        // Purga de caché antigua y registro del Service Worker v=341
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v340") {
+                    if (key !== "yacente-v341") {
                         caches.delete(key);
                     }
                 });
@@ -3149,9 +3160,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=340")
+                navigator.serviceWorker.register("sw.js?v=341")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v340 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v341 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
