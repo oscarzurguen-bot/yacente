@@ -3151,6 +3151,11 @@ function renderActiveSection(sectionId, forcedDirection) {
             dateContainer.classList.add("hidden");
             renderComponentRepertorio();
             break;
+        case "section-componente-ajustes":
+            pageTitle.innerText = "Ajustes";
+            pageSubtitle.innerText = "Seguridad y gestión de la cuenta";
+            dateContainer.classList.add("hidden");
+            break;
         case "section-componente-notificaciones":
             pageTitle.innerText = "Centro de Notificaciones";
             pageSubtitle.innerText = "Avisos de nuevos ensayos y actuaciones";

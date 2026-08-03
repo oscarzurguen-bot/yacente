@@ -4432,45 +4432,31 @@ body.component-portal #candle-tribute-container {
     transform: translateY(0);
 }
 
-/* Header Top Bar para Versión del Músico con Botón Hamburguesa */
-.musician-top-header {
+/* Botón Hamburguesa para el Músico situado al lado del título */
+.btn-musician-hamburger {
     display: none;
     align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    background: var(--bg-card);
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 95;
-}
-body.component-portal .musician-top-header {
-    display: flex;
-}
-.btn-musician-hamburger {
+    justify-content: center;
+    width: 38px;
+    height: 38px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     color: var(--text-primary);
-    width: 38px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+body.component-portal .btn-musician-hamburger {
+    display: inline-flex !important;
+}
+body.component-portal .btn-mobile-menu-toggle {
+    display: none !important;
 }
 .btn-musician-hamburger:hover {
     background: rgba(212, 175, 55, 0.15);
     border-color: var(--color-gold);
     color: var(--color-gold);
-}
-.musician-header-title {
-    font-family: 'Cinzel', serif;
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--color-gold);
-    letter-spacing: 1px;
 }
 
 /* Modal Drawer Lateral del Músico */
