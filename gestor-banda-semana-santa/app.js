@@ -303,7 +303,8 @@ function initApp() {
     renderStatistics();
     renderMarchasList();
     renderRehearsalMarchasWidget();
-    
+    updateSuggestionsBadge();
+
     // Conectar a Firebase si está configurado
     initFirebase();
 }
@@ -996,9 +997,17 @@ function startCloudSync() {
             list.push({ ...doc.data(), docId: doc.id });
         });
         state.suggestions = list;
+        updateSuggestionsBadge();
+
         const suggestionsSection = document.getElementById("section-otros-sugerencias");
         if (suggestionsSection && suggestionsSection.classList.contains("active")) {
             renderAdminSuggestionsList();
+        }
+
+        const mySuggestionsSection = document.getElementById("section-componente-sugerencias");
+        if (mySuggestionsSection && mySuggestionsSection.classList.contains("active")) {
+            renderComponentSugerenciasPage();
+            renderMySuggestionHistory();
         }
     }, err => {
         console.error("Error sync sugerencias:", err);
@@ -1210,6 +1219,36 @@ function dbDeleteSuggestion(suggestion) {
         saveStateToLocalStorage();
         return Promise.resolve();
     }
+}
+
+function dbMarkAllSuggestionsRead() {
+    const unread = (state.suggestions || []).filter(s => !s.read);
+    if (unread.length === 0) return Promise.resolve();
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        const batch = db.batch();
+        unread.forEach(s => {
+            if (s.docId) batch.update(db.collection("suggestions").doc(s.docId), { read: true });
+        });
+        return batch.commit().catch(err => console.error("Error al marcar sugerencias como leídas:", err));
+    } else {
+        unread.forEach(s => { s.read = true; });
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function updateSuggestionsBadge() {
+    const unreadCount = (state.suggestions || []).filter(s => !s.read).length;
+    document.querySelectorAll(".suggestions-unread-badge").forEach(badge => {
+        if (unreadCount > 0) {
+            badge.innerText = unreadCount > 99 ? "99+" : String(unreadCount);
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
+    });
 }
 
 function dbSaveSuggestion(suggestion) {
@@ -3212,6 +3251,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Haz llegar tus propuestas a la directiva";
             dateContainer.classList.add("hidden");
             renderComponentSugerenciasPage();
+            renderMySuggestionHistory();
             break;
         case "section-componente-ajustes":
             pageTitle.innerText = "Ajustes";
@@ -3228,6 +3268,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Propuestas enviadas por los músicos";
             dateContainer.classList.add("hidden");
             renderAdminSuggestionsList();
+            dbMarkAllSuggestionsRead().then(() => updateSuggestionsBadge());
             break;
         case "section-componente-notificaciones":
             pageTitle.innerText = "Centro de Notificaciones";
@@ -13398,6 +13439,69 @@ function renderComponentSugerenciasPage() {
     }
 }
 
+function renderMySuggestionHistory() {
+    const musicianId = getAuthMusicianId();
+    const container = document.getElementById("my-suggestions-history-list");
+    const emptyState = document.getElementById("my-suggestions-history-empty");
+    if (!container || !musicianId) return;
+
+    const mine = (state.suggestions || [])
+        .filter(s => String(s.authorId) === String(musicianId))
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    container.innerHTML = "";
+
+    if (mine.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    mine.forEach(sug => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "card-item";
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        `;
+
+        const anonymousTag = sug.anonymous ? `<span style="font-size: 0.68rem; color: var(--text-muted);">Enviada de forma anónima</span>` : "";
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(sug.date).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
+                <button type="button" class="btn-delete-my-suggestion" title="Eliminar sugerencia" aria-label="Eliminar sugerencia" style="background: none; border: none; cursor: pointer; color: var(--color-absent); padding: 2px; display: inline-flex; align-items: center;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: var(--text-color); white-space: pre-wrap;">${escapeHtml(sug.text)}</p>
+            ${anonymousTag}
+        `;
+
+        const deleteBtn = itemDiv.querySelector(".btn-delete-my-suggestion");
+        deleteBtn.addEventListener("click", () => {
+            if (!confirm("¿Estás seguro de que quieres eliminar esta sugerencia de tu historial? Esta acción no se puede deshacer.")) return;
+            dbDeleteSuggestion(sug)
+                .then(() => {
+                    showToast("Sugerencia eliminada", "success");
+                    renderMySuggestionHistory();
+                    renderComponentSugerenciasPage();
+                    updateSuggestionsBadge();
+                })
+                .catch(() => {
+                    showToast("No se ha podido eliminar la sugerencia.", "error");
+                });
+        });
+
+        container.appendChild(itemDiv);
+    });
+}
+
 function setupSuggestionsMailboxEvents() {
     // Formulario de envío de sugerencia (vista músico)
     const formSuggestion = document.getElementById("form-suggestion-mailbox");
@@ -13432,7 +13536,8 @@ function setupSuggestionsMailboxEvents() {
                 authorId: musicianId,
                 authorName: musician ? musician.name : "Desconocido",
                 anonymous: anonymous,
-                date: new Date().toISOString()
+                date: new Date().toISOString(),
+                read: false
             };
 
             const submitBtn = formSuggestion.querySelector("button[type=submit]");
@@ -13445,6 +13550,7 @@ function setupSuggestionsMailboxEvents() {
                     if (toggle) toggle.checked = false;
                     showToast("Sugerencia enviada a la directiva. ¡Gracias!", "success");
                     renderComponentSugerenciasPage();
+                    renderMySuggestionHistory();
                 })
                 .catch(() => {
                     showToast("No se ha podido enviar la sugerencia. Comprueba tu conexión e inténtalo de nuevo.", "error");
