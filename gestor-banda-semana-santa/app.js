@@ -4453,6 +4453,15 @@ function openActuacionDetailModal(date) {
     modal.classList.add("active");
 }
 
+function formatRoleShort(role) {
+    if (!role) return "Músico";
+    let r = role.trim();
+    if (r === "Ayud. Dirección" || r === "Ayudante Dirección" || r === "Ayudante de Dirección" || r === "A.Dirección") return "A.Dirección";
+    if (r === "Responsable Voz" || r === "Responsable de voz" || r === "Responsable de Voz" || r === "Resp. Voz" || r === "Resp. Voz de sección") return "Resp. Voz";
+    if (r === "Músico de fila" || r === "Músico de Fila") return "Músico";
+    return r;
+}
+
 // ==========================================================================
 // SECCIÓN: GESTIÓN DE PLANTILLA (GROUPED BY VOICE)
 // ==========================================================================
@@ -4527,13 +4536,13 @@ function renderPlantillaTable() {
             
             <div class="card-table plantilla-group-table-card">
                 <div class="table-responsive">
-                    <table class="data-table" style="table-layout: fixed; width: 100%;">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th style="width: 44%;">Nombre</th>
-                                <th style="width: 28%;">Rol</th>
-                                <th style="text-align: center; width: 75px; padding-left: 2px; padding-right: 2px;">Acceso PIN</th>
-                                <th style="width: 65px; text-align: center; padding-left: 2px; padding-right: 6px;">Acciones</th>
+                                <th class="col-name">Nombre</th>
+                                <th class="col-role">Rol</th>
+                                <th class="col-pin">Acceso PIN</th>
+                                <th class="col-actions">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4554,7 +4563,7 @@ function renderPlantillaTable() {
 
             const tr = document.createElement("tr");
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;">
+                <td class="col-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;">
                     <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
                         <div class="musician-avatar-clickable" data-id="${musician.id}" style="cursor: pointer; flex-shrink: 0; transition: transform 0.2s ease;" title="Ver foto en grande">
                             ${avatarMarkup}
@@ -4562,10 +4571,10 @@ function renderPlantillaTable() {
                         <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; min-width: 0;" title="${musician.name}">${musician.name}</div>
                     </div>
                 </td>
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; padding-right: 2px;">
-                    <span class="text-muted" title="${musician.role || 'Músico de fila'}" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; max-width: 100%;">${musician.role || 'Músico de fila'}</span>
+                <td class="col-role" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;">
+                    <span class="text-muted" title="${musician.role || 'Músico'}" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; max-width: 100%;">${formatRoleShort(musician.role)}</span>
                 </td>
-                <td style="white-space: nowrap; text-align: center; width: 75px; padding-left: 2px; padding-right: 2px;">
+                <td class="col-pin">
                     <div style="display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">
                         ${musician.pin ? `
                             <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="PIN configurado. Pulsa para borrar/restablecer PIN">
@@ -4584,7 +4593,7 @@ function renderPlantillaTable() {
                         `}
                     </div>
                 </td>
-                <td style="white-space: nowrap; width: 65px; text-align: center; padding-left: 2px; padding-right: 6px;">
+                <td class="col-actions">
                     <div style="display: inline-flex; gap: 6px; justify-content: center; align-items: center; vertical-align: middle;">
                         <button class="btn-action edit-musician-btn" data-id="${musician.id}" title="Editar">
                             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4704,7 +4713,7 @@ function openEditMusicianModal(id) {
     document.getElementById("musician-id").value = m.id;
     document.getElementById("musician-name").value = m.name;
     document.getElementById("musician-instrument").value = m.instrument;
-    const roleVal = m.role || "Músico";
+    const roleVal = formatRoleShort(m.role);
     const roleSelect = document.getElementById("musician-role");
     const hasOption = Array.from(roleSelect.options).some(opt => opt.value === roleVal);
     roleSelect.value = hasOption ? roleVal : "Músico";
