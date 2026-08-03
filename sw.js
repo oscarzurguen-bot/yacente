@@ -3,46 +3,7 @@
  * Gestiona el cacheo de recursos para funcionamiento offline y notificaciones push.
  */
 
-// Importar SDK de Firebase para notificaciones push en segundo plano
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
-// Inicializa Firebase Messaging extrayendo la configuración desde la caché
-function initMessagingFromCache() {
-    if (typeof caches === 'undefined') return;
-    
-    caches.open('fcm-config')
-        .then(cache => cache.match('/config.json'))
-        .then(response => {
-            if (response) {
-                return response.json();
-            }
-        })
-        .then(config => {
-            if (config && firebase.apps.length === 0) {
-                firebase.initializeApp(config);
-                const messaging = firebase.messaging();
-                
-                messaging.onBackgroundMessage((payload) => {
-                    console.log('[SW] Recibido mensaje push en segundo plano:', payload);
-                    const title = payload.notification.title || "Nueva notificación";
-                    const options = {
-                        body: payload.notification.body || "",
-                        icon: "./icons/icon-192-rounded.png",
-                        badge: "./icons/icon-192-rounded.png",
-                        data: {
-                            click_action: payload.notification.click_action || "/"
-                        }
-                    };
-                    self.registration.showNotification(title, options);
-                });
-            }
-        })
-        .catch(err => console.error("[SW] Error al inicializar FCM desde caché:", err));
-}
-
-// Inicializar al cargar el script
-initMessagingFromCache();
 
 // Escucha evento click en notificaciones de segundo plano para redirigir
 self.addEventListener('notificationclick', (event) => {
@@ -65,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v234";
+const CACHE_NAME = "yacente-v348";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -79,6 +40,7 @@ const ASSETS_TO_CACHE = [
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js",
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js",
     "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js",
+
     "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
 ];
 

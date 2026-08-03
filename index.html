@@ -95,13 +95,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=234">
+    <link rel="stylesheet" href="style.css?v=348">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
 </head>
 <body class="mobile-simplified-active">
     <!-- Pantalla de Bloqueo: Contraseña de Directiva -->
@@ -266,11 +265,21 @@
             </div>
         </aside>
 
+        <!-- Sidebar Overlay Backdrop para móvil -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
         <!-- Main Content Wrapper -->
         <main class="main-content">
             <!-- Header -->
             <header class="content-header">
-                <div class="header-title-container" style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+                <div class="header-title-container" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <button id="btn-toggle-mobile-sidebar" class="btn-mobile-menu-toggle" aria-label="Abrir Menú">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
                     <div>
                         <h2 id="page-title" style="margin: 0;">Asistencia</h2>
                         <p id="page-subtitle" class="text-muted" style="margin: 4px 0 0 0;">Control diario de músicos por sección</p>
@@ -334,6 +343,9 @@
                             <path d="M12 20h9"></path>
                             <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
+                    </button>
+                    <button id="btn-open-announcement-modal" class="btn btn-primary btn-sm admin-only-element" style="width: 38px; height: 38px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; padding: 0; margin: 0; background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; border: none; font-weight: 700; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3); transition: all 0.2s ease;" title="Enviar aviso o comunicado a los músicos">
+                        <span style="font-size: 1.1rem; line-height: 1;">📢</span>
                     </button>
                 </div>
             </header>
@@ -503,11 +515,12 @@
                             <thead>
                                 <tr>
                                     <th style="white-space: nowrap;">Fecha</th>
+                                    <th style="white-space: nowrap;">Hora</th>
                                     <th style="white-space: nowrap;">Lugar</th>
                                     <th style="white-space: nowrap;">Tipo</th>
-                                    <th>Músicos Presentes</th>
+                                    <th>Presentes</th>
                                     <th>Ausencias</th>
-                                    <th>% Asistencia</th>
+                                    <th>%</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -887,10 +900,13 @@
                     </div>
                 </div>
 
-                <!-- Top 10 Marchas Ensayadas -->
+                <!-- Marchas más Ensayadas -->
                 <div class="card-collapsible" id="card-stats-marchas" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
-                        <h3>Marchas más Ensayadas (Top 10)</h3>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="margin: 0;">Marchas más ensayadas</h3>
+                            <button id="btn-toggle-all-marchas-ensayadas" class="btn btn-secondary btn-sm" title="Ver todas las marchas" style="padding: 2px 8px; font-size: 0.85rem; font-weight: bold; border-radius: 4px; z-index: 10; line-height: 1.2;">+</button>
+                        </div>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <button id="btn-stats-to-repertoire" class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.72rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; z-index: 10;">
                                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
@@ -925,10 +941,13 @@
                     </div>
                 </div>
 
-                <!-- Marchas menos Ensayadas / Más tiempo sin ensayar (Top 10) -->
+                <!-- Marchas más olvidadas -->
                 <div class="card-collapsible" id="card-stats-marchas-olvidadas" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
-                        <h3>Marchas más olvidadas (Top 10 sin ensayar)</h3>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="margin: 0;">Marchas más olvidadas</h3>
+                            <button id="btn-toggle-all-marchas-olvidadas" class="btn btn-secondary btn-sm" title="Ver todas las marchas" style="padding: 2px 8px; font-size: 0.85rem; font-weight: bold; border-radius: 4px; z-index: 10; line-height: 1.2;">+</button>
+                        </div>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
@@ -973,12 +992,75 @@
                                 <select id="stats-ov-year-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; width: auto; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
                                     <!-- Populated dynamically -->
                                 </select>
+                                <button id="btn-download-season-report" class="btn btn-secondary btn-icon" style="padding: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="Descargar Informe de Temporada (PDF)">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
 
                         <!-- Bar Chart Container -->
                         <div id="stats-ov-chart-container" style="position: relative; width: 100%; min-height: 280px; margin-top: 10px; display: flex; flex-direction: column;">
                             <!-- Dynamic chart output -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparativa de Asistencia por Cuerdas (Gráfico interactivo) -->
+                <div class="card-collapsible" style="margin-bottom: 24px;" id="card-stats-section-comparison">
+                    <div class="card-collapsible-header">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 1.1rem;">📈</span>
+                            <h3 style="margin: 0;">Comparativa de Asistencia por Cuerdas</h3>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <!-- Subtitle & Controls -->
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <p class="text-muted" style="margin: 0; font-size: 0.84rem;">Evolución del porcentaje de asistencia comparado entre las cuerdas de la banda.</p>
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                                <label for="stats-section-time-select" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; margin: 0;">Periodo:</label>
+                                <select id="stats-section-time-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
+                                    <option value="season" selected>Temporada Actual</option>
+                                    <option value="last6m">Últimos 6 Meses</option>
+                                    <option value="last3m">Últimos 3 Meses</option>
+                                    <option value="all">Todo el Histórico</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Selector de Secciones (Pills / Badges) -->
+                        <div style="margin-bottom: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                                <span style="font-size: 0.78rem; font-weight: 700; color: var(--color-gold); text-transform: uppercase; letter-spacing: 0.5px;">Seleccionar Cuerdas a Mostrar</span>
+                                <div style="display: flex; gap: 6px;">
+                                    <button type="button" id="btn-stats-sec-select-all" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Todas</button>
+                                    <button type="button" id="btn-stats-sec-select-metals" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Metales</button>
+                                    <button type="button" id="btn-stats-sec-select-percussion" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Percusión</button>
+                                    <button type="button" id="btn-stats-sec-clear-all" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Ninguna</button>
+                                </div>
+                            </div>
+                            <div id="stats-section-pills-container" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                <!-- Dynamic pills populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Line Chart Container -->
+                        <div id="stats-section-line-chart-container" style="position: relative; width: 100%; min-height: 320px; margin-top: 10px; box-sizing: border-box;">
+                            <!-- Dynamic SVG chart populated by JS -->
+                        </div>
+
+                        <!-- Summary grid below chart -->
+                        <div id="stats-section-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 20px;">
+                            <!-- Dynamic summary cards populated by JS -->
                         </div>
                     </div>
                 </div>
@@ -1075,8 +1157,18 @@
                         <h3>Contraseña de Directiva</h3>
                         <p class="text-muted" style="margin-bottom: 20px;">Modifica la contraseña utilizada para acceder al panel de administración y autorizar operaciones de seguridad.</p>
                         
-                        <div class="settings-buttons">
+                        <div class="settings-buttons" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                             <button id="btn-open-change-password-modal" class="btn btn-primary">Cambiar Contraseña</button>
+                            
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <span>🔒</span> Bloqueo de pasado:
+                                </span>
+                                <label class="switch" title="Activar/Desactivar Bloqueo de Pasado">
+                                    <input type="checkbox" id="toggle-past-lock">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -1100,25 +1192,7 @@
                         </div>
                     </div>
 
-                    <!-- Configuración de Notificaciones Push (FCM) -->
-                    <div class="card settings-card" id="push-settings-card">
-                        <h3>Notificaciones Push (FCM)</h3>
-                        <p class="text-muted" style="margin-bottom: 15px;">Configura las credenciales de Firebase Cloud Messaging para activar el envío de alertas directas a los dispositivos móviles de los músicos convocados.</p>
-                        
-                        <form id="form-push-config" style="display: flex; flex-direction: column; gap: 12px;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label for="push-vapid-key">Clave Pública VAPID</label>
-                                <input type="text" id="push-vapid-key" placeholder="Ej: BEl3vXw..." style="width: 100%; font-family: monospace; font-size: 0.8rem;">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label for="push-server-key">Clave de Servidor FCM (Legacy)</label>
-                                <input type="password" id="push-server-key" placeholder="Ej: AAAAYaC..." style="width: 100%; font-family: monospace; font-size: 0.8rem;">
-                            </div>
-                            <div class="settings-buttons" style="margin-top: 5px;">
-                                <button type="submit" class="btn btn-primary" id="btn-save-push-config">Guardar Claves Push</button>
-                            </div>
-                        </form>
-                    </div>
+
 
                     <!-- Simulador de Formación -->
                     <div class="card settings-card">
@@ -1156,43 +1230,42 @@
                 <!-- Perfil Card -->
                 <div class="card component-profile-card">
                     <div class="profile-header-layout">
-                        <div class="profile-avatar">
+                        <!-- Foto de perfil interactiva (haz clic para cambiar la foto) -->
+                        <div class="profile-avatar" id="comp-profile-avatar-container" style="position: relative; cursor: pointer;" title="Haz clic para cambiar tu foto de perfil">
                             <span id="comp-avatar-letters">--</span>
+                            <img id="comp-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
                         </div>
+                        <input type="file" id="comp-photo-file-input" accept="image/*" class="hidden">
+                        
+                        <!-- Meta: Nombre y Rol -->
                         <div class="profile-meta">
                             <h3 id="comp-profile-name">Cargando nombre...</h3>
                             <p id="comp-profile-details" class="text-muted">Cargando instrumento...</p>
                         </div>
-                        <!-- Campana de Notificaciones (dentro de botón circular a color) -->
-                        <button id="btn-comp-notifications-bell" class="btn-notifications-bell" title="Ver Notificaciones">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                            </svg>
-                            <!-- Badge -->
-                            <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
-                        </button>
-                        <div class="profile-streak-badge" id="comp-streak-badge" title="Racha de ensayos consecutivos">
-                            <span class="streak-icon">🔥</span>
-                            <span class="streak-count" id="comp-streak-val">0</span>
+                        
+                        <!-- Acciones Arriba a la Derecha del Panel: Racha y Notificaciones -->
+                        <div style="position: absolute; top: -2px; right: 0; display: flex; align-items: center; gap: 8px;">
+                            <div class="profile-streak-badge" id="comp-streak-badge" title="Racha de ensayos consecutivos" style="position: relative; top: 0; right: 0;">
+                                <span class="streak-icon">🔥</span>
+                                <span class="streak-count" id="comp-streak-val">0</span>
+                            </div>
+                            <!-- Botón Notificaciones del Músico -->
+                            <button id="btn-comp-notifications-bell" class="btn-notifications-bell" title="Ver Notificaciones" style="position: relative;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <!-- Badge -->
+                                <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Notificaciones Push Setting -->
-                <div class="card" id="comp-notifications-card" style="margin-top: 15px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.15);">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 1.5rem; line-height: 1;">🔔</span>
-                        <div>
-                            <h4 style="margin: 0; font-size: 0.92rem; font-weight: 600; color: var(--text-primary);">Notificaciones Push</h4>
-                            <p id="comp-notifications-status" style="margin: 2px 0 0 0; font-size: 0.76rem; color: var(--text-muted); line-height: 1.3;">Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.</p>
-                        </div>
-                    </div>
-                    <button id="btn-comp-enable-notifications" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">Habilitar</button>
-                </div>
+
 
                 <!-- Estadísticas Resumen Grid -->
-                <div class="stats-cards-grid" style="margin-top: 20px;">
+                <div class="stats-cards-grid">
                     <div class="card stat-summary-card">
                         <div class="stat-circle-progress" id="comp-progress-circle">
                             <svg viewBox="0 0 36 36" class="circular-chart gold">
@@ -1207,7 +1280,7 @@
                     <div class="card stat-numbers-card">
                         <div class="stat-number-row">
                             <div class="stat-num-box">
-                                <span class="num" id="comp-stat-attended">0</span>
+                                <span class="num" style="color: var(--color-present);" id="comp-stat-attended">0</span>
                                 <span class="label">Asistidos</span>
                             </div>
                             <div class="stat-num-box">
@@ -1223,7 +1296,7 @@
                 </div>
 
                 <!-- Insignias / Medallas -->
-                <div class="card" style="margin-top: 20px; padding: 20px;">
+                <div class="card" style="padding: 20px;">
                     <div class="insignias-header-row" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
                         <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Mis Insignias</h3>
                         <div class="profile-insignias-badge" id="comp-insignias-badge" title="Insignias desbloqueadas">
@@ -1475,7 +1548,7 @@
 
                 <!-- Ranking de Asistencia -->
                 <div class="card" style="margin-top: 20px; padding: 20px;">
-                    <h3 style="margin-top: 0; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Top 10 Asistencia</h3>
+                    <h3 style="margin-top: 0; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Top 25 Asistencia</h3>
                     <div id="comp-ranking-container" style="display: flex; flex-direction: column; gap: 10px;">
                         <!-- Populate dynamically -->
                     </div>
@@ -1495,32 +1568,10 @@
                 </div>
             </section>
 
-            <!-- Sección: Notificaciones de Componente -->
-            <section id="section-componente-notificaciones" class="app-section">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-                    <button id="btn-back-from-notif" class="btn-action" style="background: transparent; border: none; padding: 4px; color: var(--text-color); cursor: pointer;" title="Volver al Perfil">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
-                    </button>
-                    <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Notificaciones</h2>
-                </div>
-
-                <div class="card" style="padding: 20px; border: 1px solid var(--border-color);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <span class="text-muted" style="font-size: 0.88rem;" id="comp-notif-count-label">No tienes notificaciones pendientes.</span>
-                        <button id="btn-comp-notif-mark-all-read" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 4px 8px;">Marcar todas como leídas</button>
-                    </div>
-
-                    <div id="comp-notif-list-container" style="display: flex; flex-direction: column; gap: 12px;">
-                        <!-- Dynamic notifications list -->
-                    </div>
-                </div>
-            </section>
-
             <!-- Sección: Eventos Programados (Futuros) -->
             <section id="section-componente-eventos" class="app-section">
+
+
                 <!-- Calendario Mensual Músicos -->
                 <div class="card" style="padding: 16px; margin-bottom: 20px; box-sizing: border-box;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
@@ -1780,6 +1831,122 @@
         </div>
     </div>
 
+    <!-- Modal de Explicación de Racha de Asistencia -->
+    <div id="modal-streak-info" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px; text-align: center; padding: 24px 20px;">
+            <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">
+                    <span>🔥</span> Racha de Asistencia
+                </h3>
+                <button class="modal-close" id="btn-close-streak-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Indicador Racha en Grande -->
+                <div style="margin: 10px 0 16px 0;">
+                    <div style="font-size: 3.5rem; font-weight: 800; font-family: 'Cinzel', serif; color: #E67E22; line-height: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>🔥</span>
+                        <span id="modal-streak-count-big">0</span>
+                    </div>
+                    <div style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-top: 6px;">
+                        Ensayos Consecutivos
+                    </div>
+                </div>
+
+                <!-- Mensaje Motivacional Dinámico -->
+                <div id="modal-streak-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 18px; text-align: center;">
+                    Cargando mensaje...
+                </div>
+
+                <!-- Récord Personal de Racha -->
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 16px;">
+                    <span>🏆</span> Récord Personal: <span id="modal-streak-best-val" style="font-weight: 700;">0</span> ensayos seguidos
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 8px;">
+                <button class="btn btn-primary" id="btn-streak-modal-ok" style="width: 100%; justify-content: center; padding: 10px 16px;">¡Entendido!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Flotante de Notificaciones del Músico -->
+    <div id="modal-component-notifications" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
+                <h3 style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <span>🔔</span> Notificaciones
+                </h3>
+                <button class="modal-close" id="btn-close-comp-notif-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap;">
+                    <span class="text-muted" style="font-size: 0.82rem;" id="comp-notif-count-label">No tienes notificaciones pendientes.</span>
+                    <button id="btn-comp-notif-mark-all-read" class="btn btn-secondary btn-sm" style="font-size: 0.76rem; padding: 4px 8px;">Marcar todas leídas</button>
+                </div>
+                <div id="comp-notif-list-container" style="display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; padding-right: 4px;">
+                    <!-- Notificaciones dinámicas -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Enviar Comunicado / Notificación a la Banda (Directiva) -->
+    <div id="modal-send-announcement" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                    <span>📢</span> Enviar Comunicado a la Banda
+                </h3>
+                <button class="modal-close" id="btn-close-announcement-modal">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="form-send-announcement">
+                <!-- Plantillas Rápidas -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">Mensajes Rápidos Frecuentes</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="announcement-quick-pills">
+                        <button type="button" class="quick-announcement-pill" data-title="Recordatorio de Cuotas" data-body="Recordad que podéis hacer el pago en efectivo de las cuotas de la cofradía a Albín en los ensayos." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">📢 Cuotas</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Recordatorio de linterna" data-body="Para la convocatoria de hoy no olvidéis traer la linterna." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">🔦 Linterna</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Uniformidad" data-body="" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">👔 Uniformes</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Horario de Salida de Autobús" data-body="" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">🚌 Autobús</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Recordatorio de partituras" data-body="Recordad traer las partituras de la marcha nueva para el ensayo de hoy." style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">📄 Partituras</button>
+                        <button type="button" class="quick-announcement-pill" data-title="Urgente" data-body="" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; font-size: 0.75rem; color: var(--text-primary); cursor: pointer;">🚨 Urgente</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="announcement-title-input" style="font-size: 0.85rem; font-weight: 600;">Título del Comunicado</label>
+                    <input type="text" id="announcement-title-input" required placeholder="Ej: Recordatorio de Uniformidad" style="width: 100%; padding: 8px 12px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label for="announcement-target-select" style="font-size: 0.85rem; font-weight: 600;">Destinatarios</label>
+                    <select id="announcement-target-select" style="width: 100%; padding: 8px 12px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+                        <option value="all" selected>🎺 Toda la Banda (Todos los músicos)</option>
+                        <option value="Trompetas 1ª">Trompetas 1ª</option>
+                        <option value="Bajos">Bajos</option>
+                        <option value="Trompetas 2ª y 3ª">Trompetas 2ª y 3ª</option>
+                        <option value="Cornetas">Cornetas</option>
+                        <option value="Percusión">Percusión</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="announcement-body-input" style="font-size: 0.85rem; font-weight: 600;">Mensaje / Indicación</label>
+                    <textarea id="announcement-body-input" required placeholder="Escribe aquí el mensaje detallado para la banda..." style="width: 100%; height: 110px; resize: vertical; padding: 10px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: inherit; font-size: 0.88rem; box-sizing: border-box;"></textarea>
+                </div>
+
+                <div class="modal-actions" style="margin-top: 0;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-announcement-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; font-weight: 700;">📢 Enviar Notificación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 
     <!-- Modal: Crear Ensayo -->
     <div id="modal-rehearsal" class="modal-overlay">
@@ -1811,7 +1978,12 @@
                     <select id="rehearsal-location-input" style="width: 100%;">
                         <option value="Parking" selected>Parking</option>
                         <option value="Arrabal">Arrabal</option>
+                        <option value="San Blas">San Blas</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="rehearsal-time-input">Hora del Ensayo</label>
+                    <input type="text" id="rehearsal-time-input" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-rehearsal-modal">Cancelar</button>
@@ -1870,10 +2042,18 @@
                     </div>
                     <div style="width: 1px; height: 30px; background-color: var(--border-color);"></div>
                     <div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: #3498db;" id="rehearsal-detail-estimated-count">0</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-top: 2px;">Previsión</div>
+                    </div>
+                    <div style="width: 1px; height: 30px; background-color: var(--border-color);"></div>
+                    <div>
                         <div style="font-size: 1.25rem; font-weight: 700; color: var(--color-gold);" id="rehearsal-detail-ratio">0%</div>
                         <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-top: 2px;">Asistencia</div>
                     </div>
                 </div>
+
+                <!-- Banner de Alerta de Previsión de Asistencia -->
+                <div id="rehearsal-detail-prevision-alert" class="hidden" style="margin-top: -8px; padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;"></div>
 
                 <!-- Detalle de Músicos categorized by status -->
                 <div>
@@ -2017,6 +2197,31 @@
         </div>
     </div>
 
+    <!-- Modal: Autorización Bloqueo de Pasado -->
+    <div id="modal-past-lock-auth" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px; width: 90%;">
+            <div class="modal-header">
+                <h3 style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                    <span>🔒</span> Bloqueo de Pasado
+                </h3>
+                <button class="modal-close" id="btn-close-past-lock-modal">&times;</button>
+            </div>
+            <form id="form-past-lock-auth">
+                <p class="text-muted" style="font-size: 0.88rem; margin-bottom: 16px;">
+                    Introduce la contraseña clave para cambiar el estado del bloqueo de pasado:
+                </p>
+                <div class="form-group">
+                    <label for="past-lock-password">Contraseña Clave</label>
+                    <input type="password" id="past-lock-password" placeholder="Introduce la contraseña clave" required style="width: 100%;">
+                </div>
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-past-lock-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Resumen Semanal -->
     <div id="modal-weekly-report" class="modal-overlay">
         <div class="modal-card" style="max-width: 580px; width: 90%;">
@@ -2114,7 +2319,14 @@
                     <select id="quick-session-location" style="width: 100%;">
                         <option value="Parking" selected>Parking</option>
                         <option value="Arrabal">Arrabal</option>
+                        <option value="San Blas">San Blas</option>
                     </select>
+                </div>
+                
+                <!-- Group: Rehearsal Time -->
+                <div class="form-group" id="quick-session-time-group" style="margin-top: 15px;">
+                    <label for="quick-session-time">Hora del Ensayo</label>
+                    <input type="text" id="quick-session-time" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
                 </div>
                  
                 <!-- Group: Performance Name (hidden by default) -->
@@ -2180,10 +2392,18 @@
                     </div>
                     <div style="width: 1px; height: 30px; background-color: var(--border-color);"></div>
                     <div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: #3498db;" id="actuacion-detail-estimated-count">0</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-top: 2px;">Previsión</div>
+                    </div>
+                    <div style="width: 1px; height: 30px; background-color: var(--border-color);"></div>
+                    <div>
                         <div style="font-size: 1.25rem; font-weight: 700; color: var(--color-gold);" id="actuacion-detail-ratio">0%</div>
                         <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); margin-top: 2px;">Asistencia</div>
                     </div>
                 </div>
+
+                <!-- Banner de Alerta de Previsión de Asistencia -->
+                <div id="actuacion-detail-prevision-alert" class="hidden" style="margin-top: -8px; padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;"></div>
 
                 <!-- Detalle de Músicos categorized by status -->
                 <div>
@@ -2299,9 +2519,12 @@
     <div id="modal-musician-stats" class="modal-overlay">
         <div class="modal-card" style="max-width: 640px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
-                <div>
-                    <h3 id="detail-musician-name" style="margin: 0;">Componente</h3>
-                    <p id="detail-musician-instrument" class="text-muted" style="margin: 4px 0 0; font-size: 0.85rem;"></p>
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div id="detail-musician-avatar" style="width: 60px; height: 60px; min-width: 60px; border-radius: 50%; background-color: rgba(212, 175, 55, 0.15); color: var(--color-gold); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; overflow: hidden; flex-shrink: 0; border: 2px solid var(--color-gold); box-shadow: 0 0 10px rgba(212, 175, 55, 0.25); cursor: pointer; transition: transform 0.2s ease;" title="Ver foto en grande">--</div>
+                    <div>
+                        <h3 id="detail-musician-name" style="margin: 0;">Componente</h3>
+                        <p id="detail-musician-instrument" class="text-muted" style="margin: 4px 0 0; font-size: 0.85rem;"></p>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <button class="btn btn-secondary btn-sm" id="btn-download-pdf" title="Descargar informe PDF" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0;">
@@ -2362,18 +2585,26 @@
             </div>
 
             <!-- Resumen visual -->
-            <div class="stats-overview-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 16px;">
-                <div class="card stat-overview-card" style="padding: 14px;">
-                    <h3 style="font-size: 0.75rem;">Asistencia</h3>
-                    <div class="huge-number" id="detail-attendance-pct" style="font-size: 1.8rem;">0%</div>
+            <div class="stats-overview-grid" style="grid-template-columns: repeat(5, 1fr); margin-bottom: 16px; gap: 6px;">
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Asistencia</h3>
+                    <div class="huge-number" id="detail-attendance-pct" style="font-size: 1.35rem; font-weight: 700;">0%</div>
                 </div>
-                <div class="card stat-overview-card" style="padding: 14px;">
-                    <h3 style="font-size: 0.75rem;">Sesiones</h3>
-                    <div class="huge-number" id="detail-total-sessions" style="font-size: 1.8rem;">0</div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Sesiones</h3>
+                    <div class="huge-number" id="detail-total-sessions" style="font-size: 1.35rem; font-weight: 700; color: #D4AF37;">0</div>
                 </div>
-                <div class="card stat-overview-card" style="padding: 14px;">
-                    <h3 style="font-size: 0.75rem;">Faltas</h3>
-                    <div class="huge-number" id="detail-total-absences" style="font-size: 1.8rem; color: var(--color-absent);">0</div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Asistencias</h3>
+                    <div class="huge-number" id="detail-total-attended" style="font-size: 1.35rem; font-weight: 700; color: var(--color-present);">0</div>
+                </div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Faltas</h3>
+                    <div class="huge-number" id="detail-total-absences" style="font-size: 1.35rem; font-weight: 700; color: var(--color-absent);">0</div>
+                </div>
+                <div class="card stat-overview-card" style="padding: 10px 2px; text-align: center;">
+                    <h3 style="font-size: 0.65rem; margin: 0 0 4px 0;">Justificadas</h3>
+                    <div class="huge-number" id="detail-total-justified" style="font-size: 1.35rem; font-weight: 700; color: var(--color-justified);">0</div>
                 </div>
             </div>
 
@@ -2424,7 +2655,7 @@
                 </div>
                 
                 <!-- Asignación Manual por la Directiva -->
-                <div style="background-color: rgba(212, 175, 55, 0.03); border: 1px solid rgba(212, 175, 55, 0.12); padding: 16px; border-radius: 6px; margin-bottom: 16px;">
+                <div id="detail-insignias-box" style="background-color: rgba(212, 175, 55, 0.03); border: 1px solid rgba(212, 175, 55, 0.12); padding: 16px; border-radius: 6px; margin-bottom: 16px; transition: all 0.3s ease;">
                     <strong style="font-size: 0.9rem; display: block; color: #D4AF37; margin-bottom: 10px; font-family: 'Cinzel', serif;">Insignias Asignables por la Dirección</strong>
                     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">
                         <!-- Contra viento y marea -->
@@ -2725,6 +2956,166 @@
         </div>
     </div>
 
+    <!-- Modal: Previsualización de Foto de Perfil en Grande -->
+    <div id="modal-photo-preview" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px; width: 92%; text-align: center; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-photo-preview" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <h3 id="photo-preview-name" style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 1.15rem;">Nombre del Músico</h3>
+            <p id="photo-preview-instrument" class="text-muted" style="margin: 0 0 18px 0; font-size: 0.85rem;">Instrumento • Rol</p>
+            
+            <div id="photo-preview-container" style="width: 100%; max-width: 320px; height: 320px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 3px solid var(--color-gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.35); background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;">
+                <img id="photo-preview-img" src="" alt="Foto de Perfil" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;">
+                <div id="photo-preview-initials" class="hidden" style="font-size: 5rem; font-weight: 800; color: var(--color-gold); font-family: 'Cinzel', serif;"></div>
+            </div>
+            
+            <input type="file" id="modal-photo-file-input" accept="image/*" class="hidden">
+            
+            <div id="modal-photo-actions" style="margin-top: 18px; display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-primary hidden" id="btn-edit-photo-modal" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; background: linear-gradient(135deg, var(--color-gold), #b89628); color: #000; border: none; padding: 10px 16px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.92rem;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Cambiar foto de perfil</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-close-photo-preview-footer" style="width: 100%;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+    <!-- Modal: Detalle de Ensayo / Actuación para Músicos -->
+    <div id="modal-comp-rehearsal-detail" class="modal-overlay">
+        <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <div>
+                    <h3 id="comp-rehearsal-detail-title" style="margin: 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.15rem;">Ensayo / Actuación</h3>
+                    <p id="comp-rehearsal-detail-subtitle" class="text-muted" style="margin: 4px 0 0; font-size: 0.82rem;"></p>
+                </div>
+                <button class="modal-close" id="btn-close-comp-rehearsal-detail">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+                <!-- Tarjeta de Asistencia General -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                    <div>
+                        <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Asistencia General</div>
+                        <div id="comp-rehearsal-detail-pct" style="font-size: 2.2rem; font-weight: 800; font-family: 'Outfit', sans-serif; color: var(--color-gold); line-height: 1.1; margin-top: 2px;">--%</div>
+                        <div id="comp-rehearsal-detail-counts" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; font-weight: 500;">-- presentes de -- convocados</div>
+                    </div>
+                </div>
+
+                <!-- Sección de Marchas Tocadas -->
+                <div>
+                    <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; font-family: 'Outfit', sans-serif; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <span>🎶</span> Marchas Ensayadas / Tocadas
+                    </h4>
+                    <div id="comp-rehearsal-detail-marchas" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Rellenado dinámicamente por JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <button type="button" class="btn btn-secondary" id="btn-close-comp-rehearsal-detail-footer" style="width: 100%;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalle de Próximo Evento para Músicos -->
+    <div id="modal-comp-upcoming-event-detail" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px; width: 92%; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-upcoming-event-detail" style="position: absolute; top: 16px; right: 16px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            
+            <!-- 1. Título del Ensayo / Evento -->
+            <h3 id="upcoming-event-detail-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
+            
+            <!-- 2. Especificaciones del Evento (Fecha, Hora, Lugar, Convocados) -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📅</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Fecha</div>
+                        <div id="upcoming-event-detail-date" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Viernes, 14 de Marzo de 2026</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">⏰</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Hora</div>
+                        <div id="upcoming-event-detail-time" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">21:00 h</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📍</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Lugar</div>
+                        <div id="upcoming-event-detail-location" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Parking de la Sede</div>
+                    </div>
+                </div>
+
+                <div id="upcoming-event-detail-convocated-box" class="hidden" style="display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">🎺</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Voces Convocadas</div>
+                        <div id="upcoming-event-detail-convocated" style="font-size: 0.88rem; color: var(--color-gold); font-weight: 600; margin-top: 1px;">Cornetas 1ª, Trompetas 1ª</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Texto Explicativo del Preaviso -->
+            <p style="margin: 0 0 14px 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; text-align: left;">
+                Confirma tu asistencia o ausencia haciendo un preaviso a la dirección. De esta forma se podrá hacer una previsión de la asistencia y valorar cambios en la programación.
+            </p>
+
+            <!-- 4. Etiqueta / Botón de Preaviso Clicable -->
+            <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: center;">
+                <span id="upcoming-event-detail-badge" class="comp-attendance-badge pending clickable-badge" style="padding: 8px 24px; font-size: 0.92rem; font-weight: 700; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;" title="Pulsa para cambiar tu preaviso de asistencia">Preaviso</span>
+            </div>
+
+            <!-- 5. Botón Cerrar -->
+            <div style="display: flex; flex-direction: column;">
+                <button type="button" class="btn btn-secondary" id="btn-close-upcoming-event-detail-footer" style="width: 100%;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Seleccionar Evento cuando hay Múltiples el mismo día -->
+    <div id="modal-comp-multi-event-select" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px; width: 92%; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-multi-event-select" style="position: absolute; top: 16px; right: 16px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            
+            <h3 style="margin: 0 0 6px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.25rem;">Eventos de este día</h3>
+            <p id="multi-event-select-date-subtitle" style="margin: 0 0 16px 0; font-size: 0.84rem; color: var(--text-muted);">Selecciona el evento que deseas consultar:</p>
+            
+            <div id="multi-event-select-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <!-- Inyectado dinámicamente -->
+            </div>
+
+            <button type="button" class="btn btn-secondary" id="btn-close-multi-event-select-footer" style="width: 100%;">Cerrar</button>
+        </div>
+    </div>
+
     <!-- Modal: Preaviso (RSVP) Músicos -->
     <div id="modal-componente-preaviso" class="modal-overlay">
         <div class="modal-card" style="max-width: 400px; width: 90%;">
@@ -2831,23 +3222,42 @@
         </a>
     </nav>
 
-    <script src="app.js?v=234"></script>
+    <script src="app.js?v=348"></script>
     <script>
-        // Desregistrar Service Worker y borrar cachés para desarrollo
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                for (let registration of registrations) {
-                    registration.unregister().then(() => {
-                        console.log("[PWA] Service Worker desregistrado para forzar recarga de cambios.");
-                    });
-                }
+        // Purga de caché antigua y registro del Service Worker v=348
+        if ("caches" in window) {
+            caches.keys().then(keys => {
+                keys.forEach(key => {
+                    if (key !== "yacente-v348") {
+                        caches.delete(key);
+                    }
+                });
             });
         }
-        if (window.caches) {
-            caches.keys().then((names) => {
-                for (let name of names) {
-                    caches.delete(name);
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let registration of registrations) {
+                    registration.update();
                 }
+            });
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("sw.js?v=348")
+                    .then((registration) => {
+                        console.log("[PWA] Service Worker v348 registrado correctamente:", registration);
+                        registration.onupdatefound = () => {
+                            const installingWorker = registration.installing;
+                            if (installingWorker) {
+                                installingWorker.onstatechange = () => {
+                                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        window.location.reload();
+                                    }
+                                };
+                            }
+                        };
+                    })
+                    .catch((err) => {
+                        console.error("[PWA] Error al registrar Service Worker:", err);
+                    });
             });
         }
     </script>

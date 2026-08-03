@@ -1005,9 +1005,9 @@ svg.chevron {
 /* Grid of Musicians */
 .musicians-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 16px;
-    padding: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 10px;
+    padding: 14px;
 }
 
 /* Musician Card */
@@ -1015,10 +1015,10 @@ svg.chevron {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    padding: 16px;
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
     transition: var(--transition-normal);
 }
 .musician-card:hover {
@@ -1028,37 +1028,50 @@ svg.chevron {
 .musician-card-top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+    width: 100%;
 }
 
 /* Dynamic avatar styling */
 .musician-avatar {
-    width: 42px;
-    height: 42px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.78rem;
     background-color: var(--color-purple-dark);
     color: var(--color-gold);
     border: 1px solid var(--border-color);
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
 .musician-details {
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    justify-content: center;
+    flex: 1;
+    min-width: 0;
 }
 .musician-name {
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
 }
 .musician-role {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
 }
 
 /* Card states */
@@ -1094,25 +1107,29 @@ svg.chevron {
 
 /* Quick attendance toggle button group */
 .attendance-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
 }
 
 .toggle-btn {
-    border-radius: var(--radius-sm);
-    padding: 8px;
+    border-radius: 5px;
+    padding: 4px 8px;
     font-weight: 600;
-    font-size: 0.85rem;
-    display: flex;
+    font-size: 0.76rem;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 3px;
     cursor: pointer;
     background-color: var(--bg-primary);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
     transition: var(--transition-fast);
+    height: 26px;
+    line-height: 1;
 }
 
 .toggle-btn.btn-present:hover, 
@@ -1133,10 +1150,11 @@ svg.chevron {
 /* Justified options that fade in when absent */
 .absence-details-container {
     border-top: 1px dashed var(--border-color);
-    padding-top: 12px;
+    padding-top: 8px;
+    margin-top: 2px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     max-height: 250px;
     opacity: 1;
     overflow: hidden;
@@ -1330,11 +1348,7 @@ svg.chevron {
 .settings-card {
     display: flex;
     flex-direction: column;
-}
-@media (min-width: 768px) {
-    .settings-card {
-        min-height: 300px;
-    }
+    padding: 16px !important;
 }
 .settings-card h3 {
     font-size: 1.15rem;
@@ -1367,9 +1381,10 @@ svg.chevron {
     transition: opacity var(--transition-normal), visibility var(--transition-normal);
 }
 .modal-overlay.active {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: all;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: all !important;
+    z-index: 10000000 !important;
 }
 
 .modal-card {
@@ -1511,6 +1526,49 @@ svg.chevron {
 /* ==========================================================================
    RESPONSIVE DESIGN (MOBILE ADAPTATIONS)
    ========================================================================== */
+/* Sidebar Overlay Backdrop para Móvil */
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.sidebar-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Botón Hamburguesa en Cabecera Móvil */
+.btn-mobile-menu-toggle {
+    display: none;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--color-gold);
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+.btn-mobile-menu-toggle:hover {
+    background: rgba(212, 175, 55, 0.15);
+    border-color: var(--color-gold);
+}
+
+.nav-item-more-mobile {
+    display: none;
+}
+
 @media (max-width: 1024px) {
     :root {
         --sidebar-width: 80px;
@@ -1539,6 +1597,16 @@ svg.chevron {
 }
 
 @media (max-width: 768px) {
+    .btn-mobile-menu-toggle {
+        display: inline-flex;
+    }
+    .nav-item-more-mobile {
+        display: flex;
+    }
+    body.component-portal .btn-mobile-menu-toggle {
+        display: none !important;
+    }
+
     .app-container {
         flex-direction: column;
     }
@@ -1587,6 +1655,91 @@ svg.chevron {
     body.mobile-simplified-active .nav-item[data-target="section-estadisticas"] {
         display: none !important;
     }
+
+    /* Ocultar la sección de Ajustes y el botón Más en la versión móvil */
+    .nav-item[data-target="section-ajustes"],
+    .nav-item-more-mobile {
+        display: none !important;
+    }
+
+    /* Estado Desplegado de la Sidebar (Slide-over Drawer) en Móvil */
+    .sidebar.open {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 275px !important;
+        max-width: 85vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        align-items: stretch !important;
+        background-color: var(--bg-secondary) !important;
+        border-right: 1px solid var(--border-color) !important;
+        border-top: none !important;
+        box-shadow: 10px 0 35px rgba(0, 0, 0, 0.8) !important;
+        z-index: 1000 !important;
+        padding: 20px 16px !important;
+        overflow-y: auto !important;
+        transform: translateX(0) !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+
+    .sidebar.open .sidebar-header {
+        display: flex !important;
+    }
+
+    .sidebar.open .logo-text {
+        display: block !important;
+    }
+
+    /* Ocultar pie de la sidebar y conmutador de modo claro/oscuro en el Drawer móvil */
+    .sidebar.open .sidebar-footer,
+    .sidebar.open .theme-toggle {
+        display: none !important;
+    }
+
+    .sidebar.open .sidebar-nav {
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+        margin: 16px 0 !important;
+        flex: 0 0 auto !important;
+    }
+
+    /* Ocultar por defecto todos los nav-items en el Drawer móvil */
+    .sidebar.open .sidebar-nav .nav-item {
+        display: none !important;
+    }
+
+    /* Mostrar EXCLUSIVAMENTE Plantilla y Estadísticas en el Drawer móvil */
+    .sidebar.open .sidebar-nav .nav-item[data-target="section-plantilla"],
+    .sidebar.open .sidebar-nav .nav-item[data-target="section-estadisticas"] {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 12px !important;
+        padding: 12px 14px !important;
+        font-size: 0.9rem !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+        flex: 0 0 auto !important;
+    }
+
+    .sidebar.open .sidebar-nav .nav-item span {
+        display: inline-block !important;
+    }
+
+    /* Ocultar los botones de Salir y Cerrar Sesión dentro de la Sidebar desplegable móvil */
+    .sidebar.open #btn-logout-sidebar-admin,
+    .sidebar.open #btn-logout-nav-admin {
+        display: none !important;
+    }
+
     .main-content {
         margin-left: 0;
         margin-bottom: 60px; /* Space for the bottom menu */
@@ -2074,6 +2227,35 @@ svg.chevron {
         border: 1px solid #dee2e6 !important;
         font-family: 'Outfit', sans-serif !important;
         align-items: center !important;
+    }
+
+    /* Estilos adicionales para el informe de temporada */
+    .print-repertoire-flex {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 20px !important;
+        margin-top: 10px !important;
+        width: 100% !important;
+    }
+    .print-repertoire-col {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    .print-repertoire-col-title {
+        font-size: 8.5pt !important;
+        font-weight: 700 !important;
+        color: #475569 !important;
+        margin-bottom: 8px !important;
+        border-bottom: 1px dashed #cbd5e1 !important;
+        padding-bottom: 4px !important;
+    }
+    .print-repertoire-item-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        font-size: 8pt !important;
+        padding: 3px 0 !important;
+        border-bottom: 1px solid #f1f5f9 !important;
     }
 }
 
@@ -2956,28 +3138,34 @@ svg.chevron {
     display: none !important;
 }
 
-/* Barra de Navegación Inferior Móvil */
+/* Barra de Navegación Inferior Móvil para Músicos */
 .component-mobile-nav {
     position: fixed;
     bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
     width: 100%;
     max-width: 800px;
     height: 62px;
-    background: rgba(26, 10, 14, 0.9);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(212, 175, 55, 0.25);
-    display: flex;
+    background: rgba(26, 10, 14, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(212, 175, 55, 0.4);
+    display: none;
     justify-content: space-around;
     align-items: center;
-    z-index: 9999;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+    z-index: 99999;
+    box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.9);
     box-sizing: border-box;
-    border-top-left-radius: 12px;
-    border-top-right-radius: 12px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
     padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+body.component-portal .component-mobile-nav:not(.hidden) {
+    display: flex;
 }
 .component-mobile-nav.hidden {
     display: none !important;
@@ -3025,6 +3213,82 @@ body.component-portal #candle-tribute-container {
     display: none !important;
 }
 
+/* Transiciones de Desplazamiento Suave (Swipe Slide Animations) */
+.main-content {
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Opción 1: iOS Push (Página entra con sombra desde el lateral, estilo iOS nativo) */
+.trans-ios-right { animation: iosPushRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+.trans-ios-left { animation: iosPushLeft 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; }
+
+@keyframes iosPushRight {
+    0% { opacity: 0.7; transform: translateX(100%); box-shadow: -12px 0 30px rgba(0,0,0,0.6); }
+    100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
+}
+@keyframes iosPushLeft {
+    0% { opacity: 0.7; transform: translateX(-100%); box-shadow: 12px 0 30px rgba(0,0,0,0.6); }
+    100% { opacity: 1; transform: translateX(0); box-shadow: 0 0 0 rgba(0,0,0,0); }
+}
+
+/* Opción 2: Glass Flow (Fundido con desenfoque de cristal y desplazamiento sutil) */
+.trans-glass-right { animation: glassFlowRight 0.28s ease-out forwards; }
+.trans-glass-left { animation: glassFlowLeft 0.28s ease-out forwards; }
+
+@keyframes glassFlowRight {
+    0% { opacity: 0; filter: blur(8px); transform: translateX(45px); }
+    100% { opacity: 1; filter: blur(0px); transform: translateX(0); }
+}
+@keyframes glassFlowLeft {
+    0% { opacity: 0; filter: blur(8px); transform: translateX(-45px); }
+    100% { opacity: 1; filter: blur(0px); transform: translateX(0); }
+}
+
+/* Opción 3: Snappy Parallax (Deslizamiento 100% directo, instantáneo e hiper-rápido) */
+.trans-snappy-right { animation: snappyRight 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
+.trans-snappy-left { animation: snappyLeft 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards; }
+
+@keyframes snappyRight {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(0); }
+}
+@keyframes snappyLeft {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(0); }
+}
+
+/* Opción 4: Tarjeta 3D (Desplazamiento con leve perspectiva y giro 3D) */
+.trans-3d-right { animation: card3DRight 0.32s ease-out forwards; }
+.trans-3d-left { animation: card3DLeft 0.32s ease-out forwards; }
+
+@keyframes card3DRight {
+    0% { opacity: 0.2; transform: perspective(800px) rotateY(-14deg) translateX(70px); }
+    100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+}
+@keyframes card3DLeft {
+    0% { opacity: 0.2; transform: perspective(800px) rotateY(14deg) translateX(-70px); }
+    100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+}
+
+/* Mi Ficha - Separación uniforme y moderada entre paneles */
+#section-componente-ficha.active {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+}
+#section-componente-ficha .comp-section-top-bar {
+    margin-bottom: 0 !important;
+}
+#section-componente-ficha .card,
+#section-componente-ficha .stats-cards-grid {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+#section-componente-ficha .stats-cards-grid {
+    gap: 12px !important;
+}
+
 /* Tarjeta Perfil de Músico */
 .component-profile-card {
     background: linear-gradient(135deg, rgba(26, 10, 14, 0.7), rgba(15, 6, 9, 0.9));
@@ -3042,49 +3306,68 @@ body.component-portal #candle-tribute-container {
     align-items: center;
     gap: 16px;
     position: relative;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 .profile-avatar {
-    width: 55px;
-    height: 55px;
+    width: 75px;
+    height: 75px;
     border-radius: 50%;
     background-color: rgba(212, 175, 55, 0.12);
-    border: none;
+    border: 2px solid var(--color-gold);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #D4AF37;
     font-weight: 700;
-    font-size: 1.25rem;
+    font-size: 1.6rem;
     font-family: 'Cinzel', serif;
-    text-shadow: 0 0 10px rgba(212, 175, 55, 0.25);
+    overflow: hidden;
     flex-shrink: 0;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.profile-avatar:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.5);
+    border-color: #FFF;
 }
 .profile-meta {
     flex: 1;
-    min-width: 150px;
+    min-width: 0;
+    padding-right: 100px;
 }
 .profile-meta h3 {
-    margin: 0 0 4px 0;
+    margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     color: #FFF;
+    white-space: normal;
+    word-break: break-word;
 }
 .profile-meta p {
-    margin: 0;
+    margin: 3px 0 0 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
 }
 .profile-streak-badge {
+    position: absolute;
+    top: -2px;
+    right: 0;
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(230, 126, 34, 0.15);
-    border: 1px solid rgba(230, 126, 34, 0.35);
-    padding: 6px 12px;
+    background: rgba(255, 119, 0, 0.16);
+    border: 1px solid rgba(255, 120, 0, 0.65);
+    padding: 5px 10px;
     border-radius: 20px;
-    color: #E67E22;
+    color: #ff8c1a;
     font-weight: 700;
-    font-size: 0.88rem;
-    box-shadow: 0 4px 10px rgba(230, 126, 34, 0.1);
+    font-size: 0.85rem;
 }
 .profile-insignias-badge {
     display: flex;
@@ -3167,6 +3450,15 @@ body.component-portal #candle-tribute-container {
 }
 .circular-chart.gold .circle {
     stroke: #D4AF37;
+}
+.circular-chart.red .circle {
+    stroke: var(--color-absent);
+}
+.circular-chart.yellow .circle {
+    stroke: #F1C40F;
+}
+.circular-chart.green .circle {
+    stroke: var(--color-present);
 }
 .percentage {
     fill: #fff;
@@ -3335,6 +3627,48 @@ body.component-portal #candle-tribute-container {
 .medal-card.locked .medal-icon-wrapper {
     filter: grayscale(1);
     opacity: 0.4;
+}
+
+/* Insignias conseguidas pero anuladas cuando 'Volver... a ensayar' está activa */
+.medal-card.annulled-medal {
+    opacity: 0.85 !important;
+    border-color: rgba(184, 151, 48, 0.35) !important;
+    background: linear-gradient(135deg, rgba(184, 151, 48, 0.04), rgba(0, 0, 0, 0.3)) !important;
+    box-shadow: none !important;
+    position: relative;
+}
+
+.medal-card.annulled-medal .medal-title {
+    color: #b89730 !important; /* Amarillo apagado */
+    text-decoration: line-through;
+    opacity: 0.9;
+}
+
+.medal-card.annulled-medal .medal-icon-wrapper {
+    background-color: rgba(184, 151, 48, 0.1) !important;
+    border-color: #b89730 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    opacity: 0.75 !important;
+}
+
+.medal-card.annulled-medal .medal-progress-bar .progress {
+    background: #b89730 !important;
+    opacity: 0.7;
+}
+
+.medal-card.annulled-medal .medal-progress-text {
+    color: #b89730 !important;
+    opacity: 0.85;
+}
+
+.medal-card.annulled-medal .medal-progress-text .annulled-status-text {
+    color: var(--color-absent, #e74c3c) !important;
+    font-weight: 700 !important;
+}
+
+.medal-card.annulled-medal .medal-stars {
+    opacity: 0.55 !important;
 }
 
 /* Estilos para el sistema de estrellas progresivo en insignias */
@@ -3591,23 +3925,23 @@ body.component-portal #candle-tribute-container {
     vertical-align: middle;
     display: inline-block;
 }
-.btn-reset-pin-row {
+.btn-reset-pin-row-padlock {
     background: none;
     border: none;
-    color: var(--color-absent);
-    cursor: pointer;
     padding: 4px;
-    border-radius: 4px;
+    cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    vertical-align: middle;
-    margin-left: 4px;
-    transition: all 0.2s ease;
+    border-radius: 4px;
+    transition: transform 0.2s ease, background-color 0.2s ease;
 }
-.btn-reset-pin-row:hover {
-    background-color: rgba(231,76,60,0.12);
-    color: #FF4D4D;
+.btn-reset-pin-row-padlock:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    transform: scale(1.18);
+}
+.btn-reset-pin-row-padlock:hover .lock-svg {
+    color: var(--color-absent) !important;
 }
 
 /* Optimizaciones extras para pantallas móviles muy pequeñas */
@@ -3616,15 +3950,15 @@ body.component-portal #candle-tribute-container {
         font-size: 1.35rem !important;
     }
     .component-profile-card {
-        padding: 12px 16px !important;
+        padding: 14px 16px !important;
     }
     .profile-header-layout {
-        gap: 10px !important;
+        gap: 14px !important;
     }
     .profile-avatar {
-        width: 45px !important;
-        height: 45px !important;
-        font-size: 1.1rem !important;
+        width: 62px !important;
+        height: 62px !important;
+        font-size: 1.3rem !important;
     }
     .profile-meta h3 {
         font-size: 1.05rem !important;
@@ -3655,9 +3989,9 @@ body.component-portal #candle-tribute-container {
 }
 
 .comp-attendance-badge.pending {
-    background-color: rgba(212, 175, 55, 0.12);
-    color: var(--color-gold);
-    border-color: rgba(212, 175, 55, 0.3);
+    background-color: rgba(149, 165, 166, 0.18);
+    color: #95A5A6;
+    border-color: rgba(149, 165, 166, 0.35);
 }
 
 .comp-attendance-badge.clickable-badge {
@@ -3676,12 +4010,12 @@ body.component-portal #candle-tribute-container {
     background-color: rgba(255, 255, 255, 0.015);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 6px 4px;
+    padding: 5px 3px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
-    height: 58px;
+    height: 54px;
     box-sizing: border-box;
     position: relative;
     cursor: pointer;
@@ -3706,41 +4040,64 @@ body.component-portal #candle-tribute-container {
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--text-muted);
+    line-height: 1;
+    margin-bottom: 2px;
 }
 .comp-calendar-day-card.today .comp-calendar-day-number {
     color: var(--color-gold);
 }
 
-/* Event status dots container */
+/* Event status badges container */
+.comp-calendar-day-card.has-actuacion {
+    background-color: rgba(46, 204, 113, 0.15) !important;
+    border-color: rgba(46, 204, 113, 0.45) !important;
+    box-shadow: inset 0 0 10px rgba(46, 204, 113, 0.15);
+}
+
 .comp-calendar-indicator-container {
     display: flex;
+    flex-direction: column;
     gap: 3px;
     justify-content: center;
     align-items: center;
     width: 100%;
-    margin-top: 4px;
+    margin-top: 3px;
+    overflow: hidden;
 }
-.comp-calendar-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    display: inline-block;
+
+/* Tarjeta rectangular de color sólido sin texto */
+.comp-calendar-badge {
+    display: block;
+    width: 82%;
+    height: 5px;
+    border-radius: 3px;
+    box-sizing: border-box;
+    transition: transform 0.15s ease;
 }
-.comp-calendar-dot.pending {
-    background-color: var(--color-gold);
-    box-shadow: 0 0 4px var(--color-gold);
+
+.comp-calendar-badge.present {
+    background-color: #2ECC71;
+    box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
 }
-.comp-calendar-dot.present {
-    background-color: var(--color-present);
-    box-shadow: 0 0 4px var(--color-present);
+
+.comp-calendar-badge.justified {
+    background-color: #E67E22;
+    box-shadow: 0 0 4px rgba(230, 126, 34, 0.5);
 }
-.comp-calendar-dot.absent {
-    background-color: var(--color-absent);
-    box-shadow: 0 0 4px var(--color-absent);
+
+.comp-calendar-badge.absent {
+    background-color: #E74C3C;
+    box-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
 }
-.comp-calendar-dot.justified {
-    background-color: var(--color-justified);
-    box-shadow: 0 0 4px var(--color-justified);
+
+.comp-calendar-badge.pending {
+    background-color: #95A5A6;
+    box-shadow: 0 0 4px rgba(149, 165, 166, 0.5);
+}
+
+.comp-calendar-badge.actuacion {
+    background-color: #2ECC71;
+    box-shadow: 0 0 5px rgba(46, 204, 113, 0.7);
 }
 
 /* Ranking Cards styles */
@@ -3840,4 +4197,72 @@ body.component-portal #candle-tribute-container {
 .btn-notifications-bell:active {
     transform: scale(0.95);
 }
+
+#btn-open-announcement-modal:hover {
+    background: linear-gradient(135deg, #ffd700 0%, #d4af37 100%) !important;
+    transform: scale(1.06);
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.5) !important;
+}
+#btn-open-announcement-modal:active {
+    transform: scale(0.95);
+}
+
+/* Botón reversible "Marcar Todos / Desmarcar Todos" en pase de lista por voz */
+.btn-mark-section-present {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-muted, #a0a0a0) !important;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    user-select: none;
+}
+
+.btn-mark-section-present:hover {
+    transform: scale(1.06);
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: var(--text-primary, #ffffff) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.btn-mark-section-present:active {
+    transform: scale(0.95);
+}
+
+.btn-mark-section-present.all-present {
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: rgba(255, 255, 255, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Animación y cursor clicable para fotos de perfil en grande */
+.musician-avatar-clickable:hover,
+#detail-musician-avatar:hover,
+.comp-profile-avatar-wrapper:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.45) !important;
+    cursor: pointer;
+}
+
+/* Filas clicables en el historial de músicos */
+.comp-session-row-clickable {
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.comp-session-row-clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(212, 175, 55, 0.2);
+}
+
+.comp-session-row-clickable:active {
+    transform: translateY(0);
+}
+
+
 

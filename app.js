@@ -138,7 +138,7 @@ function getAuthToken() {
     return sessionStorage.getItem("yacente_authenticated") === "true" || localStorage.getItem("yacente_authenticated") === "true";
 }
 function getAuthRole() {
-    return sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role");
+    return sessionStorage.getItem("yacente_role") || localStorage.getItem("yacente_role") || null;
 }
 function getAuthMusicianId() {
     return sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
@@ -230,11 +230,12 @@ function initApp() {
     state.formacionDesfile = parseDesfileFormacion(storedDesfile);
     state.directorConcierto = localStorage.getItem("yacente_director_concierto") || null;
 
-    // Cargar credenciales de Firebase
+    // Cargar credenciales de Firebase y Bloqueo de Pasado
     const storedFbConfig = localStorage.getItem("yacente_firebase_config");
     const storedFbHash = localStorage.getItem("yacente_firebase_hash");
     state.firebaseConfig = storedFbConfig ? JSON.parse(storedFbConfig) : null;
     state.firebasePasswordHash = storedFbHash || "";
+    state.pastLockEnabled = localStorage.getItem("yacente_past_lock_enabled") === "true";
 
     if (storedMusicians && storedAttendance) {
         state.musicians = JSON.parse(storedMusicians);
@@ -283,13 +284,6 @@ function initApp() {
             const mobNav = document.getElementById("component-mobile-nav");
             if (mobNav) mobNav.classList.remove("hidden");
             renderActiveSection("section-componente-ficha");
-            
-            // Auto-request notifications on load
-            if ("Notification" in window && Notification.permission === "default") {
-                Notification.requestPermission().then(() => {
-                    renderComponentFicha();
-                });
-            }
         } else {
             document.body.classList.remove("component-portal");
             renderActiveSection("section-pasar-lista");
@@ -485,6 +479,18 @@ function isCloudActive() {
     return state.firebaseConfig !== null;
 }
 
+// Bloqueo de Pasado (Inamovible)
+const PAST_LOCK_MASTER_PASS = "arquero7777";
+
+function isPastLockBlocked(dateStr) {
+    if (!state.pastLockEnabled) return false;
+    const targetDate = dateStr || state.currentDate;
+    if (!targetDate) return false;
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+    return targetDate < todayStr;
+}
+
 let unsubMusicians = null;
 let unsubAttendance = null;
 let unsubSessionTypes = null;
@@ -494,6 +500,38 @@ let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
+let unsubAnnouncements = null;
+let unsubDeletedNotifs = null;
+
+function getDeletedNotificationIds(musicianId) {
+    if (!musicianId) return [];
+    try {
+        return JSON.parse(localStorage.getItem("yacente_deleted_notifications_" + musicianId) || "[]");
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveDeletedNotificationId(musicianId, notifId) {
+    if (!musicianId || !notifId) return;
+    const deletedKey = "yacente_deleted_notifications_" + musicianId;
+    const deleted = getDeletedNotificationIds(musicianId);
+    if (!deleted.includes(notifId)) {
+        deleted.push(notifId);
+        localStorage.setItem(deletedKey, JSON.stringify(deleted));
+    }
+    if (isCloudActive()) {
+        try {
+            const db = firebase.firestore();
+            db.collection("musician_deleted_notifs").doc(musicianId).set({
+                deletedIds: firebase.firestore.FieldValue.arrayUnion(notifId)
+            }, { merge: true }).catch(err => console.error("Error al guardar notificación eliminada en Firestore:", err));
+        } catch (e) {
+            console.error("Error al guardar en Firestore:", e);
+        }
+    }
+}
+
 
 // Inicializa Firebase
 function initFirebase() {
@@ -603,12 +641,23 @@ function showLockScreen() {
         document.getElementById("lock-password-input").value = "";
         document.getElementById("lock-error-msg").classList.add("hidden");
     }
+    const mobNav = document.getElementById("component-mobile-nav");
+    if (mobNav) mobNav.classList.add("hidden");
 }
 
 // Oculta la pantalla de bloqueo
 function hideLockScreen() {
     const lock = document.getElementById("lock-screen");
     if (lock) lock.classList.add("hidden");
+    const activeRole = getAuthRole();
+    const mobNav = document.getElementById("component-mobile-nav");
+    if (activeRole === "component") {
+        document.body.classList.add("component-portal");
+        if (mobNav) mobNav.classList.remove("hidden");
+    } else {
+        document.body.classList.remove("component-portal");
+        if (mobNav) mobNav.classList.add("hidden");
+    }
 }
 
 // Escucha en tiempo real de Firestore
@@ -619,12 +668,7 @@ function startCloudSync() {
     // Detener escuchas previas si existen
     stopCloudSync();
     
-    // Registrar token de dispositivo si es un músico
-    const authRole = getAuthRole();
-    const musicianId = getAuthMusicianId();
-    if (authRole === "component" && musicianId) {
-        registerDeviceToken(musicianId);
-    }
+
     
     // Escucha de músicos
     unsubMusicians = db.collection("musicians").onSnapshot(snapshot => {
@@ -711,25 +755,29 @@ function startCloudSync() {
                             if (sessionData.type === "ensayo") {
                                 const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
                                 const locationVal = sessionData.location || "Parking";
-                                body = `${subtypeText} - ${formattedDate} (${locationVal})`;
+                                const timeStr = sessionData.time ? ` ${sessionData.time}` : "";
+                                body = `${subtypeText}${timeStr} - ${formattedDate} (${locationVal})`;
                             } else {
                                 body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
                             }
                             
                             // Save to local storage notifications list
                             const notifId = `${sessionDate}-${sessionData.type}`;
-                            const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-                            if (!notifs.some(n => n.id === notifId)) {
-                                notifs.unshift({
-                                    id: notifId,
-                                    title: title,
-                                    body: body,
-                                    date: new Date().toISOString(),
-                                    seen: false
-                                });
-                                localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
-                                updateNotificationsBadge();
-                                sendBrowserNotification(title, body);
+                            const deletedIds = getDeletedNotificationIds(musicianId);
+                            if (!deletedIds.includes(notifId)) {
+                                const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+                                if (!notifs.some(n => n.id === notifId)) {
+                                    notifs.unshift({
+                                        id: notifId,
+                                        title: title,
+                                        body: body,
+                                        date: new Date().toISOString(),
+                                        seen: false
+                                    });
+                                    localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                                    updateNotificationsBadge();
+                                    sendBrowserNotification(title, body);
+                                }
                             }
                         }
                     }
@@ -891,6 +939,76 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync formación desfile:", err);
     });
+
+    // Escucha de comunicados de la directiva
+    unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const docId = change.doc.id;
+                const musicianId = getAuthMusicianId();
+                if (!musicianId) return;
+
+                const targetId = data.id || docId;
+                const deletedIds = getDeletedNotificationIds(musicianId);
+                if (deletedIds.includes(targetId)) return;
+
+                const musician = (state.musicians || []).find(m => m.id === musicianId);
+                const instrument = musician ? musician.instrument : null;
+
+                if (data.targetSection === "all" || (instrument && data.targetSection === instrument)) {
+                    const key = "yacente_notifications_" + musicianId;
+                    const notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    const exists = notifs.some(n => n.id === targetId);
+                    if (!exists) {
+                        const newItem = {
+                            id: targetId,
+                            title: data.title,
+                            body: data.body,
+                            date: data.date || new Date().toISOString(),
+                            seen: false,
+                            type: "announcement"
+                        };
+                        notifs.unshift(newItem);
+                        localStorage.setItem(key, JSON.stringify(notifs));
+                        updateNotificationsBadge();
+                        if (document.body.classList.contains("component-portal")) {
+                            sendBrowserNotification(data.title, data.body);
+                            renderComponentNotificationsList();
+                        }
+                    }
+                }
+            }
+        });
+    }, err => {
+        console.error("Error sync comunicados:", err);
+    });
+
+    // Escucha de notificaciones eliminadas por el músico
+    const currentMusId = getAuthMusicianId();
+    if (currentMusId) {
+        unsubDeletedNotifs = db.collection("musician_deleted_notifs").doc(currentMusId).onSnapshot(doc => {
+            if (doc.exists && doc.data() && doc.data().deletedIds) {
+                const cloudDeletedIds = doc.data().deletedIds || [];
+                const deletedKey = "yacente_deleted_notifications_" + currentMusId;
+                const localDeletedIds = JSON.parse(localStorage.getItem(deletedKey) || "[]");
+                const merged = Array.from(new Set([...localDeletedIds, ...cloudDeletedIds]));
+                localStorage.setItem(deletedKey, JSON.stringify(merged));
+
+                const notifKey = "yacente_notifications_" + currentMusId;
+                const localNotifs = JSON.parse(localStorage.getItem(notifKey) || "[]");
+                const filteredNotifs = localNotifs.filter(n => !merged.includes(n.id));
+                if (filteredNotifs.length !== localNotifs.length) {
+                    localStorage.setItem(notifKey, JSON.stringify(filteredNotifs));
+                    updateNotificationsBadge();
+                    const notifModal = document.getElementById("modal-component-notifications");
+                    if (notifModal && notifModal.classList.contains("active")) {
+                        renderComponentNotificationsList();
+                    }
+                }
+            }
+        }, err => console.error("Error sync deleted notifs:", err));
+    }
 }
 
 // Detiene escuchas en tiempo real
@@ -904,6 +1022,8 @@ function stopCloudSync() {
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
+    if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
+    if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1046,6 +1166,7 @@ function dbDeleteMusician(id) {
 }
 
 function dbSaveAttendance(date, musicianId, recordObj) {
+    if (isPastLockBlocked(date)) return;
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("attendance").doc(date).set({
@@ -1058,6 +1179,7 @@ function dbSaveAttendance(date, musicianId, recordObj) {
 }
 
 function dbSaveSessionType(date, sessionTypeObj) {
+    if (isPastLockBlocked(date)) return;
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("sessionTypes").doc(date).set(sessionTypeObj)
@@ -1068,6 +1190,7 @@ function dbSaveSessionType(date, sessionTypeObj) {
 }
 
 function dbDeleteSession(date) {
+    if (isPastLockBlocked(date)) return;
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("attendance").doc(date).delete()
@@ -1158,16 +1281,19 @@ function setupEventListeners() {
     
     // Barra de navegación inferior móvil
     document.querySelectorAll(".mobile-nav-item").forEach(item => {
-        item.addEventListener("click", (e) => {
-            e.preventDefault();
+        const handleNav = (e) => {
+            if (e.cancelable) e.preventDefault();
             if (item.classList.contains("btn-logout-component")) {
                 logoutComponent();
             } else {
                 const target = item.getAttribute("data-target");
                 if (target) renderActiveSection(target);
             }
-        });
+        };
+        item.addEventListener("click", handleNav);
     });
+    // Navegación táctil por deslizamiento (Swipe Gestures) para el portal de músicos
+    setupComponentSwipeNavigation();
 
     // Formulario de cambio de PIN en Ficha
     const formChangePin = document.getElementById("form-change-pin");
@@ -1182,7 +1308,7 @@ function setupEventListeners() {
                 return;
             }
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
             
             musician.pin = newPin;
@@ -1264,11 +1390,64 @@ function setupEventListeners() {
         });
     }
 
+    // Helper functions para menú desplegable lateral móvil (Drawer)
+    window.openMobileSidebar = function() {
+        const sidebar = document.querySelector(".sidebar");
+        const backdrop = document.getElementById("sidebar-backdrop");
+        if (sidebar) sidebar.classList.add("open");
+        if (backdrop) backdrop.classList.add("active");
+    };
+
+    window.closeMobileSidebar = function() {
+        const sidebar = document.querySelector(".sidebar");
+        const backdrop = document.getElementById("sidebar-backdrop");
+        if (sidebar) sidebar.classList.remove("open");
+        if (backdrop) backdrop.classList.remove("active");
+    };
+
+    window.toggleMobileSidebar = function() {
+        const sidebar = document.querySelector(".sidebar");
+        if (sidebar && sidebar.classList.contains("open")) {
+            window.closeMobileSidebar();
+        } else {
+            window.openMobileSidebar();
+        }
+    };
+
+    const btnToggleMobileSidebar = document.getElementById("btn-toggle-mobile-sidebar");
+    const btnOpenMoreMenu = document.getElementById("btn-open-more-menu");
+    const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+    if (btnToggleMobileSidebar) {
+        btnToggleMobileSidebar.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.toggleMobileSidebar();
+        });
+    }
+
+    if (btnOpenMoreMenu) {
+        btnOpenMoreMenu.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openMobileSidebar();
+        });
+    }
+
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener("click", () => {
+            window.closeMobileSidebar();
+        });
+    }
+
     // Navegación Sidebar
     document.querySelectorAll(".nav-item").forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             const targetId = item.getAttribute("data-target");
+            
+            window.closeMobileSidebar();
+
             if (!targetId) return;
             
             document.querySelectorAll(".nav-item").forEach(nav => nav.classList.remove("active"));
@@ -1348,6 +1527,24 @@ function setupEventListeners() {
         renderStatistics();
     });
 
+    const btnToggleEnsayadas = document.getElementById("btn-toggle-all-marchas-ensayadas");
+    if (btnToggleEnsayadas) {
+        btnToggleEnsayadas.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAllMarchasEnsayadas = !showAllMarchasEnsayadas;
+            renderStatistics();
+        });
+    }
+
+    const btnToggleOlvidadas = document.getElementById("btn-toggle-all-marchas-olvidadas");
+    if (btnToggleOlvidadas) {
+        btnToggleOlvidadas.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAllMarchasOlvidadas = !showAllMarchasOlvidadas;
+            renderStatistics();
+        });
+    }
+
     // Alternancia en Visión General (Estadísticas)
     const btnOvYears = document.getElementById("btn-stats-ov-years");
     const btnOvMonths = document.getElementById("btn-stats-ov-months");
@@ -1391,6 +1588,14 @@ function setupEventListeners() {
         ovYearSelect.addEventListener("change", (e) => {
             state.statsOvSelectedSeason = e.target.value;
             renderGeneralOverviewChart();
+        });
+    }
+
+    const btnDownloadSeasonReport = document.getElementById("btn-download-season-report");
+    if (btnDownloadSeasonReport) {
+        btnDownloadSeasonReport.addEventListener("click", () => {
+            const season = document.getElementById("stats-ov-year-select").value;
+            downloadSeasonPDFReport(season);
         });
     }
 
@@ -1455,7 +1660,7 @@ function setupEventListeners() {
                 const musicianId = currentDetailMusicianId;
                 if (!musicianId) return;
                 
-                const musician = state.musicians.find(m => m.id === musicianId);
+                const musician = state.musicians.find(m => String(m.id) === String(musicianId));
                 if (!musician) return;
                 
                 musician[badge.field] = e.target.checked;
@@ -1488,7 +1693,7 @@ function setupEventListeners() {
             if (getAuthRole() !== "admin") {
                 e.preventDefault();
                 const musicianId = currentDetailMusicianId;
-                const musician = state.musicians.find(m => m.id === musicianId);
+                const musician = state.musicians.find(m => String(m.id) === String(musicianId));
                 rutaInputListener.value = musician ? (musician.badgeRutaTrips || 0) : 0;
                 showToast("Solo la dirección puede asignar estas insignias", "error");
                 return;
@@ -1496,7 +1701,7 @@ function setupEventListeners() {
             const musicianId = currentDetailMusicianId;
             if (!musicianId) return;
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
             
             const val = parseInt(e.target.value, 10);
@@ -1527,7 +1732,7 @@ function setupEventListeners() {
             if (getAuthRole() !== "admin") {
                 e.preventDefault();
                 const musicianId = currentDetailMusicianId;
-                const musician = state.musicians.find(m => m.id === musicianId);
+                const musician = state.musicians.find(m => String(m.id) === String(musicianId));
                 hermandadInputListener.value = musician ? (musician.badgeHermandadEvents || 0) : 0;
                 showToast("Solo la dirección puede asignar estas insignias", "error");
                 return;
@@ -1535,7 +1740,7 @@ function setupEventListeners() {
             const musicianId = currentDetailMusicianId;
             if (!musicianId) return;
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) return;
             
             const val = parseInt(e.target.value, 10);
@@ -1581,13 +1786,23 @@ function setupEventListeners() {
         document.querySelectorAll(".instrument-section").forEach(sec => sec.classList.remove("collapsed"));
     });
     document.getElementById("btn-reset-attendance").addEventListener("click", () => {
+        const date = state.currentDate;
+        if (isPastLockBlocked(date)) {
+            showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+            return;
+        }
         if (confirm("¿Resetear la lista? Todos los componentes se marcarán como ausentes.")) {
             const date = state.currentDate;
+            if (!state.sessionTypes[date]) {
+                state.sessionTypes[date] = { type: "ensayo", name: "" };
+                dbSaveSessionType(date, state.sessionTypes[date]);
+            }
             state.musicians.forEach(musician => {
                 if (state.attendance[date] && state.attendance[date][musician.id]) {
                     state.attendance[date][musician.id].status = "absent";
                     state.attendance[date][musician.id].justified = false;
                     state.attendance[date][musician.id].reason = "";
+                    dbSaveAttendance(date, musician.id, state.attendance[date][musician.id]);
                 }
             });
             saveStateToLocalStorage();
@@ -1613,6 +1828,61 @@ function setupEventListeners() {
     const closeModalMusician = () => modalMusician.classList.remove("active");
     document.getElementById("btn-close-modal").addEventListener("click", closeModalMusician);
     document.getElementById("btn-cancel-modal").addEventListener("click", closeModalMusician);
+
+    // Event listeners para el modal de racha
+    const streakModal = document.getElementById("modal-streak-info");
+    const closeStreakBtn = document.getElementById("btn-close-streak-modal");
+    const okStreakBtn = document.getElementById("btn-streak-modal-ok");
+
+    if (closeStreakBtn) {
+        closeStreakBtn.addEventListener("click", () => {
+            if (streakModal) streakModal.classList.remove("active");
+        });
+    }
+    if (okStreakBtn) {
+        okStreakBtn.addEventListener("click", () => {
+            if (streakModal) streakModal.classList.remove("active");
+        });
+    }
+    if (streakModal) {
+        streakModal.addEventListener("click", (e) => {
+            if (e.target === streakModal) {
+                streakModal.classList.remove("active");
+            }
+        });
+    }
+
+    // Modal de previsualización de foto de perfil
+    const closePhotoPreview = () => {
+        const modal = document.getElementById("modal-photo-preview");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnClosePhoto = document.getElementById("btn-close-photo-preview");
+    const btnClosePhotoFooter = document.getElementById("btn-close-photo-preview-footer");
+    const modalPhoto = document.getElementById("modal-photo-preview");
+    if (btnClosePhoto) btnClosePhoto.addEventListener("click", closePhotoPreview);
+    if (btnClosePhotoFooter) btnClosePhotoFooter.addEventListener("click", closePhotoPreview);
+    if (modalPhoto) {
+        modalPhoto.addEventListener("click", (e) => {
+            if (e.target === modalPhoto) closePhotoPreview();
+        });
+    }
+
+    // Modal de detalle de ensayo para músicos
+    const closeCompRehearsal = () => {
+        const modal = document.getElementById("modal-comp-rehearsal-detail");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnCloseCompRehearsal = document.getElementById("btn-close-comp-rehearsal-detail");
+    const btnCloseCompRehearsalFooter = document.getElementById("btn-close-comp-rehearsal-detail-footer");
+    const modalCompRehearsal = document.getElementById("modal-comp-rehearsal-detail");
+    if (btnCloseCompRehearsal) btnCloseCompRehearsal.addEventListener("click", closeCompRehearsal);
+    if (btnCloseCompRehearsalFooter) btnCloseCompRehearsalFooter.addEventListener("click", closeCompRehearsal);
+    if (modalCompRehearsal) {
+        modalCompRehearsal.addEventListener("click", (e) => {
+            if (e.target === modalCompRehearsal) closeCompRehearsal();
+        });
+    }
 
     document.getElementById("form-musician").addEventListener("submit", (e) => {
         e.preventDefault();
@@ -1692,6 +1962,9 @@ function setupEventListeners() {
         if (document.getElementById("rehearsal-location-input")) {
             document.getElementById("rehearsal-location-input").value = "Parking";
         }
+        if (document.getElementById("rehearsal-time-input")) {
+            document.getElementById("rehearsal-time-input").value = "";
+        }
         modalRehearsal.classList.add("active");
     });
 
@@ -1735,12 +2008,14 @@ function setupEventListeners() {
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
+        const timeVal = document.getElementById("rehearsal-time-input") ? document.getElementById("rehearsal-time-input").value.trim() : "";
         state.sessionTypes[sessionKey] = { 
             type: "ensayo", 
             subtype: subtype, 
             name: "", 
             convocatedVoices: convocatedVoices,
-            location: locationVal
+            location: locationVal,
+            time: timeVal
         };
         initializeAttendanceForDate(sessionKey, convocatedVoices);
         
@@ -1748,8 +2023,7 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            // Disparar notificaciones push para el nuevo ensayo
-            sendPushNotificationToConvocated(state.sessionTypes[sessionKey], sessionKey);
+
         } else {
             saveStateToLocalStorage();
         }
@@ -1815,8 +2089,7 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            // Disparar notificaciones push para la nueva actuación
-            sendPushNotificationToConvocated(state.sessionTypes[sessionKey], sessionKey);
+
         } else {
             saveStateToLocalStorage();
         }
@@ -1841,20 +2114,7 @@ function setupEventListeners() {
         showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
     });
 
-    // Guardar configuración de notificaciones push
-    const formPushConfig = document.getElementById("form-push-config");
-    if (formPushConfig) {
-        formPushConfig.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const vapidKey = document.getElementById("push-vapid-key").value.trim();
-            const serverKey = document.getElementById("push-server-key").value.trim();
-            
-            localStorage.setItem("yacente_vapid_key", vapidKey);
-            localStorage.setItem("yacente_fcm_server_key", serverKey);
-            
-            showToast("Configuración push guardada correctamente", "success");
-        });
-    }
+
 
     // ==========================================
     // BACKUPS Y COPIAS
@@ -1926,7 +2186,7 @@ function setupEventListeners() {
     }
 
     if (formChangeAdminPass) {
-        formChangeAdminPass.addEventListener("submit", (e) => {
+        formChangeAdminPass.addEventListener("submit", async (e) => {
             e.preventDefault();
             const oldPass = document.getElementById("admin-pass-old").value.trim();
             const newPass = document.getElementById("admin-pass-new").value.trim();
@@ -1942,12 +2202,28 @@ function setupEventListeners() {
                 return;
             }
             
-            // Validar contraseña actual
             const oldHash = hashString(oldPass);
-            let isValid = false;
+            let targetHash = state.firebasePasswordHash || localStorage.getItem("yacente_firebase_hash") || "";
+
+            // Si la nube está activa, obtener la contraseña real de la directiva guardada en Firestore
+            if (isCloudActive()) {
+                try {
+                    const db = firebase.firestore();
+                    const secDoc = await db.collection("config").doc("security").get();
+                    if (secDoc.exists && secDoc.data() && secDoc.data().passwordHash) {
+                        targetHash = secDoc.data().passwordHash;
+                        state.firebasePasswordHash = targetHash;
+                        localStorage.setItem("yacente_firebase_hash", targetHash);
+                    }
+                } catch (err) {
+                    console.error("Error al verificar contraseña actual en Firestore:", err);
+                }
+            }
             
-            if (state.firebasePasswordHash) {
-                isValid = (oldHash === state.firebasePasswordHash);
+            // Validar contraseña actual
+            let isValid = false;
+            if (targetHash) {
+                isValid = (oldHash === targetHash);
             } else {
                 isValid = (oldPass === "admin");
             }
@@ -1979,6 +2255,76 @@ function setupEventListeners() {
             } else {
                 showToast("Contraseña de directiva actualizada localmente", "success");
                 closeChangePassModal();
+            }
+        });
+    }
+
+    // Bloqueo de Pasado (Interruptor y Modal de Seguridad)
+    const togglePastLock = document.getElementById("toggle-past-lock");
+    const modalPastLock = document.getElementById("modal-past-lock-auth");
+    const formPastLock = document.getElementById("form-past-lock-auth");
+    const closePastLockBtn = document.getElementById("btn-close-past-lock-modal");
+    const cancelPastLockBtn = document.getElementById("btn-cancel-past-lock-modal");
+
+    if (togglePastLock) {
+        togglePastLock.checked = !!state.pastLockEnabled;
+
+        togglePastLock.addEventListener("click", (e) => {
+            if (!state.pastLockEnabled) {
+                // ACTIVAR directamente sin pedir contraseña
+                state.pastLockEnabled = true;
+                togglePastLock.checked = true;
+                localStorage.setItem("yacente_past_lock_enabled", "true");
+
+                if (isCloudActive()) {
+                    const db = firebase.firestore();
+                    db.collection("config").doc("security").set({
+                        pastLockEnabled: true
+                    }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
+                }
+
+                showToast("Bloqueo de pasado activado.", "success");
+            } else {
+                // DESACTIVAR requiere contraseña
+                e.preventDefault();
+                const passInput = document.getElementById("past-lock-password");
+                if (passInput) passInput.value = "";
+                if (modalPastLock) modalPastLock.classList.add("active");
+            }
+        });
+    }
+
+    const closePastLockModal = () => {
+        if (modalPastLock) modalPastLock.classList.remove("active");
+    };
+
+    if (closePastLockBtn) closePastLockBtn.addEventListener("click", closePastLockModal);
+    if (cancelPastLockBtn) cancelPastLockBtn.addEventListener("click", closePastLockModal);
+
+    if (formPastLock) {
+        formPastLock.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const passInput = document.getElementById("past-lock-password").value.trim();
+
+            if (passInput === PAST_LOCK_MASTER_PASS) {
+                state.pastLockEnabled = false;
+                localStorage.setItem("yacente_past_lock_enabled", "false");
+
+                if (togglePastLock) {
+                    togglePastLock.checked = false;
+                }
+
+                if (isCloudActive()) {
+                    const db = firebase.firestore();
+                    db.collection("config").doc("security").set({
+                        pastLockEnabled: false
+                    }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
+                }
+
+                showToast("Bloqueo de pasado desactivado.", "success");
+                closePastLockModal();
+            } else {
+                showToast("Contraseña de bloqueo de pasado incorrecta", "error");
             }
         });
     }
@@ -2135,10 +2481,8 @@ function setupEventListeners() {
         const date = state.activeDetailDate;
         if (!date) return;
         
-        const rawDate = date.split("_")[0];
-        const today = new Date().toISOString().split("T")[0];
-        if (rawDate < today) {
-            showToast("No puedes eliminar ensayos pasados desde el calendario", "warning");
+        if (isPastLockBlocked(date)) {
+            showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
             return;
         }
         
@@ -2170,6 +2514,9 @@ function setupEventListeners() {
         
         // Reset defaults
         document.getElementById("quick-session-actuacion-name").value = "";
+        if (document.getElementById("quick-session-time")) {
+            document.getElementById("quick-session-time").value = "";
+        }
         
         const sessionInfo = state.sessionTypes[date];
         if (sessionInfo) {
@@ -2196,6 +2543,9 @@ function setupEventListeners() {
                 if (document.getElementById("quick-session-location")) {
                     document.getElementById("quick-session-location").value = sessionInfo.location || "Parking";
                 }
+                if (document.getElementById("quick-session-time")) {
+                    document.getElementById("quick-session-time").value = sessionInfo.time || "";
+                }
             }
         } else {
             // Default when not created
@@ -2221,13 +2571,16 @@ function setupEventListeners() {
         const type = quickSessionTypeSelect.value;
         const actuacionGroup = document.getElementById("quick-session-actuacion-group");
         const locationGroup = document.getElementById("quick-session-location-group");
+        const timeGroup = document.getElementById("quick-session-time-group");
         
         if (type === "actuacion") {
             actuacionGroup.classList.remove("hidden");
             if (locationGroup) locationGroup.classList.add("hidden");
+            if (timeGroup) timeGroup.classList.add("hidden");
         } else {
             actuacionGroup.classList.add("hidden");
             if (locationGroup) locationGroup.classList.remove("hidden");
+            if (timeGroup) timeGroup.classList.remove("hidden");
         }
     }
     
@@ -2244,27 +2597,28 @@ function setupEventListeners() {
         
         if (type.startsWith("ensayo-")) {
             const locationVal = document.getElementById("quick-session-location") ? document.getElementById("quick-session-location").value : "Parking";
+            const timeVal = document.getElementById("quick-session-time") ? document.getElementById("quick-session-time").value.trim() : "";
             
             if (type === "ensayo-general") {
-                newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal };
+                newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal, time: timeVal };
             } else if (type === "ensayo-trompetas1") {
                 convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
-                newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-bajos") {
                 convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
-                newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-trompetas2y3") {
                 convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
-                newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-cornetas") {
                 convocatedVoices = ["Cornetas"];
-                newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-percusion") {
                 convocatedVoices = ["Tambores", "Bombos", "Platos"];
-                newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices, location: locationVal };
+                newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices, location: locationVal, time: timeVal };
             } else if (type === "ensayo-primeras") {
                 convocatedVoices = ["Trompetas 1ª", "Cornetas"];
-                newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices, location: locationVal }; // Fallback
+                newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices, location: locationVal, time: timeVal }; // Fallback
             }
         } else if (type === "actuacion") {
             const actuacionName = document.getElementById("quick-session-actuacion-name").value.trim();
@@ -2301,10 +2655,7 @@ function setupEventListeners() {
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            // Disparar notificaciones push si es una sesión nueva
-            if (state.isAddingNewSession) {
-                sendPushNotificationToConvocated(newSession, sessionKey);
-            }
+
         } else {
             saveStateToLocalStorage();
         }
@@ -2462,21 +2813,42 @@ function setupMarchasDragAndDrop() {
         });
     });
     
-    // Inicializar eventos de preaviso
+    // Inicializar eventos de preaviso, detalle de eventos, foto de perfil y comunicados
     setupPreavisoEvents();
+    setupUpcomingEventDetailEvents();
+    setupMultiEventSelectModalEvents();
+    setupProfilePhotoEvents();
+    setupAnnouncementEvents();
 
-    // Notificaciones de Músicos
+    // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
+    const notifModal = document.getElementById("modal-component-notifications");
+    const closeNotifBtn = document.getElementById("btn-close-comp-notif-modal");
+
     if (btnNotifBell) {
-        btnNotifBell.addEventListener("click", () => {
-            renderActiveSection("section-componente-notificaciones");
+        btnNotifBell.addEventListener("click", (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            renderComponentNotificationsList();
+            if (notifModal) {
+                notifModal.classList.add("active");
+            }
         });
     }
 
-    const btnBackNotif = document.getElementById("btn-back-from-notif");
-    if (btnBackNotif) {
-        btnBackNotif.addEventListener("click", () => {
-            renderActiveSection("section-componente-ficha");
+    if (closeNotifBtn) {
+        closeNotifBtn.addEventListener("click", () => {
+            if (notifModal) notifModal.classList.remove("active");
+        });
+    }
+
+    if (notifModal) {
+        notifModal.addEventListener("click", (e) => {
+            if (e.target === notifModal) {
+                notifModal.classList.remove("active");
+            }
         });
     }
 
@@ -2495,25 +2867,142 @@ function setupMarchasDragAndDrop() {
     }
 }
 
-function renderActiveSection(sectionId) {
+function setupComponentSwipeNavigation() {
+    const mainContent = document.querySelector(".main-content");
+    if (!mainContent) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    const sectionsOrder = [
+        "section-componente-ficha",
+        "section-componente-eventos",
+        "section-componente-historial",
+        "section-componente-repertorio"
+    ];
+
+    mainContent.addEventListener("touchstart", (e) => {
+        if (getAuthRole() !== "component") return;
+        if (!e.touches || e.touches.length > 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    mainContent.addEventListener("touchend", (e) => {
+        if (getAuthRole() !== "component") return;
+        if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+
+        // Umbral de deslizamiento horizontal (min 50px) y tolerancia vertical (max 60px)
+        if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 60) {
+            const activeSection = document.querySelector(".app-section.active");
+            if (!activeSection) return;
+
+            const currentId = activeSection.id;
+            const currentIndex = sectionsOrder.indexOf(currentId);
+
+            if (currentIndex !== -1) {
+                if (deltaX < 0) {
+                    // Deslizar izquierda -> Siguiente página (desplazar desde la derecha)
+                    if (currentIndex < sectionsOrder.length - 1) {
+                        renderActiveSection(sectionsOrder[currentIndex + 1], "next");
+                    }
+                } else {
+                    // Deslizar derecha -> Página anterior (desplazar desde la izquierda)
+                    if (currentIndex > 0) {
+                        renderActiveSection(sectionsOrder[currentIndex - 1], "prev");
+                    }
+                }
+            } else if (currentId === "section-componente-notificaciones") {
+                if (deltaX > 0) {
+                    renderActiveSection("section-componente-ficha", "prev");
+                }
+            }
+        }
+    }, { passive: true });
+}
+
+function renderActiveSection(sectionId, forcedDirection) {
     const activeRole = getAuthRole();
-    if (activeRole === "component" && !sectionId.startsWith("section-componente-")) {
-        sectionId = "section-componente-ficha";
+    const mobNav = document.getElementById("component-mobile-nav");
+    if (activeRole === "component") {
+        document.body.classList.add("component-portal");
+        if (mobNav) mobNav.classList.remove("hidden");
+        if (!sectionId.startsWith("section-componente-")) {
+            sectionId = "section-componente-ficha";
+        }
+    } else {
+        document.body.classList.remove("component-portal");
+        if (mobNav) mobNav.classList.add("hidden");
     }
 
+    // En móvil, la sección de Ajustes no es accesible y se redirige a Pasar Lista
+    if (window.innerWidth <= 768 && sectionId === "section-ajustes") {
+        sectionId = "section-pasar-lista";
+    }
+
+    const previousActive = document.querySelector(".app-section.active");
+    const sectionsOrder = [
+        "section-componente-ficha",
+        "section-componente-eventos",
+        "section-componente-historial",
+        "section-componente-repertorio"
+    ];
+
+    let direction = forcedDirection;
+    if (!direction && activeRole === "component" && previousActive && previousActive.id !== sectionId) {
+        const prevIdx = sectionsOrder.indexOf(previousActive.id);
+        const nextIdx = sectionsOrder.indexOf(sectionId);
+        if (prevIdx !== -1 && nextIdx !== -1) {
+            direction = nextIdx > prevIdx ? "next" : "prev";
+        }
+    }
+
+    const allTransClasses = [
+        "trans-ios-right", "trans-ios-left",
+        "trans-glass-right", "trans-glass-left",
+        "trans-snappy-right", "trans-snappy-left",
+        "trans-3d-right", "trans-3d-left",
+        "slide-in-right", "slide-in-left"
+    ];
+
     document.querySelectorAll(".app-section").forEach(section => {
-        section.classList.remove("active");
+        section.classList.remove("active", ...allTransClasses);
     });
-    document.getElementById(sectionId).classList.add("active");
+
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.add("active");
+        if (activeRole === "component" && direction) {
+            const style = window.swipeTransitionStyle || "ios";
+            const animClass = `trans-${style}-${direction === "next" ? "right" : "left"}`;
+            targetSection.classList.add(animClass);
+        }
+    }
 
     const pageTitle = document.getElementById("page-title");
     const pageSubtitle = document.getElementById("page-subtitle");
     const dateContainer = document.getElementById("header-date-container");
     const sessionBadge = document.getElementById("attendance-session-badge");
     const configBtn = document.getElementById("btn-configure-session");
+    const announcementBtn = document.getElementById("btn-open-announcement-modal");
 
     if (sessionBadge) sessionBadge.style.display = "none";
     if (configBtn) configBtn.style.display = "none";
+
+    // Visibilidad del botón de comunicado (Solo Director y NO en la sección de Ajustes)
+    if (announcementBtn) {
+        if (activeRole !== "component" && sectionId !== "section-ajustes") {
+            announcementBtn.style.display = "inline-flex";
+        } else {
+            announcementBtn.style.display = "none";
+        }
+    }
 
     // Manejo del contenedor de tributo (vela)
     const tributeContainer = document.getElementById("candle-tribute-container");
@@ -2577,13 +3066,7 @@ function renderActiveSection(sectionId) {
             pageSubtitle.innerText = "Administración general y copias de seguridad";
             dateContainer.classList.add("hidden");
             
-            // Popula claves push si existen
-            const savedVapid = localStorage.getItem("yacente_vapid_key") || "";
-            const savedServerKey = localStorage.getItem("yacente_fcm_server_key") || "";
-            const vapidInput = document.getElementById("push-vapid-key");
-            const serverKeyInput = document.getElementById("push-server-key");
-            if (vapidInput) vapidInput.value = savedVapid;
-            if (serverKeyInput) serverKeyInput.value = savedServerKey;
+
             break;
         case "section-componente-ficha":
             pageTitle.innerText = "Mi Ficha";
@@ -2693,6 +3176,8 @@ function renderAttendance() {
         });
         const sectionRatio = Math.round((presents / musiciansInSection.length) * 100) || 0;
 
+        const allPresent = presents === musiciansInSection.length && musiciansInSection.length > 0;
+
         const headerDiv = document.createElement("div");
         headerDiv.className = "instrument-header";
         headerDiv.innerHTML = `
@@ -2700,7 +3185,21 @@ function renderAttendance() {
                 <h3>${sectionName}</h3>
                 <span class="musician-count-badge">${musiciansInSection.length}</span>
             </div>
-            <div class="instrument-header-actions">
+            <div class="instrument-header-actions" style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn-mark-section-present ${allPresent ? 'all-present' : ''}" title="${allPresent ? 'Desmarcar a todos los componentes de ' + sectionName : 'Marcar a todos los componentes de ' + sectionName + ' como presentes'}">
+                    ${allPresent ? `
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        <span>Desmarcar todos</span>
+                    ` : `
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span>Marcar todos</span>
+                    `}
+                </button>
                 <span class="section-attendance-ratio">${sectionRatio}% Asistencia</span>
                 <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 12 15 18 9"></polyline>
@@ -2708,6 +3207,14 @@ function renderAttendance() {
             </div>
         `;
         
+        const btnMarkSection = headerDiv.querySelector(".btn-mark-section-present");
+        if (btnMarkSection) {
+            btnMarkSection.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleVoiceAttendance(musiciansInSection, sectionName, !allPresent);
+            });
+        }
+
         headerDiv.addEventListener("click", () => {
             sectionDiv.classList.toggle("collapsed");
         });
@@ -2732,30 +3239,32 @@ function renderAttendance() {
             }
 
             const initials = getInitials(musician.name);
+            const avatarMarkup = musician.photo
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                : initials;
             
             cardDiv.innerHTML = `
                 <div class="musician-card-top">
-                    <div class="musician-avatar">${initials}</div>
+                    <div class="musician-avatar">${avatarMarkup}</div>
                     <div class="musician-details">
                         <span class="musician-name">${musician.name}</span>
                         <span class="musician-role">${musician.role || 'Músico de fila'}</span>
                     </div>
-                </div>
-                
-                <div class="attendance-actions">
-                    <button class="toggle-btn btn-present" data-id="${musician.id}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        Presente
-                    </button>
-                    <button class="toggle-btn btn-absent" data-id="${musician.id}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                        Ausente
-                    </button>
+                    <div class="attendance-actions">
+                        <button class="toggle-btn btn-present" data-id="${musician.id}">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                            Presente
+                        </button>
+                        <button class="toggle-btn btn-absent" data-id="${musician.id}">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Ausente
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="absence-details-container ${attState.status === 'present' ? 'hidden' : ''} ${attState.status === 'absent' && attState.justified && attState.reason && attState.reason.trim() !== '' ? 'show-summary' : 'show-form'}">
@@ -2875,9 +3384,56 @@ function showAbsenceSummary(card, reasonText) {
     absenceContainer.classList.add("show-summary");
 }
 
+function toggleVoiceAttendance(musiciansInSection, sectionName, shouldMarkPresent) {
+    const date = state.currentDate;
+    if (!date) return;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
+
+    if (!state.attendance[date]) {
+        state.attendance[date] = {};
+    }
+
+    const updates = {};
+    const newStatus = shouldMarkPresent ? "present" : "absent";
+
+    musiciansInSection.forEach(m => {
+        state.attendance[date][m.id] = {
+            status: newStatus,
+            justified: false,
+            reason: ""
+        };
+        updates[m.id] = { status: newStatus, justified: false, reason: "" };
+    });
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("attendance").doc(date).set(updates, { merge: true })
+            .catch(err => console.error("Error al actualizar presencia masiva en la nube:", err));
+    } else {
+        saveStateToLocalStorage();
+    }
+
+    updateAttendanceStatsRibbon();
+    renderAttendance();
+    renderStatistics();
+
+    if (shouldMarkPresent) {
+        showToast(`Músicos de ${sectionName || 'la voz'} marcados como presentes`, "success");
+    } else {
+        showToast(`Músicos de ${sectionName || 'la voz'} desmarcados`, "info");
+    }
+}
+
 function ensureAttendanceRecord(date, id) {
     if (!state.attendance[date]) {
         state.attendance[date] = {};
+    }
+    if (!state.sessionTypes[date]) {
+        state.sessionTypes[date] = { type: "ensayo", name: "" };
+        dbSaveSessionType(date, state.sessionTypes[date]);
     }
     if (!state.attendance[date][id]) {
         state.attendance[date][id] = {
@@ -2890,6 +3446,10 @@ function ensureAttendanceRecord(date, id) {
 
 function updateMusicianAttendance(id, status) {
     const date = state.currentDate;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
     ensureAttendanceRecord(date, id);
     const record = state.attendance[date][id];
     
@@ -2928,6 +3488,15 @@ function updateMusicianAttendance(id, status) {
 
 function updateMusicianJustification(id, isJustified) {
     const date = state.currentDate;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        const card = document.getElementById(`card-${id}`);
+        if (card) {
+            const chk = card.querySelector(".chk-justified");
+            if (chk) chk.checked = !isJustified;
+        }
+        return;
+    }
     ensureAttendanceRecord(date, id);
     state.attendance[date][id].justified = isJustified;
     
@@ -2962,13 +3531,17 @@ function updateMusicianJustification(id, isJustified) {
 
 function updateMusicianReason(id, reasonText) {
     const date = state.currentDate;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
     ensureAttendanceRecord(date, id);
     state.attendance[date][id].reason = reasonText.trim();
     dbSaveAttendance(date, id, state.attendance[date][id]);
 }
 
 function updateSectionHeaderRatio(musicianId) {
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
     
     const sectionName = musician.instrument;
@@ -3082,7 +3655,7 @@ function renderEnsayosList() {
             currentMonthStr = ""; // reset month when year changes
             const yearHeaderTr = document.createElement("tr");
             yearHeaderTr.innerHTML = `
-                <td colspan="7" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
+                <td colspan="8" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
                     Año ${yyyy}
                 </td>
             `;
@@ -3094,7 +3667,7 @@ function renderEnsayosList() {
             currentMonthStr = monthName;
             const monthHeaderTr = document.createElement("tr");
             monthHeaderTr.innerHTML = `
-                <td colspan="7" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
+                <td colspan="8" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
                     ${monthName}
                 </td>
             `;
@@ -3114,9 +3687,9 @@ function renderEnsayosList() {
             if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
                 return;
             }
-            const r = dayRecord[m.id];
+            total++;
+            const r = dayRecord ? dayRecord[m.id] : null;
             if (r) {
-                total++;
                 if (r.status === "present") {
                     present++;
                 } else if (r.justified) {
@@ -3124,6 +3697,8 @@ function renderEnsayosList() {
                 } else {
                     absentUnjustified++;
                 }
+            } else {
+                absentUnjustified++;
             }
         });
 
@@ -3154,11 +3729,37 @@ function renderEnsayosList() {
         }
 
         const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
+        
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+        let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total}`;
+        if (rawDate >= todayStr) {
+            const prev = getSessionPrevision(date);
+            let badgeBg = "rgba(46, 204, 113, 0.15)";
+            let badgeColor = "#2ecc71";
+            let badgeIcon = "🟢";
+            if (prev.estimatedPct < 50) {
+                badgeBg = "rgba(231, 76, 60, 0.15)";
+                badgeColor = "#e74c3c";
+                badgeIcon = "⚠️";
+            } else if (prev.estimatedPct < 80) {
+                badgeBg = "rgba(241, 196, 15, 0.15)";
+                badgeColor = "#f1c40f";
+                badgeIcon = "🟡";
+            }
+            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
+        }
+
         const tr = document.createElement("tr");
         tr.classList.add("clickable-row");
         tr.innerHTML = `
             <td style="white-space: nowrap;">
                 <strong>${formatDateShortSpanish(date)}</strong>
+            </td>
+            <td>
+                <span>${sessionInfo && sessionInfo.time ? sessionInfo.time : "-"}</span>
             </td>
             <td>
                 <span>${locationVal}</span>
@@ -3167,7 +3768,7 @@ function renderEnsayosList() {
                 ${typeLabel}
             </td>
             <td>
-                <span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos
+                ${presentsCellHTML}
             </td>
             <td style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
@@ -3220,6 +3821,10 @@ function renderEnsayosList() {
 
         tr.querySelector(".delete-rehearsal-btn").addEventListener("click", (e) => {
             e.stopPropagation();
+            if (isPastLockBlocked(date)) {
+                showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+                return;
+            }
             if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
                 delete state.attendance[date];
                 delete state.sessionTypes[date];
@@ -3233,6 +3838,50 @@ function renderEnsayosList() {
 
         tbody.appendChild(tr);
     });
+}
+
+function getSessionPrevision(date) {
+    const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
+    const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
+    const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
+    
+    let totalConvocated = 0;
+    let preavisoAbsences = 0;
+    const voicePrevision = {};
+
+    const musiciansList = (state && state.musicians) || [];
+    musiciansList.forEach(m => {
+        if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+            return;
+        }
+
+        totalConvocated++;
+        const voice = m.instrument || "Otros";
+        if (!voicePrevision[voice]) {
+            voicePrevision[voice] = { total: 0, absent: 0 };
+        }
+        voicePrevision[voice].total++;
+
+        const dayRecord = state.attendance[date];
+        const r = dayRecord ? dayRecord[m.id] : null;
+        // Solo cuenta como preaviso de no asistencia si el músico ha hecho un preaviso explícito (ausencia justificada o con motivo)
+        const isExplicitPreavisoFalta = r && r.status === "absent" && (r.justified === true || (r.reason && r.reason.trim().length > 0));
+        if (isExplicitPreavisoFalta) {
+            preavisoAbsences++;
+            voicePrevision[voice].absent++;
+        }
+    });
+
+    const estimatedCount = Math.max(0, totalConvocated - preavisoAbsences);
+    const estimatedPct = totalConvocated > 0 ? Math.round((estimatedCount / totalConvocated) * 100) : 100;
+
+    return {
+        totalConvocated,
+        preavisoAbsences,
+        estimatedCount,
+        estimatedPct,
+        voicePrevision
+    };
 }
 
 function openRehearsalDetailModal(date) {
@@ -3268,7 +3917,8 @@ function openRehearsalDetailModal(date) {
         subtypeText = `Ensayo por Voces (Convocadas: ${convocated.join(", ")})`;
     }
     const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
-    document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}`;
+    const timeVal = sessionInfo && sessionInfo.time ? ` | Hora: ${sessionInfo.time}` : "";
+    document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}${timeVal}`;
 
     // Marchas
     const marchasContainer = document.getElementById("rehearsal-detail-marchas");
@@ -3346,6 +3996,42 @@ function openRehearsalDetailModal(date) {
     document.getElementById("badge-detail-sinjustificar-count").innerText = absentCount;
 
     document.getElementById("rehearsal-detail-ratio").innerText = `${ratio}%`;
+
+    // Previsión de Asistencia
+    const prevision = getSessionPrevision(date);
+    const estimatedEl = document.getElementById("rehearsal-detail-estimated-count");
+    if (estimatedEl) {
+        estimatedEl.innerText = `${prevision.estimatedCount}/${prevision.totalConvocated}`;
+    }
+
+    const alertBanner = document.getElementById("rehearsal-detail-prevision-alert");
+    if (alertBanner) {
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+        
+        if (rawDate >= todayStr) {
+            alertBanner.classList.remove("hidden");
+            if (prevision.estimatedPct < 60) {
+                alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
+                alertBanner.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+                alertBanner.style.color = "#e74c3c";
+                alertBanner.innerHTML = `<span>⚠️ <strong>Previsión Baja (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Riesgo de alta falta de asistencia (${prevision.preavisoAbsences} preavisos registrados).</span>`;
+            } else if (prevision.estimatedPct < 80) {
+                alertBanner.style.backgroundColor = "rgba(241, 196, 15, 0.15)";
+                alertBanner.style.border = "1px solid rgba(241, 196, 15, 0.4)";
+                alertBanner.style.color = "#f1c40f";
+                alertBanner.innerHTML = `<span>🟡 <strong>Previsión Aceptable (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> ${prevision.preavisoAbsences} preavisos registrados.</span>`;
+            } else {
+                alertBanner.style.backgroundColor = "rgba(46, 204, 113, 0.15)";
+                alertBanner.style.border = "1px solid rgba(46, 204, 113, 0.4)";
+                alertBanner.style.color = "#2ecc71";
+                alertBanner.innerHTML = `<span>🟢 <strong>Convocatoria Confirmada (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Alta previsión de asistencia.</span>`;
+            }
+        } else {
+            alertBanner.classList.add("hidden");
+        }
+    }
 
     // Render lists grouped by voice
     const hasPresents = renderGroupedList(presentsList, listPresent);
@@ -3524,9 +4210,9 @@ function renderActuacionesList() {
         let total = 0;
 
         state.musicians.forEach(m => {
-            const r = dayRecord[m.id];
+            total++;
+            const r = dayRecord ? dayRecord[m.id] : null;
             if (r) {
-                total++;
                 if (r.status === "present") {
                     present++;
                 } else if (r.justified) {
@@ -3534,10 +4220,34 @@ function renderActuacionesList() {
                 } else {
                     absentUnjustified++;
                 }
+            } else {
+                absentUnjustified++;
             }
         });
 
         const ratio = total > 0 ? Math.round((present / total) * 100) : 0;
+
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+        let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos`;
+        if (rawDate >= todayStr) {
+            const prev = getSessionPrevision(date);
+            let badgeBg = "rgba(46, 204, 113, 0.15)";
+            let badgeColor = "#2ecc71";
+            let badgeIcon = "🟢";
+            if (prev.estimatedPct < 60) {
+                badgeBg = "rgba(231, 76, 60, 0.15)";
+                badgeColor = "#e74c3c";
+                badgeIcon = "⚠️";
+            } else if (prev.estimatedPct < 80) {
+                badgeBg = "rgba(241, 196, 15, 0.15)";
+                badgeColor = "#f1c40f";
+                badgeIcon = "🟡";
+            }
+            presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
+        }
 
         const tr = document.createElement("tr");
         tr.classList.add("clickable-row");
@@ -3549,7 +4259,7 @@ function renderActuacionesList() {
                 <span style="font-weight: 600; color: var(--color-gold);">${sessionInfo.name || "Sin nombre"}</span>
             </td>
             <td>
-                <span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos
+                ${presentsCellHTML}
             </td>
             <td style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
@@ -3602,6 +4312,10 @@ function renderActuacionesList() {
 
         tr.querySelector(".delete-actuacion-btn").addEventListener("click", (e) => {
             e.stopPropagation();
+            if (isPastLockBlocked(date)) {
+                showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+                return;
+            }
             const actuacionName = sessionInfo.name || formatDateSpanish(date);
             if (confirm(`¿Estás seguro de que quieres eliminar la actuación "${actuacionName}" del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
                 delete state.attendance[date];
@@ -3706,6 +4420,42 @@ function openActuacionDetailModal(date) {
     document.getElementById("badge-actuacion-detail-sinjustificar-count").innerText = absentCount;
 
     document.getElementById("actuacion-detail-ratio").innerText = `${ratio}%`;
+
+    // Previsión de Asistencia
+    const prevision = getSessionPrevision(date);
+    const estimatedEl = document.getElementById("actuacion-detail-estimated-count");
+    if (estimatedEl) {
+        estimatedEl.innerText = `${prevision.estimatedCount}/${prevision.totalConvocated}`;
+    }
+
+    const alertBanner = document.getElementById("actuacion-detail-prevision-alert");
+    if (alertBanner) {
+        const rawDate = date.split("_")[0];
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+        
+        if (rawDate >= todayStr) {
+            alertBanner.classList.remove("hidden");
+            if (prevision.estimatedPct < 60) {
+                alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
+                alertBanner.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+                alertBanner.style.color = "#e74c3c";
+                alertBanner.innerHTML = `<span>⚠️ <strong>Previsión Baja (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Riesgo de alta falta de asistencia (${prevision.preavisoAbsences} preavisos registrados).</span>`;
+            } else if (prevision.estimatedPct < 80) {
+                alertBanner.style.backgroundColor = "rgba(241, 196, 15, 0.15)";
+                alertBanner.style.border = "1px solid rgba(241, 196, 15, 0.4)";
+                alertBanner.style.color = "#f1c40f";
+                alertBanner.innerHTML = `<span>🟡 <strong>Previsión Aceptable (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> ${prevision.preavisoAbsences} preavisos registrados.</span>`;
+            } else {
+                alertBanner.style.backgroundColor = "rgba(46, 204, 113, 0.15)";
+                alertBanner.style.border = "1px solid rgba(46, 204, 113, 0.4)";
+                alertBanner.style.color = "#2ecc71";
+                alertBanner.innerHTML = `<span>🟢 <strong>Convocatoria Confirmada (${prevision.estimatedCount}/${prevision.totalConvocated} músicos - ${prevision.estimatedPct}%):</strong> Alta previsión de asistencia.</span>`;
+            }
+        } else {
+            alertBanner.classList.add("hidden");
+        }
+    }
 
     // Render lists grouped by voice
     const hasPresents = renderGroupedList(presentsList, listPresent);
@@ -3821,27 +4571,41 @@ function renderPlantillaTable() {
         const tbody = groupSection.querySelector("tbody");
 
         musiciansInVoice.forEach(musician => {
+            const initials = getInitials(musician.name);
+            const avatarMarkup = musician.photo
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 50%; display: block; border: 1.5px solid var(--color-gold); box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);">`
+                : `<div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
+
             const tr = document.createElement("tr");
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">
-                    <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="musician-avatar-clickable" data-id="${musician.id}" style="cursor: pointer; flex-shrink: 0; transition: transform 0.2s ease;" title="Ver foto en grande">
+                            ${avatarMarkup}
+                        </div>
+                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                    </div>
                 </td>
                 <td style="white-space: nowrap;">
                     <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
                 </td>
                 <td style="white-space: nowrap; text-align: center; width: 100px;">
-                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; vertical-align: middle;">
-                        <span class="pin-status-icon" title="${musician.pin ? 'PIN configurado' : 'Sin PIN (Auto-registro activo)'}">
-                            ${musician.pin ? '🔒' : '🔓'}
-                        </span>
+                    <div style="display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">
                         ${musician.pin ? `
-                            <button class="btn-reset-pin-row" data-id="${musician.id}" title="Borrar PIN (Restablecer)" style="margin: 0; padding: 2px;">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="PIN configurado. Pulsa para borrar/restablecer PIN">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lock-svg" style="color: var(--text-muted); display: block;">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
                             </button>
-                        ` : ''}
+                        ` : `
+                            <div style="padding: 4px; display: inline-flex; align-items: center; justify-content: center; opacity: 0.45;" title="Sin PIN (Auto-registro activo)">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted); display: block;">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                                </svg>
+                            </div>
+                        `}
                     </div>
                 </td>
                 <td style="white-space: nowrap; width: 100px; text-align: center;">
@@ -3862,6 +4626,11 @@ function renderPlantillaTable() {
                 </td>
             `;
 
+            tr.querySelector(".musician-avatar-clickable").addEventListener("click", (e) => {
+                e.stopPropagation();
+                openPhotoPreviewModal(musician.id);
+            });
+
             tr.querySelector(".musician-name-clickable").addEventListener("click", () => {
                 openMusicianDetailStats(musician.id);
             });
@@ -3874,7 +4643,7 @@ function renderPlantillaTable() {
                 deleteMusician(musician.id);
             });
 
-            const resetPinBtn = tr.querySelector(".btn-reset-pin-row");
+            const resetPinBtn = tr.querySelector(".btn-reset-pin-row-padlock");
             if (resetPinBtn) {
                 resetPinBtn.addEventListener("click", () => {
                     if (confirm(`¿Estás seguro de que quieres restablecer el PIN de ${musician.name}? Volverá a registrarse con el siguiente PIN que introduzca.`)) {
@@ -3914,6 +4683,42 @@ function renderPlantillaTable() {
             </div>
         `;
     }
+}
+
+function openPhotoPreviewModal(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return;
+
+    const modal = document.getElementById("modal-photo-preview");
+    if (!modal) return;
+
+    document.getElementById("photo-preview-name").innerText = musician.name;
+    document.getElementById("photo-preview-instrument").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
+
+    const imgEl = document.getElementById("photo-preview-img");
+    const initialsEl = document.getElementById("photo-preview-initials");
+
+    if (musician.photo) {
+        imgEl.src = musician.photo;
+        imgEl.classList.remove("hidden");
+        initialsEl.classList.add("hidden");
+    } else {
+        imgEl.classList.add("hidden");
+        initialsEl.innerText = getInitials(musician.name);
+        initialsEl.classList.remove("hidden");
+    }
+
+    const currentMusId = getAuthMusicianId();
+    const btnEditModal = document.getElementById("btn-edit-photo-modal");
+    if (btnEditModal) {
+        if (currentMusId && String(currentMusId) === String(musicianId)) {
+            btnEditModal.classList.remove("hidden");
+        } else {
+            btnEditModal.classList.add("hidden");
+        }
+    }
+
+    modal.classList.add("active");
 }
 
 function openEditMusicianModal(id) {
@@ -4153,7 +4958,11 @@ function renderStatistics() {
     renderStatsStreaks(filteredDates);
     renderStatsMarchasOlvidadas();
     renderGeneralOverviewChart();
+    renderSectionAttendanceComparisonChart();
 }
+
+let showAllMarchasEnsayadas = false;
+let showAllMarchasOlvidadas = false;
 
 function renderStatsMarchasTop10(filteredDates) {
     const playCounts = {};
@@ -4166,19 +4975,26 @@ function renderStatsMarchasTop10(filteredDates) {
         });
     }
 
-    const topMarchas = (state.marchas || [])
+    const allMarchas = (state.marchas || [])
         .map(m => ({
             ...m,
             count: playCounts[m.id] || 0
         }))
-        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'es'))
-        .slice(0, 10);
+        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'es'));
+
+    const displayMarchas = showAllMarchasEnsayadas ? allMarchas : allMarchas.slice(0, 5);
+
+    const toggleBtn = document.getElementById("btn-toggle-all-marchas-ensayadas");
+    if (toggleBtn) {
+        toggleBtn.innerText = showAllMarchasEnsayadas ? "−" : "+";
+        toggleBtn.title = showAllMarchasEnsayadas ? "Mostrar Top 5" : `Ver todas las marchas (${allMarchas.length})`;
+    }
 
     const tbody = document.getElementById("stats-marchas-table-body");
     if (!tbody) return;
 
     tbody.innerHTML = "";
-    if (topMarchas.length === 0) {
+    if (displayMarchas.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="text-center text-muted" style="padding: 20px;">
@@ -4187,7 +5003,7 @@ function renderStatsMarchasTop10(filteredDates) {
             </tr>
         `;
     } else {
-        topMarchas.forEach((m, idx) => {
+        displayMarchas.forEach((m, idx) => {
             let statusLabel = "";
             if (m.status === "green") {
                 statusLabel = `<span style="color: var(--color-present); font-weight: 600;">🟢 Bien</span>`;
@@ -4267,9 +5083,15 @@ function renderStatsMarchasOlvidadas() {
         return b.days - a.days || a.title.localeCompare(b.title, 'es');
     });
 
-    const top10 = olvidadas.slice(0, 10);
+    const displayOlvidadas = showAllMarchasOlvidadas ? olvidadas : olvidadas.slice(0, 5);
 
-    if (top10.length === 0) {
+    const toggleBtn = document.getElementById("btn-toggle-all-marchas-olvidadas");
+    if (toggleBtn) {
+        toggleBtn.innerText = showAllMarchasOlvidadas ? "−" : "+";
+        toggleBtn.title = showAllMarchasOlvidadas ? "Mostrar Top 5" : `Ver todas las marchas (${olvidadas.length})`;
+    }
+
+    if (displayOlvidadas.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="text-center text-muted" style="padding: 20px;">
@@ -4280,7 +5102,7 @@ function renderStatsMarchasOlvidadas() {
         return;
     }
 
-    top10.forEach((m, idx) => {
+    displayOlvidadas.forEach((m, idx) => {
         let statusLabel = "";
         if (m.status === "green") {
             statusLabel = `<span style="color: var(--color-present); font-weight: 600;">🟢 Bien</span>`;
@@ -4547,7 +5369,7 @@ let showAllDetailAbsences = false;
 function openMusicianDetailStats(musicianId) {
     currentDetailMusicianId = musicianId;
     showAllDetailAbsences = false;
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     document.getElementById("detail-musician-name").innerText = musician.name;
@@ -4566,7 +5388,7 @@ function renderMusicianDetailContent() {
     const musicianId = currentDetailMusicianId;
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     const currentStreak = calculateMusicianStreak(musicianId);
@@ -4582,7 +5404,19 @@ function renderMusicianDetailContent() {
     const badgeBorder = hasVolverEnsayar ? "1px solid rgba(231, 76, 60, 0.35)" : "1px solid rgba(212, 175, 55, 0.25)";
     const badgeIcon = hasVolverEnsayar ? "⚠️" : "🏅";
 
-    document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(230, 126, 34, 0.12); color: #e67e22; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600;"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>`;
+    const detailAvatarEl = document.getElementById("detail-musician-avatar");
+    if (detailAvatarEl) {
+        detailAvatarEl.style.cursor = "pointer";
+        detailAvatarEl.title = "Ver foto en grande";
+        detailAvatarEl.onclick = () => openPhotoPreviewModal(musicianId);
+        if (musician.photo) {
+            detailAvatarEl.innerHTML = `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            detailAvatarEl.innerText = getInitials(musician.name);
+        }
+    }
+
+    document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 119, 0, 0.16); color: #ff8c1a; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: 1px solid rgba(255, 120, 0, 0.65);"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>`;
     document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role || "Músico"}`;
 
     const detailChecks = [
@@ -4603,6 +5437,18 @@ function renderMusicianDetailContent() {
             el.disabled = !isAdmin;
         }
     });
+
+    const detailInsigniasBox = document.getElementById("detail-insignias-box");
+    if (detailInsigniasBox) {
+        detailInsigniasBox.style.opacity = "1";
+        detailInsigniasBox.style.filter = "none";
+        detailInsigniasBox.style.pointerEvents = "auto";
+        if (hasVolverEnsayar) {
+            detailInsigniasBox.title = "Las insignias concedidas o asignables figuran como anuladas debido a baja asistencia (Volver... a ensayar activa)";
+        } else {
+            detailInsigniasBox.title = "";
+        }
+    }
 
 
 
@@ -4706,9 +5552,20 @@ function renderMusicianDetailContent() {
     const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 0;
 
     // Tarjetas resumen
-    document.getElementById("detail-attendance-pct").innerText = `${pct}%`;
+    const pctEl = document.getElementById("detail-attendance-pct");
+    pctEl.innerText = `${pct}%`;
+    if (pct < 50) {
+        pctEl.style.setProperty("color", "#E74C3C", "important");
+    } else if (pct < 80) {
+        pctEl.style.setProperty("color", "#F1C40F", "important");
+    } else {
+        pctEl.style.setProperty("color", "#2ECC71", "important");
+    }
+
     document.getElementById("detail-total-sessions").innerText = totalSessions;
-    document.getElementById("detail-total-absences").innerText = totalAbsent;
+    document.getElementById("detail-total-attended").innerText = presents;
+    document.getElementById("detail-total-absences").innerText = absentUnjustified;
+    document.getElementById("detail-total-justified").innerText = absentJustified;
 
     // Gráfico de sectores (pie chart)
     const pieSvg = document.getElementById("detail-pie-svg");
@@ -4883,6 +5740,9 @@ function renderMusicianDetailContent() {
                     } else if (medal.unlocked && medal.stars > 0) {
                         cardClass += ` unlocked-${medal.stars}star`;
                     }
+                    if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+                        cardClass += ` annulled-medal`;
+                    }
                     
                     let starsHTML = "";
                     if (medal.stars !== undefined && medal.stars > 0) {
@@ -4896,6 +5756,11 @@ function renderMusicianDetailContent() {
                         }
                         starsHTML = `<div class="medal-stars" style="display: flex;">${starsSpanHTML}</div>`;
                     }
+
+                    const descHTML = (hasVolverEnsayar && medal.unlocked && !medal.isNegative)
+                        ? `<div style="font-size: 0.72rem; color: var(--color-absent); font-weight: 700;">Anulada</div>`
+                        : `<div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.desc}">${medal.desc}</div>`;
+
                     return `
                         <div class="medal-card ${cardClass}" style="padding: 10px; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; border-radius: 6px;">
                             <div class="medal-icon-wrapper" style="position: relative; width: 32px; height: 32px; font-size: 1.1rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
@@ -4904,7 +5769,7 @@ function renderMusicianDetailContent() {
                             </div>
                             <div style="flex: 1; min-width: 0; text-align: left;">
                                 <div style="font-weight: 700; color: #FFF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.title}">${medal.title}</div>
-                                <div style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${medal.desc}">${medal.desc}</div>
+                                ${descHTML}
                             </div>
                         </div>
                     `;
@@ -4918,7 +5783,7 @@ function downloadMusicianPDFReport() {
     const musicianId = currentDetailMusicianId;
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     const yearFilter = document.getElementById("detail-filter-year").value;
@@ -5136,7 +6001,7 @@ function downloadRepertoirePDFReport() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     if (!state.marchas || state.marchas.length === 0) {
@@ -5243,6 +6108,447 @@ function downloadRepertoirePDFReport() {
 
     window.print();
     
+    setTimeout(() => {
+        printArea.innerHTML = "";
+    }, 10000);
+}
+
+function downloadSeasonPDFReport(selectedSeason) {
+    if (!selectedSeason) {
+        showToast("Selecciona una temporada válida", "warning");
+        return;
+    }
+
+    const seasonParts = selectedSeason.split("-");
+    const year1 = parseInt(seasonParts[0], 10);
+    const year2 = parseInt(seasonParts[1], 10);
+
+    const allDates = Object.keys(state.attendance);
+    const seasonDates = allDates.filter(date => {
+        const parts = date.split("-");
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        return (y === year1 && m >= 9) || (y === year2 && m < 9);
+    }).sort((a, b) => a.localeCompare(b));
+
+    if (seasonDates.length === 0) {
+        showToast("No hay convocatorias registradas para la temporada " + selectedSeason, "warning");
+        return;
+    }
+
+    let totalConvocatorias = seasonDates.length;
+    let totalEnsayosCount = 0;
+    let totalActuacionesCount = 0;
+
+    seasonDates.forEach(date => {
+        const info = state.sessionTypes[date];
+        if (info && info.type === "actuacion") {
+            totalActuacionesCount++;
+        } else {
+            totalEnsayosCount++;
+        }
+    });
+
+    let totalAsistenciasGral = 0;
+    let totalFaltasUnjustifiedGral = 0;
+    let totalFaltasJustifiedGral = 0;
+    let totalEvaluationsGral = 0;
+
+    const musicianStats = {};
+    state.musicians.forEach(m => {
+        musicianStats[m.id] = {
+            id: m.id,
+            name: m.name,
+            instrument: m.instrument,
+            role: m.role,
+            presents: 0,
+            absentJustified: 0,
+            absentUnjustified: 0,
+            total: 0,
+            maxStreak: 0,
+            currentStreak: 0
+        };
+    });
+
+    seasonDates.forEach(date => {
+        const dayRecord = state.attendance[date] || {};
+        state.musicians.forEach(m => {
+            const r = dayRecord[m.id];
+            if (r) {
+                const stats = musicianStats[m.id];
+                stats.total++;
+                totalEvaluationsGral++;
+
+                if (r.status === "present") {
+                    stats.presents++;
+                    totalAsistenciasGral++;
+                    
+                    stats.currentStreak++;
+                    if (stats.currentStreak > stats.maxStreak) {
+                        stats.maxStreak = stats.currentStreak;
+                    }
+                } else {
+                    if (r.justified) {
+                        stats.absentJustified++;
+                        totalFaltasJustifiedGral++;
+                    } else {
+                        stats.absentUnjustified++;
+                        totalFaltasUnjustifiedGral++;
+                    }
+                    stats.currentStreak = 0;
+                }
+            }
+        });
+    });
+
+    const totalFaltasTotalesGral = totalFaltasUnjustifiedGral + totalFaltasJustifiedGral;
+    const avgAttendancePct = totalEvaluationsGral > 0 ? Math.round((totalAsistenciasGral / totalEvaluationsGral) * 100) : 0;
+    const avgUnjustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100) : 0;
+    const avgJustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasJustifiedGral / totalEvaluationsGral) * 100) : 0;
+    const presentsPctOfTotal = totalEvaluationsGral > 0 ? ((totalAsistenciasGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
+    const absentUnjustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
+    const absentJustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasJustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
+
+    const sections = {};
+    state.musicians.forEach(m => {
+        const sec = m.instrument || "Otros";
+        if (!sections[sec]) {
+            sections[sec] = { presents: 0, absentJustified: 0, absentUnjustified: 0, total: 0 };
+        }
+        const stats = musicianStats[m.id];
+        if (stats) {
+            sections[sec].presents += stats.presents;
+            sections[sec].absentJustified += stats.absentJustified;
+            sections[sec].absentUnjustified += stats.absentUnjustified;
+            sections[sec].total += stats.total;
+        }
+    });
+
+    let sectionsHTML = "";
+    const sortedSections = Object.keys(sections).sort((a, b) => {
+        const pctA = sections[a].total > 0 ? (sections[a].presents / sections[a].total) : 0;
+        const pctB = sections[b].total > 0 ? (sections[b].presents / sections[b].total) : 0;
+        return pctB - pctA;
+    });
+
+    sortedSections.forEach(secName => {
+        const s = sections[secName];
+        const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 0;
+        let color = "var(--color-absent)";
+        if (pct >= 80) color = "var(--color-present)";
+        else if (pct >= 50) color = "var(--color-gold)";
+
+        sectionsHTML += `
+            <tr>
+                <td><strong>${secName}</strong></td>
+                <td style="text-align: center;">${s.presents}</td>
+                <td style="text-align: center;">${s.absentUnjustified}</td>
+                <td style="text-align: center;">${s.absentJustified}</td>
+                <td style="text-align: right; padding-right: 15px; color: ${color}; font-weight: bold;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    const musiciansList = Object.values(musicianStats);
+
+    const top3Streaks = [...musiciansList]
+        .filter(m => m.total > 0)
+        .sort((a, b) => b.maxStreak - a.maxStreak || b.presents - a.presents)
+        .slice(0, 3);
+
+    let streaksHTML = "";
+    const streakMedals = ["🥇 1º Puesto", "🥈 2º Puesto", "🥉 3º Puesto"];
+    for (let i = 0; i < 3; i++) {
+        const m = top3Streaks[i];
+        if (m && m.maxStreak > 0) {
+            streaksHTML += `
+                <div class="print-stat-box" style="text-align: left; padding: 10px;">
+                    <div class="print-stat-title">${streakMedals[i]}</div>
+                    <div style="font-size: 9pt; font-weight: 700; color: #0f172a; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.name}</div>
+                    <div style="font-size: 7.5pt; color: #64748b;">${m.instrument}</div>
+                    <div style="font-size: 11pt; font-weight: 800; color: #E67E22; margin-top: 4px;">${m.maxStreak} 🔥 <span style="font-size: 7pt; font-weight: 500; color: #64748b;">consecutivos</span></div>
+                </div>
+            `;
+        } else {
+            streaksHTML += `
+                <div class="print-stat-box" style="text-align: left; padding: 10px; display: flex; align-items: center; justify-content: center; min-height: 70px;">
+                    <div style="font-size: 8pt; color: #94a3b8; font-style: italic; text-align: center;">Sin registros</div>
+                </div>
+            `;
+        }
+    }
+
+    const top5Attendance = [...musiciansList]
+        .filter(m => m.total > 0)
+        .sort((a, b) => {
+            const pctA = a.presents / a.total;
+            const pctB = b.presents / b.total;
+            return pctB - pctA || b.presents - a.presents;
+        })
+        .slice(0, 5);
+
+    let top5HTML = "";
+    top5Attendance.forEach((m, idx) => {
+        const pct = Math.round((m.presents / m.total) * 100);
+        top5HTML += `
+            <tr>
+                <td><strong>${idx + 1}º ${m.name}</strong></td>
+                <td>${m.instrument}</td>
+                <td style="text-align: center;">${m.presents} / ${m.total}</td>
+                <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    if (top5HTML === "") {
+        top5HTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin datos en este periodo.</td></tr>`;
+    }
+
+    const alertMusicians = musiciansList
+        .filter(m => m.total > 0 && (m.presents / m.total) < 0.5)
+        .sort((a, b) => (a.presents / a.total) - (b.presents / b.total));
+
+    let alertsHTML = "";
+    alertMusicians.forEach(m => {
+        const pct = Math.round((m.presents / m.total) * 100);
+        alertsHTML += `
+            <tr class="alert-row">
+                <td><strong>${m.name}</strong></td>
+                <td>${m.instrument}</td>
+                <td style="text-align: center;">${m.presents} / ${m.total}</td>
+                <td style="text-align: right; padding-right: 15px; font-weight: bold;">${pct}%</td>
+            </tr>
+        `;
+    });
+
+    if (alertsHTML === "") {
+        alertsHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b; font-style: italic;">No hay componentes por debajo del 50% de asistencia en esta temporada. ¡Buen compromiso general!</td></tr>`;
+    }
+
+    const totalMarchas = state.marchas ? state.marchas.length : 0;
+    let greenCount = 0;
+    let yellowCount = 0;
+    let redCount = 0;
+    let noneCount = 0;
+
+    if (state.marchas && state.musicianMarchaStatuses) {
+        state.marchas.forEach(marcha => {
+            let greens = 0;
+            let totalActive = 0;
+            state.musicians.forEach(m => {
+                const key = `${m.id}_${marcha.id}`;
+                const status = state.musicianMarchaStatuses[key];
+                if (status) {
+                    totalActive++;
+                    if (status === "green") greens++;
+                }
+            });
+            const pct = totalActive > 0 ? (greens / totalActive) : 0;
+            if (pct >= 0.7) greenCount++;
+            else if (pct >= 0.3) yellowCount++;
+            else if (pct > 0) redCount++;
+            else noneCount++;
+        });
+    }
+
+    const greenPct = totalMarchas > 0 ? Math.round((greenCount / totalMarchas) * 100) : 0;
+    const redPct = totalMarchas > 0 ? Math.round((redCount / totalMarchas) * 100) : 0;
+
+    const marchaPlays = {};
+    if (state.marchas) {
+        state.marchas.forEach(m => {
+            marchaPlays[m.id] = 0;
+        });
+    }
+
+    seasonDates.forEach(date => {
+        const info = state.sessionTypes[date];
+        if (info && info.marchas && Array.isArray(info.marchas)) {
+            info.marchas.forEach(mid => {
+                if (marchaPlays[mid] !== undefined) {
+                    marchaPlays[mid]++;
+                }
+            });
+        }
+    });
+
+    const sortedMarchas = [...(state.marchas || [])].map(m => ({
+        ...m,
+        count: marchaPlays[m.id] || 0
+    }));
+
+    const top5MostEnsayadas = [...sortedMarchas]
+        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
+        .slice(0, 5);
+
+    let top5MostEnsayadasHTML = "";
+    top5MostEnsayadas.forEach((m, idx) => {
+        top5MostEnsayadasHTML += `
+            <div class="print-repertoire-item-row">
+                <span>${idx + 1}. <strong>${m.title}</strong></span>
+                <span>${m.count} ${m.count === 1 ? 'ensayo' : 'ensayos'}</span>
+            </div>
+        `;
+    });
+
+    const top5LeastEnsayadas = [...sortedMarchas]
+        .sort((a, b) => a.count - b.count || a.title.localeCompare(b.title))
+        .slice(0, 5);
+
+    let top5LeastEnsayadasHTML = "";
+    top5LeastEnsayadas.forEach((m, idx) => {
+        const countText = m.count === 0 ? "0 Ensayos" : `${m.count} ${m.count === 1 ? 'ensayo' : 'ensayos'}`;
+        const style = m.count === 0 ? `style="color: var(--color-absent); font-weight: 500;"` : "";
+        top5LeastEnsayadasHTML += `
+            <div class="print-repertoire-item-row">
+                <span>${idx + 1}. <strong>${m.title}</strong></span>
+                <span ${style}>${countText}</span>
+            </div>
+        `;
+    });
+
+    const printArea = document.getElementById("print-report-area");
+    if (!printArea) return;
+
+    printArea.innerHTML = `
+        <div class="print-header">
+            <div class="print-brand">
+                <h1 class="print-title">YACENTE</h1>
+                <div class="print-subtitle">Asociación Musical Yacente • Informe de Temporada</div>
+            </div>
+            <div class="print-meta">
+                <strong>Temporada:</strong> ${selectedSeason}<br>
+                <strong>Fecha de generación:</strong> ${new Date().toLocaleDateString("es-ES")}<br>
+                <strong>Generado por:</strong> Dirección
+            </div>
+        </div>
+
+        <div class="print-section-title">1. Resumen General de la Temporada</div>
+        <div class="print-grid">
+            <div class="print-stat-box">
+                <div class="print-stat-title">Asistencia Media</div>
+                <div class="print-stat-value" style="color: ${avgAttendancePct >= 80 ? 'var(--color-present)' : (avgAttendancePct >= 50 ? 'var(--color-gold)' : 'var(--color-absent)')};">${avgAttendancePct}%</div>
+                <div class="print-stat-desc">${avgAttendancePct >= 80 ? 'Excelente (>=80%)' : (avgAttendancePct >= 50 ? 'Aceptable (50%-80%)' : 'Crítico (<50%)')}</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Total Convocatorias</div>
+                <div class="print-stat-value">${totalConvocatorias}</div>
+                <div class="print-stat-desc">${totalEnsayosCount} Ensayos | ${totalActuacionesCount} Actuaciones</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Incidencia de Faltas</div>
+                <div class="print-stat-value" style="color: var(--color-absent);">${avgUnjustifiedPct}%</div>
+                <div class="print-stat-desc">${totalFaltasUnjustifiedGral} Faltas sin justificar</div>
+            </div>
+        </div>
+        <div class="print-grid" style="margin-top: -5px;">
+            <div class="print-stat-box">
+                <div class="print-stat-title">Asistencias Totales</div>
+                <div class="print-stat-value" style="color: var(--color-present); font-size: 13pt;">${totalAsistenciasGral.toLocaleString()} presencias</div>
+                <div class="print-stat-desc">${presentsPctOfTotal}% del total general</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Faltas Justificadas</div>
+                <div class="print-stat-value" style="color: var(--color-justified); font-size: 13pt;">${totalFaltasJustifiedGral.toLocaleString()} justificadas</div>
+                <div class="print-stat-desc">${absentJustifiedPctOfTotal}% del total general</div>
+            </div>
+            <div class="print-stat-box">
+                <div class="print-stat-title">Faltas Sin Justificar</div>
+                <div class="print-stat-value" style="color: var(--color-absent); font-size: 13pt;">${totalFaltasUnjustifiedGral.toLocaleString()} injustificadas</div>
+                <div class="print-stat-desc">${absentUnjustifiedPctOfTotal}% del total general</div>
+            </div>
+        </div>
+
+        <div class="print-section-title">2. Asistencia por Secciones / Voces</div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Sección / Instrumento</th>
+                    <th style="text-align: center;">Presencias</th>
+                    <th style="text-align: center;">Faltas S.J.</th>
+                    <th style="text-align: center;">Faltas Just.</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sectionsHTML}
+            </tbody>
+        </table>
+
+        <div class="print-section-title">3. Compromiso y Rendimiento de Componentes</div>
+        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+            Top 3 Rachas de Asistencia de la Temporada
+        </div>
+        <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
+            ${streaksHTML}
+        </div>
+
+        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+            Top 5 Componentes con Mayor Asistencia
+        </div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Músico</th>
+                    <th>Sección</th>
+                    <th style="text-align: center;">Asistidas / Convocadas</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${top5HTML}
+            </tbody>
+        </table>
+
+        <div class="print-section-title">4. Componentes con Alerta de Asistencia (&lt;50%)</div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Músico</th>
+                    <th>Sección</th>
+                    <th style="text-align: center;">Asistidas / Convocadas</th>
+                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${alertsHTML}
+            </tbody>
+        </table>
+
+        <div class="print-section-title">5. Trabajo de Repertorio de la Temporada</div>
+        <div class="print-grid">
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Marchas en Catálogo</div>
+                <div class="print-stat-value" style="font-size: 13pt;">${totalMarchas} marchas</div>
+            </div>
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Bien Trabajadas (🟢)</div>
+                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-present);">${greenCount} (${greenPct}%)</div>
+            </div>
+            <div class="print-stat-box" style="padding: 8px;">
+                <div class="print-stat-title">Por Trabajar (🔴)</div>
+                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-absent);">${redCount} (${redPct}%)</div>
+            </div>
+        </div>
+
+        <div class="print-repertoire-flex">
+            <div class="print-repertoire-col">
+                <div class="print-repertoire-col-title">Top 5 Marchas más Ensayadas</div>
+                ${top5MostEnsayadasHTML}
+            </div>
+            <div class="print-repertoire-col">
+                <div class="print-repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
+                ${top5LeastEnsayadasHTML}
+            </div>
+        </div>
+
+        <div class="print-footer">
+            Asociación Musical Yacente • Salamanca • Sistema de Asistencia e Informes Interno
+        </div>
+    `;
+
+    window.print();
+
     setTimeout(() => {
         printArea.innerHTML = "";
     }, 10000);
@@ -5370,15 +6676,22 @@ function getInitials(name) {
 }
 
 function formatDateSpanish(dateStr) {
-    const cleanDateStr = dateStr.split("_")[0];
-    const parts = cleanDateStr.split("-");
-    const date = new Date(parts[0], parts[1] - 1, parts[2]);
-    return date.toLocaleDateString("es-ES", {
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric'
-    });
+    if (!dateStr) return "";
+    try {
+        const cleanDateStr = dateStr.split("_")[0];
+        const parts = cleanDateStr.split("-");
+        if (parts.length < 3) return dateStr;
+        const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (isNaN(date.getTime())) return dateStr;
+        return date.toLocaleDateString("es-ES", {
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric'
+        });
+    } catch (e) {
+        return dateStr;
+    }
 }
 
 function formatDateShortSpanish(dateStr) {
@@ -5451,12 +6764,6 @@ function setupFirebaseListeners() {
             
             // Guardar configuración en estado
             state.firebaseConfig = configObj;
-            
-            const isConfiguringAsAdmin = password.length > 0;
-            if (isConfiguringAsAdmin) {
-                state.firebasePasswordHash = hashString(password);
-                sessionStorage.setItem("yacente_authenticated", "true"); // El administrador que lo configura queda autenticado de inmediato
-            }
             saveStateToLocalStorage();
             
             closeFirebaseModal();
@@ -5465,26 +6772,75 @@ function setupFirebaseListeners() {
             // Inicializar Firebase
             initFirebase();
             
-            if (isConfiguringAsAdmin) {
-                // Crear el registro de seguridad en Firestore para validar a los demás dispositivos
-                const db = firebase.firestore();
-                db.collection("config").doc("security").set({
-                    passwordHash: state.firebasePasswordHash
-                })
-                .then(() => {
-                    showToast("Contraseña de seguridad configurada en la nube", "success");
-                    // Ofrecer migración de datos
-                    syncLocalToCloud();
+            const db = firebase.firestore();
+            
+            // Verificar primero si ya existe un documento de seguridad en Firestore
+            db.collection("config").doc("security").get()
+                .then(secDoc => {
+                    const hasCloudSecurity = secDoc.exists && secDoc.data() && secDoc.data().passwordHash;
+                    
+                    if (hasCloudSecurity) {
+                        const existingHash = secDoc.data().passwordHash;
+                        state.firebasePasswordHash = existingHash;
+                        localStorage.setItem("yacente_firebase_hash", existingHash);
+                        if (typeof secDoc.data().pastLockEnabled === "boolean") {
+                            state.pastLockEnabled = secDoc.data().pastLockEnabled;
+                            localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+                            const togglePastLock = document.getElementById("toggle-past-lock");
+                            if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
+                        }
+                        
+                        if (password.length > 0) {
+                            const enteredHash = hashString(password);
+                            if (enteredHash === existingHash || password === "admin") {
+                                sessionStorage.setItem("yacente_authenticated", "true");
+                                sessionStorage.setItem("yacente_role", "admin");
+                                localStorage.setItem("yacente_authenticated", "true");
+                                localStorage.setItem("yacente_role", "admin");
+                                showToast("Contraseña de directiva correcta. Conectado como Administrador.", "success");
+                            } else {
+                                showToast("Contraseña de directiva incorrecta. Conectado en modo músico.", "warning");
+                            }
+                        } else {
+                            showToast("Conectado con éxito a la nube.", "success");
+                        }
+                    } else {
+                        // Es la primera vez que se configura esta base de datos
+                        if (password.length > 0) {
+                            state.firebasePasswordHash = hashString(password);
+                            sessionStorage.setItem("yacente_authenticated", "true");
+                            sessionStorage.setItem("yacente_role", "admin");
+                            localStorage.setItem("yacente_authenticated", "true");
+                            localStorage.setItem("yacente_role", "admin");
+                            
+                            db.collection("config").doc("security").set({
+                                passwordHash: state.firebasePasswordHash
+                            }).then(() => {
+                                showToast("Contraseña de seguridad de directiva creada en la nube.", "success");
+                            }).catch(err => console.error("Error al guardar seguridad inicial:", err));
+                        } else {
+                            showToast("Conectado a la nube.", "success");
+                        }
+                    }
+                    
+                    saveStateToLocalStorage();
+                    
+                    // Comprobar si existen datos antes de recargar
+                    db.collection("musicians").limit(1).get()
+                        .then(qSnap => {
+                            if (qSnap.empty && password.length > 0) {
+                                console.log("Firestore está vacío. Sincronizando datos locales iniciales...");
+                                syncLocalToCloud();
+                            } else {
+                                setTimeout(() => window.location.reload(), 1200);
+                            }
+                        })
+                        .catch(() => window.location.reload());
                 })
                 .catch(err => {
-                    console.error("Error al guardar hash en Firestore:", err);
+                    console.error("Error al consultar seguridad en Firestore:", err);
+                    setTimeout(() => window.location.reload(), 1200);
                 });
-            } else {
-                showToast("Conectado con éxito. Cargando base de datos...", "success");
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            }
         } catch (err) {
             console.error(err);
             showToast("JSON inválido. Por favor, introduce la configuración correcta de Firebase", "error");
@@ -5555,8 +6911,18 @@ function setupFirebaseListeners() {
                 db.collection("config").doc("security").get()
                     .then(doc => {
                         let validHash = state.firebasePasswordHash; // fallback local
-                        if (doc.exists && doc.data().passwordHash) {
-                            validHash = doc.data().passwordHash;
+                        if (doc.exists && doc.data()) {
+                            if (doc.data().passwordHash) {
+                                validHash = doc.data().passwordHash;
+                                state.firebasePasswordHash = validHash;
+                                localStorage.setItem("yacente_firebase_hash", validHash);
+                            }
+                            if (typeof doc.data().pastLockEnabled === "boolean") {
+                                state.pastLockEnabled = doc.data().pastLockEnabled;
+                                localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+                                const togglePastLock = document.getElementById("toggle-past-lock");
+                                if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
+                            }
                         }
                         
                         if (enteredHash === validHash || (!validHash && enteredPassword === "admin")) {
@@ -5639,7 +7005,7 @@ function setupFirebaseListeners() {
                 return;
             }
             
-            const musician = state.musicians.find(m => m.id === musicianId);
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             if (!musician) {
                 showToast("Músico no encontrado", "error");
                 return;
@@ -5661,15 +7027,7 @@ function setupFirebaseListeners() {
                 
                 // Conectar en segundo plano a la nube
                 startCloudSync();
-                registerDeviceToken(musicianId);
-                
-                if ("Notification" in window && Notification.permission === "default") {
-                    Notification.requestPermission().then(perm => {
-                        if (perm === "granted") {
-                            registerDeviceToken(musicianId);
-                        }
-                    });
-                }
+
                 
                 renderActiveSection("section-componente-ficha");
                 showToast(`Bienvenido/a, ${musician.name}`, "success");
@@ -5849,9 +7207,18 @@ function renderMarchasList() {
         const btnStyle = `padding: 2px; background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;`;
         const iconSize = state.marchasViewMode === "list" ? 14 : 11;
 
+        const hasNotes = m.notes && m.notes.trim().length > 0;
+        const notesTitle = hasNotes ? m.notes.trim().replace(/"/g, '&quot;') : '';
+        const notesBadge = hasNotes 
+            ? `<span class="marcha-has-notes-icon" title="Nota de dirección: ${notesTitle}" style="margin-left: 6px; font-size: 0.85rem; vertical-align: middle; flex-shrink: 0; cursor: help;">❗</span>` 
+            : '';
+
         if (state.marchasViewMode === "list") {
             card.innerHTML = `
-                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 8px;">${m.title}</h4>
+                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 8px; display: flex; align-items: center;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.title}</span>
+                    ${notesBadge}
+                </h4>
                 <div class="marcha-right-controls" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto;">
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 6px;">
                         ${metaHtml}
@@ -5884,7 +7251,10 @@ function renderMarchasList() {
         } else {
             // Status or difficulty columns mode
             card.innerHTML = `
-                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 4px;">${m.title}</h4>
+                <h4 class="marcha-title-compact" title="${m.title}" style="flex: 1; min-width: 0; margin: 0; margin-right: 4px; display: flex; align-items: center;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.title}</span>
+                    ${notesBadge}
+                </h4>
                 <div class="marcha-right-controls" style="display: flex; align-items: center; gap: 3px; flex-shrink: 0; margin-left: auto;">
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 2px; margin-right: 0px;">
                         ${metaHtml}
@@ -6348,6 +7718,9 @@ function renderCalendar() {
             if (document.getElementById("quick-session-location")) {
                 document.getElementById("quick-session-location").value = "Parking";
             }
+            if (document.getElementById("quick-session-time")) {
+                document.getElementById("quick-session-time").value = "";
+            }
             
             // Hide actuation name field by default
             const actuacionGroup = document.getElementById("quick-session-actuacion-group");
@@ -6674,6 +8047,7 @@ function saveMarchaNotes() {
         marcha.notes = notesText;
         dbSaveMarcha(marcha);
         showToast("Notas de la dirección guardadas", "success");
+        renderMarchasList();
     }
     
     closeMarchaNotesModal();
@@ -7695,7 +9069,7 @@ function renderSimulatorRoster() {
 }
 
 function createParadeSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) {
-    const m = state.musicians.find(mus => mus.id === musicianId);
+    const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
     if (!m) return;
     
     const seat = document.createElement("div");
@@ -7753,16 +9127,17 @@ function createParadeSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) 
         
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
-        if (sourceType === "seat" && sourceLineStr !== undefined) {
+        if (sourceType === "seat" && sourceLineStr !== undefined && sourceLineStr !== null) {
             const sourceLine = parseInt(sourceLineStr, 10);
-            
-            // Buscar la posición del músico arrastrado en la línea de origen
-            const sourceSeatIdx = state.formacionDesfile[sourceLine].indexOf(draggedMusicianId);
-            
-            if (sourceSeatIdx !== -1) {
-                // Intercambiar músicos en los dos puestos
-                state.formacionDesfile[lineIndex][seatIndex] = draggedMusicianId;
-                state.formacionDesfile[sourceLine][sourceSeatIdx] = musicianId;
+            if (!isNaN(sourceLine) && state.formacionDesfile[sourceLine]) {
+                // Buscar la posición del músico arrastrado en la línea de origen
+                const sourceSeatIdx = state.formacionDesfile[sourceLine].indexOf(draggedMusicianId);
+                
+                if (sourceSeatIdx !== -1) {
+                    // Intercambiar músicos en los dos puestos
+                    state.formacionDesfile[lineIndex][seatIndex] = draggedMusicianId;
+                    state.formacionDesfile[sourceLine][sourceSeatIdx] = musicianId;
+                }
             }
         } else if (sourceType === "roster") {
             // Reemplazar músico en este puesto (quitar de otra fila si estaba)
@@ -7793,7 +9168,7 @@ function createParadeSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) 
 }
 
 function createConcertSeatDOM(musicianId, lineIndex, seatIndex, x, y, container) {
-    const m = state.musicians.find(mus => mus.id === musicianId);
+    const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
     if (!m) return;
     
     const seat = document.createElement("div");
@@ -7850,19 +9225,33 @@ function createConcertSeatDOM(musicianId, lineIndex, seatIndex, x, y, container)
         
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
-        if (sourceType === "seat" && sourceLineStr !== undefined) {
-            const sourceLine = parseInt(sourceLineStr, 10);
-            
-            // Buscar la posición del músico arrastrado en la línea de origen
-            const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
-            
-            if (sourceSeatIdx !== -1) {
-                // Intercambiar músicos en los dos puestos
-                state.formacionConcierto[lineIndex][seatIndex] = draggedMusicianId;
-                state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
+        if (sourceType === "seat" && sourceLineStr !== undefined && sourceLineStr !== null) {
+            if (sourceLineStr === "director") {
+                // Intercambiar (Swap): el músico arrastrado es el Director
+                const oldDirectorId = state.directorConcierto;
+                const oldMusicianId = musicianId;
+                
+                // El músico de este asiento pasa a ser Director (o null si el asiento estaba libre)
+                state.directorConcierto = oldMusicianId || null;
+                // El antiguo director pasa a ocupar este asiento de concierto
+                state.formacionConcierto[lineIndex][seatIndex] = oldDirectorId;
+            } else {
+                const sourceLine = parseInt(sourceLineStr, 10);
+                if (!isNaN(sourceLine) && state.formacionConcierto[sourceLine]) {
+                    const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
+                    
+                    if (sourceSeatIdx !== -1) {
+                        // Intercambiar músicos en los dos puestos de concierto
+                        state.formacionConcierto[lineIndex][seatIndex] = draggedMusicianId;
+                        state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
+                    }
+                }
             }
         } else if (sourceType === "roster") {
-            // Reemplazar músico en este puesto (quitar de otra fila si estaba)
+            // Reemplazar músico en este puesto (quitar del director si estaba allí)
+            if (state.directorConcierto === draggedMusicianId) {
+                state.directorConcierto = null;
+            }
             for (let i = 0; i < state.formacionConcierto.length; i++) {
                 state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
             }
@@ -7900,7 +9289,7 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
     seat.style.height = "36px";
     
     if (musicianId) {
-        const m = state.musicians.find(mus => mus.id === musicianId);
+        const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
         if (m) {
             seat.classList.add("occupied");
             const shortName = getShortName(m.name);
@@ -7949,22 +9338,27 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
         
         if (!draggedMusicianId || draggedMusicianId === musicianId) return;
         
-        // Quitar de cualquier otra posición en concierto
-        for (let i = 0; i < state.formacionConcierto.length; i++) {
-            state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
-        }
+        const oldDirectorId = state.directorConcierto;
         
-        if (sourceType === "seat" && sourceLineStr !== undefined) {
-            if (sourceLineStr !== "director") {
-                const sourceLine = parseInt(sourceLineStr, 10);
-                const sourceSeatIdx = state.formacionConcierto[sourceLine].indexOf(draggedMusicianId);
-                
-                if (sourceSeatIdx !== -1) {
-                    if (musicianId) {
-                        // Swap: colocar director actual en la silla de origen
-                        state.formacionConcierto[sourceLine][sourceSeatIdx] = musicianId;
-                    }
+        if (sourceType === "seat" && sourceLineStr !== undefined && sourceLineStr !== "director") {
+            const sourceLine = parseInt(sourceLineStr, 10);
+            const sourceSeatIdx = state.formacionConcierto[sourceLine] ? state.formacionConcierto[sourceLine].indexOf(draggedMusicianId) : -1;
+            
+            // Quitar el músico arrastrado de su fila actual
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
+            }
+            
+            if (sourceSeatIdx !== -1 && !isNaN(sourceLine) && state.formacionConcierto[sourceLine]) {
+                if (oldDirectorId) {
+                    // Swap: colocar el director anterior en la silla de concierto que deja libre el músico
+                    state.formacionConcierto[sourceLine].splice(sourceSeatIdx, 0, oldDirectorId);
                 }
+            }
+        } else {
+            // Arrastrado desde el roster
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== draggedMusicianId);
             }
         }
         
@@ -7980,7 +9374,7 @@ function createDirectorSeatDOM(musicianId, x, y, container) {
     if (musicianId) {
         seat.addEventListener("click", (e) => {
             e.stopPropagation();
-            const m = state.musicians.find(mus => mus.id === musicianId);
+            const m = state.musicians.find(mus => String(mus.id) === String(musicianId));
             if (m && confirm(`¿Deseas quitar a ${m.name} del puesto de director?`)) {
                 state.directorConcierto = null;
                 renderSimulatorSeats();
@@ -8257,7 +9651,7 @@ function createSeatDOM(seatId, seatNumber, x, y, container, formationMap) {
     
     // Comprobar ocupación
     const musicianId = formationMap[seatId];
-    const m = musicianId ? state.musicians.find(x => x.id === musicianId) : null;
+    const m = musicianId ? state.musicians.find(x => String(x.id) === String(musicianId)) : null;
     
     // Si es desfile, aplicar diseño más compacto para que quepa en pantalla
     if (simActiveMode === "desfile") {
@@ -8519,15 +9913,42 @@ function renderPopoverMusicians() {
 function assignMusicianToSeat(seatId, musicianId) {
     const map = getActiveFormationMap();
     
-    if (musicianId) {
-        Object.keys(map).forEach(key => {
-            if (map[key] === musicianId) {
-                map[key] = null;
+    if (seatId === "seat-director") {
+        const oldDirectorId = state.directorConcierto;
+        if (musicianId && oldDirectorId && musicianId !== oldDirectorId) {
+            let foundLine = -1;
+            let foundIdx = -1;
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                const idx = state.formacionConcierto[i].indexOf(musicianId);
+                if (idx !== -1) {
+                    foundLine = i;
+                    foundIdx = idx;
+                    break;
+                }
             }
-        });
+            if (foundLine !== -1 && foundIdx !== -1) {
+                state.formacionConcierto[foundLine][foundIdx] = oldDirectorId;
+            }
+        }
+        if (musicianId) {
+            for (let i = 0; i < state.formacionConcierto.length; i++) {
+                state.formacionConcierto[i] = state.formacionConcierto[i].filter(id => id !== musicianId);
+            }
+        }
+        state.directorConcierto = musicianId || null;
+    } else {
+        if (musicianId) {
+            if (state.directorConcierto === musicianId) {
+                state.directorConcierto = null;
+            }
+            Object.keys(map).forEach(key => {
+                if (map[key] === musicianId) {
+                    map[key] = null;
+                }
+            });
+        }
+        map[seatId] = musicianId;
     }
-    
-    map[seatId] = musicianId;
     
     renderSimulatorSeats();
     renderSimulatorRoster();
@@ -8767,7 +10188,7 @@ function downloadSimulatorImage() {
         const canvas_dir_w = 75;
         const canvas_dir_h = 39;
         
-        const directorMus = state.directorConcierto ? state.musicians.find(m => m.id === state.directorConcierto) : null;
+        const directorMus = state.directorConcierto ? state.musicians.find(m => String(m.id) === String(state.directorConcierto)) : null;
         if (directorMus) {
             const colors = SECTION_COLORS[directorMus.instrument] || { bg: "#d4af37", border: "#ffe893", text: "#000000" };
             ctx.fillStyle = colors.bg;
@@ -8884,7 +10305,7 @@ function downloadSimulatorImage() {
 
 function drawCanvasSeat(ctx, x, y, seatId, seatNumber, formationMap, smallerRadius) {
     const musicianId = formationMap[seatId];
-    const m = musicianId ? state.musicians.find(x => x.id === musicianId) : null;
+    const m = musicianId ? state.musicians.find(x => String(x.id) === String(musicianId)) : null;
     
     const r = smallerRadius ? 14 : 18;
     
@@ -8927,7 +10348,7 @@ function drawCanvasSeat(ctx, x, y, seatId, seatNumber, formationMap, smallerRadi
 }
 
 function drawCanvasParadeSeat(ctx, x, y, musicianId, smallerRadius) {
-    const m = state.musicians.find(x => x.id === musicianId);
+    const m = state.musicians.find(x => String(x.id) === String(musicianId));
     const r = smallerRadius ? 14 : 18;
     
     ctx.beginPath();
@@ -9020,7 +10441,7 @@ function populateLoginMusicians() {
 }
 
 function getMusicianMedalsData(musicianId) {
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return [];
 
     const dNow = new Date();
@@ -9084,16 +10505,16 @@ function getMusicianMedalsData(musicianId) {
         descEstudio = `Oro conseguido: Domina las ${totalMarchas} marchas del repertorio.`;
         unlockedEstudio = true;
         nextGoalEstudio = totalMarchas;
-    } else if (greenMarchas >= 70) {
+    } else if (greenMarchas >= 60) {
         starsEstudio = 2;
-        descEstudio = `Plata conseguido: Domina 70 marchas del repertorio. Domina todas (${totalMarchas}) para Oro.`;
+        descEstudio = `Plata conseguido: Domina 60 marchas del repertorio. Domina todas (${totalMarchas}) para Oro.`;
         unlockedEstudio = true;
         nextGoalEstudio = totalMarchas;
     } else if (greenMarchas >= 50) {
         starsEstudio = 1;
-        descEstudio = "Bronce conseguido: Domina 50 marchas del repertorio. Domina 70 para Plata.";
+        descEstudio = "Bronce conseguido: Domina 50 marchas del repertorio. Domina 60 para Plata.";
         unlockedEstudio = true;
-        nextGoalEstudio = 70;
+        nextGoalEstudio = 60;
     } else {
         starsEstudio = 0;
         descEstudio = "Domina (verde) 50 marchas del repertorio para desbloquear Bronce.";
@@ -9506,11 +10927,80 @@ function calculateMusicianStreak(musicianId) {
     return streak;
 }
 
-function renderComponentFicha() {
+function calculateMusicianBestStreak(musicianId) {
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+    const dates = Object.keys(state.attendance)
+        .filter(d => {
+            if (d > todayStr) return false; // Excluir futuros
+
+            const session = state.sessionTypes[d];
+            if (session && session.type !== "ensayo") return false;
+
+            const record = state.attendance[d] ? state.attendance[d][musicianId] : null;
+            if (!record) return false;
+
+            return true;
+        })
+        .sort((a, b) => a.localeCompare(b)); // Orden cronológico ascendente
+
+    let maxStreak = 0;
+    let currentRun = 0;
+
+    for (const date of dates) {
+        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
+        if (record && record.status === "present") {
+            currentRun++;
+            if (currentRun > maxStreak) {
+                maxStreak = currentRun;
+            }
+        } else {
+            currentRun = 0;
+        }
+    }
+    return maxStreak;
+}
+
+function openStreakInfoModal() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
-    
-    const musician = state.musicians.find(m => m.id === musicianId);
+
+    const currentStreak = calculateMusicianStreak(musicianId);
+    const historicalBest = calculateMusicianBestStreak(musicianId);
+    const bestStreak = Math.max(currentStreak, historicalBest);
+
+    const countEl = document.getElementById("modal-streak-count-big");
+    const msgEl = document.getElementById("modal-streak-message");
+    const bestEl = document.getElementById("modal-streak-best-val");
+    const modal = document.getElementById("modal-streak-info");
+
+    if (countEl) countEl.innerText = currentStreak;
+    if (bestEl) bestEl.innerText = bestStreak;
+
+    if (msgEl) {
+        if (currentStreak === 0) {
+            msgEl.innerText = "¡Comienza tu racha hoy! Cada ensayo cuenta para sumar en la banda. ¡Te esperamos en el próximo!";
+        } else if (currentStreak <= 3) {
+            const ensayoPlural = currentStreak === 1 ? "ensayo" : "ensayos";
+            msgEl.innerText = `¡Buen comienzo! Llevas ${currentStreak} ${ensayoPlural} seguidos asistiendo. Mantén el ritmo, tu esfuerzo se nota.`;
+        } else if (currentStreak <= 9) {
+            msgEl.innerText = `¡Enhorabuena! Llevas ${currentStreak} ensayos seguidos asistiendo. Tu presencia es muy importante para que el grupo avance y la banda suene bien.`;
+        } else {
+            msgEl.innerText = `¡Compromiso de hierro! 🏆 Llevas ${currentStreak} ensayos consecutivos sin faltar. Eres un pilar indispensable para la banda.`;
+        }
+    }
+
+    if (modal) {
+        modal.classList.add("active");
+    }
+}
+
+
+
+function renderComponentFicha() {
+    const musicianId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
+    const musician = state.musicians.find(m => m.id == musicianId);
     if (!musician) {
         showToast("Músico no encontrado. Iniciando cierre de sesión.", "error");
         logoutComponent();
@@ -9519,13 +11009,48 @@ function renderComponentFicha() {
     
     const parts = musician.name.trim().split(" ");
     const initials = parts.map(p => p[0]).slice(0, 2).join("").toUpperCase();
-    document.getElementById("comp-avatar-letters").innerText = initials;
+    
+    const avatarLettersEl = document.getElementById("comp-avatar-letters");
+    const avatarImgEl = document.getElementById("comp-avatar-img");
+    const avatarWrapperEl = document.querySelector(".comp-profile-avatar-wrapper");
+    if (avatarWrapperEl) {
+        avatarWrapperEl.style.cursor = "pointer";
+        avatarWrapperEl.title = "Ver foto en grande";
+        avatarWrapperEl.onclick = () => openPhotoPreviewModal(musicianId);
+    }
+    if (musician.photo) {
+        if (avatarImgEl) {
+            avatarImgEl.src = musician.photo;
+            avatarImgEl.classList.remove("hidden");
+            avatarImgEl.style.cursor = "pointer";
+            avatarImgEl.onclick = () => openPhotoPreviewModal(musicianId);
+        }
+        if (avatarLettersEl) {
+            avatarLettersEl.classList.add("hidden");
+        }
+    } else {
+        if (avatarLettersEl) {
+            avatarLettersEl.innerText = initials;
+            avatarLettersEl.classList.remove("hidden");
+            avatarLettersEl.style.cursor = "pointer";
+            avatarLettersEl.onclick = () => openPhotoPreviewModal(musicianId);
+        }
+        if (avatarImgEl) {
+            avatarImgEl.classList.add("hidden");
+        }
+    }
     
     document.getElementById("comp-profile-name").innerText = musician.name;
     document.getElementById("comp-profile-details").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
     
     const currentStreak = calculateMusicianStreak(musicianId);
     document.getElementById("comp-streak-val").innerText = currentStreak;
+    
+    const streakBadge = document.getElementById("comp-streak-badge");
+    if (streakBadge) {
+        streakBadge.style.cursor = "pointer";
+        streakBadge.onclick = () => openStreakInfoModal();
+    }
     
     let totalConvocated = 0;
     let attended = 0;
@@ -9586,15 +11111,45 @@ function renderComponentFicha() {
     document.getElementById("comp-stat-attended").innerText = attended;
     document.getElementById("comp-stat-absent").innerText = absent;
     document.getElementById("comp-stat-justified").innerText = justified;
-    document.getElementById("comp-percentage-text").textContent = `${Math.round(attendancePct)}%`;
+    let strokeColor = "#2ECC71"; // green default
+    if (attendancePct < 50) {
+        strokeColor = "#E74C3C"; // red
+    } else if (attendancePct < 80) {
+        strokeColor = "#F1C40F"; // yellow
+    }
+
+    const percentageText = document.getElementById("comp-percentage-text");
+    if (percentageText) {
+        percentageText.textContent = `${Math.round(attendancePct)}%`;
+        percentageText.style.removeProperty("fill");
+    }
     
     const progressPath = document.getElementById("comp-progress-path");
     if (progressPath) {
         progressPath.setAttribute("stroke-dasharray", `${Math.round(attendancePct)}, 100`);
+        progressPath.style.setProperty("stroke", strokeColor, "important");
+        progressPath.style.removeProperty("filter");
+    }
+    
+    const progressCircle = document.getElementById("comp-progress-circle");
+    if (progressCircle) {
+        const svgEl = progressCircle.querySelector(".circular-chart");
+        if (svgEl) {
+            svgEl.classList.remove("gold", "red", "yellow", "green");
+            if (attendancePct < 50) {
+                svgEl.classList.add("red");
+            } else if (attendancePct < 80) {
+                svgEl.classList.add("yellow");
+            } else {
+                svgEl.classList.add("green");
+            }
+        }
     }
     
     // --- EVALUAR MEDALLAS / INSIGNIAS ---
     const medalsData = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+
     medalsData.forEach(medal => {
         const medalCard = document.getElementById(`medal-${medal.id}`);
         if (medalCard) {
@@ -9605,16 +11160,27 @@ function renderComponentFicha() {
                 if (medal.unlocked && medal.stars > 0) {
                     activeClasses += ` unlocked-${medal.stars}star`;
                 }
+                if (hasVolverEnsayar && medal.unlocked) {
+                    activeClasses += ` annulled-medal`;
+                }
                 medalCard.className = activeClasses;
             }
             const descEl = medalCard.querySelector(".medal-desc");
             if (descEl && medal.desc) {
-                descEl.innerText = medal.desc;
+                descEl.innerText = (hasVolverEnsayar && medal.unlocked && !medal.isNegative)
+                    ? "Insignia conseguida anulada temporalmente debido a la alerta de baja asistencia (Volver... a ensayar)."
+                    : medal.desc;
             }
             const progressEl = medalCard.querySelector(".progress");
             if (progressEl) progressEl.style.width = `${medal.progressPct}%`;
             const textEl = medalCard.querySelector(".medal-progress-text");
-            if (textEl) textEl.innerText = medal.progressText;
+            if (textEl) {
+                if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+                    textEl.innerHTML = '<span class="annulled-status-text" style="color: var(--color-absent); font-weight: 700;">Anulada</span>';
+                } else {
+                    textEl.innerText = medal.progressText;
+                }
+            }
 
             // Render stars if the medal supports them
             let starsContainer = medalCard.querySelector(".medal-stars");
@@ -9653,7 +11219,6 @@ function renderComponentFicha() {
     });
 
     // Contabilizar insignias positivas desbloqueadas, donde cada estrella cuenta como una insignia
-    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
     const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
         if (!m.unlocked || m.isNegative) return acc;
         return acc + (m.stars || 1);
@@ -9674,49 +11239,12 @@ function renderComponentFicha() {
         }
     }
 
-    // Notificaciones Card State Handling
-    const notifCard = document.getElementById("comp-notifications-card");
-    const notifStatus = document.getElementById("comp-notifications-status");
-    const btnEnableNotif = document.getElementById("btn-comp-enable-notifications");
-    
-    if (notifCard && notifStatus && btnEnableNotif) {
-        if (!("Notification" in window)) {
-            notifStatus.innerText = "No soportado en este navegador.";
-            btnEnableNotif.style.display = "none";
-            notifCard.style.display = "flex";
-        } else if (Notification.permission === "granted") {
-            notifCard.style.display = "none";
-        } else if (Notification.permission === "denied") {
-            notifStatus.innerText = "Notificaciones bloqueadas. Por favor, habilítalas en la configuración de tu navegador para recibir avisos.";
-            btnEnableNotif.innerText = "Bloqueado";
-            btnEnableNotif.disabled = true;
-            btnEnableNotif.className = "btn btn-secondary btn-sm";
-            btnEnableNotif.style.opacity = "0.5";
-            notifCard.style.display = "flex";
-        } else {
-            notifCard.style.display = "flex";
-            notifStatus.innerText = "Habilita avisos de nuevos ensayos y actuaciones para los que estés convocado.";
-            if (btnEnableNotif.tagName === "BUTTON") {
-                // Avoid duplicating listeners by replacing with a clone
-                const newBtn = btnEnableNotif.cloneNode(true);
-                btnEnableNotif.parentNode.replaceChild(newBtn, btnEnableNotif);
-                newBtn.addEventListener("click", () => {
-                    Notification.requestPermission().then(permission => {
-                        renderComponentFicha();
-                        if (permission === "granted") {
-                            showToast("¡Notificaciones de escritorio habilitadas!", "success");
-                            registerDeviceToken(musicianId);
-                        }
-                    });
-                });
-            }
-        }
-    }
+
 
     // Actualizar badge de notificaciones
     updateNotificationsBadge();
 
-    // Renderizar ranking de los 10 mejores
+    // Renderizar ranking de los 25 mejores
     renderComponenteRanking();
 }
 
@@ -9764,21 +11292,38 @@ function renderComponenteRanking() {
         };
     });
 
-    // Ordenar de mayor a menor porcentaje de asistencia, y luego por insignias/racha como criterio de desempate
+    // Ordenar de mayor a menor porcentaje de asistencia.
+    // Solo en caso de empate en el porcentaje de asistencia, se prioriza al músico con más insignias acumuladas.
     rankingData.sort((a, b) => {
-        if (Math.round(b.attendancePct) !== Math.round(a.attendancePct)) {
-            return b.attendancePct - a.attendancePct;
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) {
+            return roundDiff;
         }
+
+        // 1. Criterio de desempate por empate en % de asistencia: Mayor número de insignias acumuladas
         if (b.badgesCount !== a.badgesCount) {
             return b.badgesCount - a.badgesCount;
         }
-        return b.streak - a.streak;
+
+        // 2. Si empatan también en insignias, comparar el porcentaje decimal exacto
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) {
+            return exactDiff;
+        }
+
+        // 3. Tercer desempate: Mayor racha de asistencia
+        if (b.streak !== a.streak) {
+            return b.streak - a.streak;
+        }
+
+        // 4. Cuarto desempate: Orden alfabético por nombre
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
     });
 
-    // Quedarse con los 10 mejores
-    const top10 = rankingData.slice(0, 10);
+    // Quedarse con los 25 mejores
+    const top25 = rankingData.slice(0, 25);
 
-    top10.forEach((item, index) => {
+    top25.forEach((item, index) => {
         const card = document.createElement("div");
         card.className = "comp-ranking-card";
         
@@ -9855,7 +11400,7 @@ function renderComponentHistorial() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
     
     const filterType = document.getElementById("filter-history-type").value;
@@ -9873,10 +11418,17 @@ function renderComponentHistorial() {
         ...Object.keys(state.attendance)
     ]));
 
-    // Obtener todas las fechas en las que el músico está convocado o tiene registro (sólo pasadas)
+    // Obtener todas las fechas en las que el músico está convocado (sólo pasadas, anteriores a hoy)
     const allConvocatedDates = allUniqueDates.filter(date => {
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        return date <= todayStr && record !== null && record !== undefined;
+        if (date >= todayStr) return false;
+        
+        const session = state.sessionTypes[date];
+        if (session && session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
+            if (!session.convocatedVoices.includes(musician.instrument)) {
+                return false;
+            }
+        }
+        return true;
     });
         
     populateHistoryFilters(allConvocatedDates);
@@ -9958,14 +11510,19 @@ function renderComponentHistorial() {
             typeLabel = "Actuación";
         }
         
-        const sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
+        const timeText = session.time ? ` • ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
-        row.className = "comp-session-row";
+        row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
         row.style.gap = "10px";
         row.style.width = "100%";
+        row.style.cursor = "pointer";
+        row.title = "Ver asistencia general y marchas tocadas";
         
         const dateParts = date.split("-");
         const yr = dateParts[0];
@@ -9984,7 +11541,7 @@ function renderComponentHistorial() {
                 <div class="comp-session-meta">
                     <h4 class="comp-session-title">${sessionTitle}</h4>
                     <div class="comp-session-details">
-                        ${session.type === "ensayo" ? `<span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${session.location || "Parking"}</span>` : `<span class="comp-session-type ${typeClass}">${typeLabel}</span>`}
+                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
                     </div>
                 </div>
                 <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
@@ -9993,16 +11550,270 @@ function renderComponentHistorial() {
             </div>
         `;
         
+        row.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openCompRehearsalDetailModal(date);
+        });
+
         container.appendChild(row);
     });
+}
+
+function openCompRehearsalDetailModal(date) {
+    const modal = document.getElementById("modal-comp-rehearsal-detail");
+    if (!modal) return;
+
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
+    const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
+    const rawDate = date.split("_")[0];
+    
+    // Safety check for played marches
+    const playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+
+    // Title and Subtitle
+    const titleEl = document.getElementById("comp-rehearsal-detail-title");
+    const subtitleEl = document.getElementById("comp-rehearsal-detail-subtitle");
+    
+    const formattedDate = formatDateSpanish(date);
+    if (titleEl) {
+        titleEl.innerText = sessionType === "actuacion" ? `Actuación del ${formattedDate}` : `Ensayo del ${formattedDate}`;
+    }
+
+    let subtypeText = sessionType === "actuacion" ? "Actuación Oficial" : "Ensayo General";
+    if (sessionInfo) {
+        if (sessionType === "ensayo" && sessionInfo.subtype && sessionInfo.subtype !== "general") {
+            const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
+            const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
+            subtypeText = `Ensayo por Voces (${convocated.join(", ")})`;
+        } else if (sessionInfo.name) {
+            subtypeText = sessionInfo.name;
+        }
+    }
+    const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking" : "");
+    const timeVal = sessionInfo && sessionInfo.time ? ` • ${sessionInfo.time}` : "";
+    const locTimeText = locationVal ? `${locationVal}${timeVal}` : timeVal;
+    
+    if (subtitleEl) {
+        subtitleEl.innerText = `${subtypeText}${locTimeText ? ' • ' + locTimeText : ''}`;
+    }
+
+    // Calculate attendance statistics
+    const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
+    const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
+    const dayRecord = state.attendance ? state.attendance[date] : null;
+
+    let presentCount = 0;
+    let justifiedCount = 0;
+    let absentCount = 0;
+    let totalConvocated = 0;
+
+    const musiciansList = (state && state.musicians) || [];
+    musiciansList.forEach(m => {
+        if (!m) return;
+        if (isSpecialRehearsal && (!m.instrument || !convocated.includes(m.instrument))) {
+            return;
+        }
+        totalConvocated++;
+        const r = dayRecord ? (dayRecord[m.id] || dayRecord[String(m.id)]) : null;
+        if (r) {
+            if (r.status === "present") {
+                presentCount++;
+            } else if (r.justified || r.status === "justified") {
+                justifiedCount++;
+            } else {
+                absentCount++;
+            }
+        } else {
+            absentCount++;
+        }
+    });
+
+    const pct = totalConvocated > 0 ? Math.round((presentCount / totalConvocated) * 100) : 0;
+
+    const pctEl = document.getElementById("comp-rehearsal-detail-pct");
+    const countsEl = document.getElementById("comp-rehearsal-detail-counts");
+
+    if (pctEl) {
+        pctEl.innerText = `${pct}%`;
+        if (pct >= 80) pctEl.style.color = "#2ecc71";
+        else if (pct >= 50) pctEl.style.color = "#f1c40f";
+        else pctEl.style.color = "#e74c3c";
+    }
+    if (countsEl) {
+        countsEl.innerText = `${presentCount} presentes de ${totalConvocated} convocados`;
+    }
+
+    // Render Played Marches List
+    const marchasContainer = document.getElementById("comp-rehearsal-detail-marchas");
+    if (marchasContainer) {
+        marchasContainer.innerHTML = "";
+        if (playedTodayIds.length === 0) {
+            marchasContainer.innerHTML = `
+                <div class="empty-state" style="padding: 16px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);">
+                    <p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">No hay registro de marchas tocadas en este ${sessionType}.</p>
+                </div>
+            `;
+        } else {
+            playedTodayIds.forEach(mId => {
+                const marchasArray = (state && state.marchas) || [];
+                const m = marchasArray.find(item => item.id === mId);
+                const itemDiv = document.createElement("div");
+                itemDiv.style.background = "rgba(212, 175, 55, 0.08)";
+                itemDiv.style.border = "1px solid rgba(212, 175, 55, 0.25)";
+                itemDiv.style.borderRadius = "8px";
+                itemDiv.style.padding = "10px 14px";
+                itemDiv.style.display = "flex";
+                itemDiv.style.alignItems = "center";
+                itemDiv.style.justifyContent = "space-between";
+                itemDiv.style.gap = "10px";
+
+                if (m) {
+                    itemDiv.innerHTML = `
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🎵 ${m.title}</div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">${m.composer || m.author || "Autor Desconocido"}</div>
+                        </div>
+                        ${m.difficulty ? `<span class="badge" style="background: rgba(255,255,255,0.06); color: var(--color-gold); font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(212, 175, 55, 0.3); font-weight: 600;">Nivel ${m.difficulty}</span>` : ""}
+                    `;
+                } else {
+                    itemDiv.innerHTML = `
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary);">🎵 Marcha (${mId})</div>
+                        </div>
+                    `;
+                }
+                marchasContainer.appendChild(itemDiv);
+            });
+        }
+    }
+
+    modal.classList.add("active");
+}
+
+let currentUpcomingEventDate = null;
+
+function openUpcomingEventDetailModal(date) {
+    currentUpcomingEventDate = date;
+    const modal = document.getElementById("modal-comp-upcoming-event-detail");
+    if (!modal) return;
+
+    const musicianId = getAuthMusicianId();
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
+    const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
+
+    // Title
+    const titleEl = document.getElementById("upcoming-event-detail-title");
+
+    let typeLabel = sessionType === "actuacion" ? "Actuación Oficial" : "Ensayo General";
+    if (sessionInfo) {
+        if (sessionType === "ensayo" && sessionInfo.subtype && sessionInfo.subtype !== "general") {
+            typeLabel = "Ensayo por Voces";
+        } else if (sessionInfo.name) {
+            typeLabel = sessionInfo.name;
+        }
+    }
+
+    if (titleEl) {
+        titleEl.innerText = sessionInfo && sessionInfo.name ? sessionInfo.name : typeLabel;
+    }
+
+    // Badge styling & text below explanation
+    const badgeEl = document.getElementById("upcoming-event-detail-badge");
+
+    const record = (state.attendance && state.attendance[date] && musicianId) ? state.attendance[date][musicianId] : null;
+
+    let badgeClass = "pending";
+    let badgeText = "Pendiente";
+
+    if (record) {
+        if (record.status === "present") {
+            badgeClass = "present";
+            badgeText = "Presente";
+        } else if (record.status === "absent") {
+            if (record.justified) {
+                badgeClass = "justified";
+                badgeText = "Justificada";
+            } else {
+                badgeClass = "absent";
+                badgeText = "Ausente";
+            }
+        }
+    }
+
+    if (badgeEl) {
+        badgeEl.className = `comp-attendance-badge ${badgeClass} clickable-badge`;
+        badgeEl.innerText = "Preaviso";
+    }
+
+    // Date
+    const dateEl = document.getElementById("upcoming-event-detail-date");
+    if (dateEl) {
+        dateEl.innerText = formatDateSpanish(date);
+    }
+
+    // Time
+    const timeEl = document.getElementById("upcoming-event-detail-time");
+    if (timeEl) {
+        timeEl.innerText = sessionInfo && sessionInfo.time ? `${sessionInfo.time} h` : "Por determinar";
+    }
+
+    // Location
+    const locEl = document.getElementById("upcoming-event-detail-location");
+    if (locEl) {
+        locEl.innerText = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking de la Sede" : "Por determinar");
+    }
+
+    // Convocated Voices Box
+    const convBox = document.getElementById("upcoming-event-detail-convocated-box");
+    const convEl = document.getElementById("upcoming-event-detail-convocated");
+    if (sessionInfo && sessionType === "ensayo" && sessionInfo.subtype !== "general" && sessionInfo.convocatedVoices && sessionInfo.convocatedVoices.length > 0) {
+        if (convBox) convBox.classList.remove("hidden");
+        if (convEl) convEl.innerText = sessionInfo.convocatedVoices.join(", ");
+    } else {
+        if (convBox) convBox.classList.add("hidden");
+    }
+
+    modal.classList.add("active");
+}
+
+function setupUpcomingEventDetailEvents() {
+    const modal = document.getElementById("modal-comp-upcoming-event-detail");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-upcoming-event-detail");
+    const btnCloseFooter = document.getElementById("btn-close-upcoming-event-detail-footer");
+    const badgeBtn = document.getElementById("upcoming-event-detail-badge");
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    if (badgeBtn) {
+        badgeBtn.addEventListener("click", () => {
+            closeModal();
+            if (currentUpcomingEventDate) {
+                openPreavisoModal(currentUpcomingEventDate);
+            }
+        });
+    }
 }
 
 function renderComponentEventos() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
+    
+
     
     const container = document.getElementById("componente-eventos-lista");
     if (!container) return;
@@ -10017,9 +11828,9 @@ function renderComponentEventos() {
         ...Object.keys(state.attendance)
     ]));
 
-    // Obtener todas las fechas futuras en las que el músico está convocado
+    // Obtener todas las fechas de hoy y futuras en las que el músico está convocado
     const allFutureDates = allUniqueDates.filter(date => {
-        if (date <= todayStr) return false;
+        if (date < todayStr) return false;
         
         const session = state.sessionTypes[date] || { type: "ensayo", subtype: "general", name: "Ensayo" };
         const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
@@ -10088,14 +11899,19 @@ function renderComponentEventos() {
             typeLabel = "Actuación";
         }
         
-        const sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
+        const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
+        const timeText = session.time ? ` • ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
-        row.className = "comp-session-row";
+        row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
         row.style.gap = "10px";
         row.style.width = "100%";
+        row.style.cursor = "pointer";
+        row.title = "Ver detalle del evento y responder asistencia";
         
         const dateParts = date.split("-");
         const yr = dateParts[0];
@@ -10114,7 +11930,7 @@ function renderComponentEventos() {
                 <div class="comp-session-meta">
                     <h4 class="comp-session-title">${sessionTitle}</h4>
                     <div class="comp-session-details">
-                        ${session.type === "ensayo" ? `<span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${session.location || "Parking"}</span>` : `<span class="comp-session-type ${typeClass}">${typeLabel}</span>`}
+                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
                     </div>
                 </div>
                 <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
@@ -10123,9 +11939,14 @@ function renderComponentEventos() {
             </div>
         `;
         
+        row.addEventListener("click", () => {
+            openUpcomingEventDetailModal(date);
+        });
+
         const badge = row.querySelector(".comp-attendance-badge");
         if (badge) {
-            badge.addEventListener("click", () => {
+            badge.addEventListener("click", (e) => {
+                e.stopPropagation();
                 openPreavisoModal(date);
             });
         }
@@ -10144,7 +11965,7 @@ function renderComponenteCalendario() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
     // Inicializar fecha del calendario si no está definida
@@ -10173,10 +11994,11 @@ function renderComponenteCalendario() {
     const totalDays = new Date(year, month + 1, 0).getDate();
     const prevMonthTotalDays = new Date(year, month, 0).getDate();
 
-    // Fecha de hoy para destacar
+    // Fecha de hoy para destacar y comparar días pasados
     const today = new Date();
     const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
     const todayDay = today.getDate();
+    const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     // Array para acumular las celdas de días
     const cells = [];
@@ -10226,39 +12048,64 @@ function renderComponenteCalendario() {
             });
 
         if (daySessions.length > 0) {
-            // Añadir manejador de click para preaviso
+            const isPastDay = dateKey < todayDateKey;
+
+            // Si hay alguna actuación en el día, se resalta la celda en verde
+            const hasActuacion = daySessions.some(s => s.type === "actuacion");
+            if (hasActuacion) {
+                dayCell.classList.add("has-actuacion");
+            }
+
+            // Añadir manejador de click para abrir el modal correspondiente
             dayCell.addEventListener("click", () => {
-                openPreavisoModal(dateKey);
+                if (daySessions.length === 1) {
+                    if (isPastDay) {
+                        openRehearsalDetailModal(dateKey);
+                    } else {
+                        openUpcomingEventDetailModal(dateKey);
+                    }
+                } else {
+                    openMultiEventSelectModal(dateKey, daySessions, isPastDay);
+                }
             });
 
-            // Añadir contenedor de puntos indicadores
+            // Añadir contenedor de etiquetas rectangulares
             const indicatorContainer = document.createElement("div");
             indicatorContainer.className = "comp-calendar-indicator-container";
 
             daySessions.forEach(session => {
-                const dot = document.createElement("span");
-                dot.className = "comp-calendar-dot";
+                const badge = document.createElement("span");
                 
-                // Determinar estado de asistencia del músico
-                const record = state.attendance[dateKey] ? state.attendance[dateKey][musicianId] : null;
+                // Determinar texto de la etiqueta rectangular
+                let labelText = "general";
+                if (session.type === "actuacion") {
+                    labelText = "actuación";
+                } else if (session.subtype === "secciones" || (session.convocatedVoices && session.convocatedVoices.length > 0 && session.subtype !== "general")) {
+                    labelText = "voz";
+                }
+
+                // Determinar estado de preaviso o asistencia para la clase de color
+                let badgeClass = "pending";
+                const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+
                 if (record) {
                     if (record.status === "present") {
-                        dot.classList.add("present");
-                        dot.title = `${session.name || 'Convocatoria'}: Asistiré`;
+                        badgeClass = "present";
                     } else if (record.status === "absent") {
-                        if (record.justified) {
-                            dot.classList.add("justified");
-                            dot.title = `${session.name || 'Convocatoria'}: Ausencia Justificada`;
-                        } else {
-                            dot.classList.add("absent");
-                            dot.title = `${session.name || 'Convocatoria'}: Ausencia`;
-                        }
+                        badgeClass = record.justified ? "justified" : "absent";
                     }
                 } else {
-                    dot.classList.add("pending");
-                    dot.title = `${session.name || 'Convocatoria'}: Pendiente`;
+                    if (isPastDay) {
+                        badgeClass = "absent";
+                    } else {
+                        badgeClass = "pending";
+                    }
                 }
-                indicatorContainer.appendChild(dot);
+
+                badge.className = `comp-calendar-badge ${badgeClass}`;
+                badge.title = `${session.name || labelText.toUpperCase()}`;
+
+                indicatorContainer.appendChild(badge);
             });
             dayCell.appendChild(indicatorContainer);
         }
@@ -10308,6 +12155,89 @@ function renderComponenteCalendario() {
             renderComponenteCalendario();
         });
     }
+}
+
+function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
+    const modal = document.getElementById("modal-comp-multi-event-select");
+    const subtitleEl = document.getElementById("multi-event-select-date-subtitle");
+    const listEl = document.getElementById("multi-event-select-list");
+    if (!modal || !listEl) return;
+
+    if (subtitleEl) {
+        subtitleEl.innerText = `Eventos del ${formatDateSpanish(dateKey)}:`;
+    }
+
+    listEl.innerHTML = "";
+    const musicianId = getAuthMusicianId();
+
+    daySessions.forEach(session => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn";
+        btn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease;";
+
+        let labelText = "general";
+        if (session.type === "actuacion") {
+            labelText = "actuación";
+        } else if (session.subtype === "secciones" || (session.convocatedVoices && session.convocatedVoices.length > 0 && session.subtype !== "general")) {
+            labelText = "voz";
+        }
+
+        let badgeClass = "pending";
+        const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+
+        if (record) {
+            if (record.status === "present") {
+                badgeClass = "present";
+            } else if (record.status === "absent") {
+                badgeClass = record.justified ? "justified" : "absent";
+            }
+        } else if (isPastDay) {
+            badgeClass = "absent";
+        }
+
+        const titleText = session.name || (session.type === "actuacion" ? "Actuación Oficial" : (labelText === "voz" ? "Ensayo por Voces" : "Ensayo General"));
+
+        btn.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+                <div style="font-weight: 700; font-size: 0.95rem; text-align: left;">${titleText}</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">⏰ ${session.time ? session.time + ' h' : 'Hora por determinar'}</div>
+            </div>
+            <span class="comp-calendar-badge ${badgeClass}" style="padding: 4px 10px; font-size: 0.75rem;">${labelText}</span>
+        `;
+
+        btn.addEventListener("click", () => {
+            modal.classList.remove("active");
+            if (isPastDay) {
+                openRehearsalDetailModal(dateKey);
+            } else {
+                openUpcomingEventDetailModal(dateKey);
+            }
+        });
+
+        listEl.appendChild(btn);
+    });
+
+    modal.classList.add("active");
+}
+
+function setupMultiEventSelectModalEvents() {
+    const modal = document.getElementById("modal-comp-multi-event-select");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-multi-event-select");
+    const btnCloseFooter = document.getElementById("btn-close-multi-event-select-footer");
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
 }
 
 function renderComponentRepertorio() {
@@ -10701,6 +12631,95 @@ function setupPreavisoEvents() {
     }
 }
 
+function setupProfilePhotoEvents() {
+    const avatarContainer = document.getElementById("comp-profile-avatar-container");
+    const btnEditModal = document.getElementById("btn-edit-photo-modal");
+    const fileInputModal = document.getElementById("modal-photo-file-input");
+    const compFileInput = document.getElementById("comp-photo-file-input");
+
+    // En la ficha del músico, hacer clic en el avatar SOLO abre la foto en grande
+    if (avatarContainer) {
+        avatarContainer.onclick = (e) => {
+            e.stopPropagation();
+            const musicianId = getAuthMusicianId();
+            if (musicianId) {
+                openPhotoPreviewModal(musicianId);
+            }
+        };
+    }
+
+    // Botón "Cambiar foto de perfil" dentro del modal en grande
+    if (btnEditModal && fileInputModal) {
+        btnEditModal.onclick = (e) => {
+            e.stopPropagation();
+            fileInputModal.click();
+        };
+    }
+
+    const processPhotoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const musicianId = getAuthMusicianId();
+        if (!musicianId) return;
+
+        const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+        if (!musician) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const maxDim = 800; // Alta resolución HD sin pérdida de calidad visual
+                let width = img.width;
+                let height = img.height;
+
+                const minDim = Math.min(width, height);
+                const sx = (width - minDim) / 2;
+                const sy = (height - minDim) / 2;
+
+                canvas.width = maxDim;
+                canvas.height = maxDim;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, maxDim, maxDim);
+
+                const base64Photo = canvas.toDataURL("image/jpeg", 0.88);
+                musician.photo = base64Photo;
+
+                saveStateToLocalStorage();
+                dbSaveMusician(musician);
+
+                // Actualizar imagen en el modal en tiempo real
+                const modalImg = document.getElementById("photo-preview-img");
+                const modalInitials = document.getElementById("photo-preview-initials");
+                if (modalImg) {
+                    modalImg.src = base64Photo;
+                    modalImg.classList.remove("hidden");
+                }
+                if (modalInitials) {
+                    modalInitials.classList.add("hidden");
+                }
+
+                renderComponentFicha();
+                renderAttendance();
+                renderPlantillaTable();
+                showToast("Foto de perfil actualizada con alta calidad", "success");
+            };
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = "";
+    };
+
+    if (fileInputModal) {
+        fileInputModal.addEventListener("change", processPhotoUpload);
+    }
+    if (compFileInput) {
+        compFileInput.addEventListener("change", processPhotoUpload);
+    }
+}
+
 function renderGeneralOverviewChart() {
     const container = document.getElementById("stats-ov-chart-container");
     if (!container) return;
@@ -10887,6 +12906,356 @@ function renderGeneralOverviewChart() {
     `;
 }
 
+const SECTION_CHART_COLORS = {
+    "Trompetas 1ª": "#f39c12",
+    "Fliscornos": "#2ecc71",
+    "Trompetas 2ª": "#e67e22",
+    "Trompetas 3ª": "#d35400",
+    "Trompas": "#1abc9c",
+    "Trombones": "#3498db",
+    "Bombardinos": "#9b59b6",
+    "Tubas": "#607d8b",
+    "Cornetas": "#e74c3c",
+    "Tambores": "#00bcd4",
+    "Bombos": "#8e44ad",
+    "Platos": "#ff4081"
+};
+
+function renderSectionAttendanceComparisonChart() {
+    const container = document.getElementById("stats-section-line-chart-container");
+    const pillsContainer = document.getElementById("stats-section-pills-container");
+    const summaryGrid = document.getElementById("stats-section-summary-grid");
+    if (!container || !pillsContainer) return;
+
+    if (!window.statsSectionChartEventsBound) {
+        window.statsSectionChartEventsBound = true;
+        const btnAll = document.getElementById("btn-stats-sec-select-all");
+        const btnMetals = document.getElementById("btn-stats-sec-select-metals");
+        const btnPerc = document.getElementById("btn-stats-sec-select-percussion");
+        const btnClear = document.getElementById("btn-stats-sec-clear-all");
+        const timeSelect = document.getElementById("stats-section-time-select");
+
+        if (btnAll) btnAll.addEventListener("click", () => {
+            state.selectedSectionsForChart = SECCIONES_ORDEN.filter(s => s !== "Dirección");
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (btnMetals) btnMetals.addEventListener("click", () => {
+            state.selectedSectionsForChart = ["Trompetas 1ª", "Fliscornos", "Trompetas 2ª", "Trompetas 3ª", "Trompas", "Trombones", "Bombardinos", "Tubas", "Cornetas"];
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (btnPerc) btnPerc.addEventListener("click", () => {
+            state.selectedSectionsForChart = ["Tambores", "Bombos", "Platos"];
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (btnClear) btnClear.addEventListener("click", () => {
+            state.selectedSectionsForChart = [];
+            renderSectionAttendanceComparisonChart();
+        });
+
+        if (timeSelect) timeSelect.addEventListener("change", () => {
+            renderSectionAttendanceComparisonChart();
+        });
+    }
+
+    // Default selected sections if empty
+    if (!state.selectedSectionsForChart) {
+        state.selectedSectionsForChart = ["Trompetas 1ª", "Cornetas", "Trombones", "Tambores"];
+    }
+
+    const timeFilter = document.getElementById("stats-section-time-select") ? document.getElementById("stats-section-time-select").value : "season";
+
+    // Filter past dates
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+    
+    let allDates = Object.keys(state.attendance).filter(dateKey => dateKey <= todayStr).sort((a, b) => a.localeCompare(b));
+
+    // Time filtering
+    if (timeFilter === "last3m") {
+        const d3m = new Date();
+        d3m.setMonth(d3m.getMonth() - 3);
+        const minStr = `${d3m.getFullYear()}-${String(d3m.getMonth() + 1).padStart(2, '0')}-01`;
+        allDates = allDates.filter(d => d >= minStr);
+    } else if (timeFilter === "last6m") {
+        const d6m = new Date();
+        d6m.setMonth(d6m.getMonth() - 6);
+        const minStr = `${d6m.getFullYear()}-${String(d6m.getMonth() + 1).padStart(2, '0')}-01`;
+        allDates = allDates.filter(d => d >= minStr);
+    } else if (timeFilter === "season") {
+        const currYear = dNow.getFullYear();
+        const currMonth = dNow.getMonth() + 1;
+        const seasonStartYear = currMonth >= 9 ? currYear : currYear - 1;
+        const minStr = `${seasonStartYear}-09-01`;
+        allDates = allDates.filter(d => d >= minStr);
+    }
+
+    // Group dates by Month
+    const monthGroups = {};
+    const monthsAbbr = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+
+    allDates.forEach(date => {
+        const parts = date.split("-");
+        const monthKey = `${parts[0]}-${parts[1]}`;
+        if (!monthGroups[monthKey]) {
+            const mIdx = parseInt(parts[1], 10) - 1;
+            monthGroups[monthKey] = {
+                key: monthKey,
+                label: `${monthsAbbr[mIdx]} '${parts[0].slice(2)}`,
+                dates: []
+            };
+        }
+        monthGroups[monthKey].dates.push(date);
+    });
+
+    const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => a.localeCompare(b));
+
+    // Valid sections excluding Dirección
+    const validSections = SECCIONES_ORDEN.filter(sec => sec !== "Dirección");
+
+    // Compute monthly attendance % per section
+    const sectionMonthlyData = {};
+    const sectionOverallStats = {};
+
+    validSections.forEach(sec => {
+        sectionMonthlyData[sec] = [];
+        sectionOverallStats[sec] = { totalPresents: 0, totalConvocated: 0, bestMonthPct: 0 };
+
+        // Musicians in this section
+        const secMusicians = state.musicians.filter(m => m.instrument === sec);
+
+        sortedMonthKeys.forEach(mKey => {
+            const mData = monthGroups[mKey];
+            let secTotalConvocated = 0;
+            let secPresents = 0;
+
+            mData.dates.forEach(date => {
+                const dayRecord = state.attendance[date] || {};
+                const sessionInfo = state.sessionTypes[date];
+                const isSpecial = sessionInfo && sessionInfo.type === "ensayo" && sessionInfo.subtype !== "general" && sessionInfo.convocatedVoices && sessionInfo.convocatedVoices.length > 0;
+                
+                if (isSpecial && !sessionInfo.convocatedVoices.includes(sec)) {
+                    return;
+                }
+
+                secMusicians.forEach(m => {
+                    const r = dayRecord[m.id];
+                    if (r) {
+                        secTotalConvocated++;
+                        if (r.status === "present") {
+                            secPresents++;
+                        }
+                    }
+                });
+            });
+
+            const pct = secTotalConvocated > 0 ? Math.round((secPresents / secTotalConvocated) * 100) : null;
+            sectionMonthlyData[sec].push({
+                monthKey: mKey,
+                label: mData.label,
+                pct: pct,
+                presents: secPresents,
+                total: secTotalConvocated
+            });
+
+            if (pct !== null) {
+                sectionOverallStats[sec].totalPresents += secPresents;
+                sectionOverallStats[sec].totalConvocated += secTotalConvocated;
+                if (pct > sectionOverallStats[sec].bestMonthPct) {
+                    sectionOverallStats[sec].bestMonthPct = pct;
+                }
+            }
+        });
+    });
+
+    // 1. Render Selector Pills
+    pillsContainer.innerHTML = "";
+    validSections.forEach(sec => {
+        const musCount = state.musicians.filter(m => m.instrument === sec).length;
+        if (musCount === 0) return; // Skip sections with no musicians
+
+        const stats = sectionOverallStats[sec];
+        const overallPct = stats.totalConvocated > 0 ? Math.round((stats.totalPresents / stats.totalConvocated) * 100) : 0;
+        const isActive = state.selectedSectionsForChart.includes(sec);
+        const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
+
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = `quick-sec-chart-pill ${isActive ? 'active' : ''}`;
+        pill.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: ${isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)'};
+            border: 1px solid ${isActive ? color : 'var(--border-color)'};
+            color: ${isActive ? '#FFF' : 'var(--text-muted)'};
+            opacity: ${isActive ? '1' : '0.6'};
+            box-shadow: ${isActive ? `0 0 10px ${color}33` : 'none'};
+        `;
+
+        pill.innerHTML = `
+            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color}; display: inline-block;"></span>
+            <span>${sec}</span>
+            <span style="font-size: 0.7rem; font-weight: 700; color: ${color}; margin-left: 2px;">${overallPct}%</span>
+        `;
+
+        pill.addEventListener("click", () => {
+            if (isActive) {
+                state.selectedSectionsForChart = state.selectedSectionsForChart.filter(s => s !== sec);
+            } else {
+                state.selectedSectionsForChart.push(sec);
+            }
+            renderSectionAttendanceComparisonChart();
+        });
+
+        pillsContainer.appendChild(pill);
+    });
+
+    // 2. Render SVG Line Chart
+    if (sortedMonthKeys.length === 0 || state.selectedSectionsForChart.length === 0) {
+        container.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; height: 260px; text-align: center; color: var(--text-muted); border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); font-size: 0.88rem;">
+                ${state.selectedSectionsForChart.length === 0 ? 'Selecciona al menos una cuerda para comparar.' : 'No hay datos de sesiones para el período seleccionado.'}
+            </div>
+        `;
+        if (summaryGrid) summaryGrid.innerHTML = "";
+        return;
+    }
+
+    const svgWidth = 800;
+    const svgHeight = 280;
+    const paddingLeft = 45;
+    const paddingRight = 25;
+    const paddingTop = 25;
+    const paddingBottom = 40;
+    const chartWidth = svgWidth - paddingLeft - paddingRight;
+    const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+    const numMonths = sortedMonthKeys.length;
+    const stepX = numMonths > 1 ? chartWidth / (numMonths - 1) : chartWidth / 2;
+
+    // Build SVG Y Gridlines
+    let gridLinesSVG = "";
+    [100, 75, 50, 25, 0].forEach(val => {
+        const y = paddingTop + (1 - val / 100) * chartHeight;
+        gridLinesSVG += `
+            <line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - paddingRight}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4,4" stroke-width="1" />
+            <text x="${paddingLeft - 8}" y="${y + 4}" fill="var(--text-muted)" font-size="10" text-anchor="end" font-family="'Outfit', sans-serif">${val}%</text>
+        `;
+    });
+
+    // Build SVG X Labels
+    let xLabelsSVG = "";
+    sortedMonthKeys.forEach((mKey, idx) => {
+        const x = numMonths > 1 ? paddingLeft + idx * stepX : paddingLeft + chartWidth / 2;
+        const label = monthGroups[mKey].label;
+        xLabelsSVG += `
+            <text x="${x}" y="${svgHeight - 12}" fill="var(--text-color)" font-size="11" font-weight="600" text-anchor="middle" font-family="'Outfit', sans-serif">${label}</text>
+        `;
+    });
+
+    // Build Polylines & Nodes per selected section
+    let pathsSVG = "";
+    let nodesSVG = "";
+
+    state.selectedSectionsForChart.forEach(sec => {
+        const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
+        const mList = sectionMonthlyData[sec] || [];
+        const points = [];
+
+        mList.forEach((item, idx) => {
+            if (item.pct !== null) {
+                const x = numMonths > 1 ? paddingLeft + idx * stepX : paddingLeft + chartWidth / 2;
+                const y = paddingTop + (1 - item.pct / 100) * chartHeight;
+                points.push({ x, y, pct: item.pct, label: item.label, presents: item.presents, total: item.total, sec });
+            }
+        });
+
+        if (points.length > 0) {
+            // Path stroke
+            if (points.length === 1) {
+                pathsSVG += `<circle cx="${points[0].x}" cy="${points[0].y}" r="5" fill="${color}" />`;
+            } else {
+                const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(" ");
+                pathsSVG += `
+                    <path d="${pathD}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 6px ${color}66);" />
+                `;
+            }
+
+            // Interactive Circle Nodes
+            points.forEach(p => {
+                const tooltipText = `${sec} (${p.label}): ${p.pct}% (${p.presents}/${p.total})`;
+                nodesSVG += `
+                    <circle class="chart-line-node" cx="${p.x}" cy="${p.y}" r="5.5" fill="var(--bg-card)" stroke="${color}" stroke-width="3" style="cursor: pointer; transition: transform 0.2s;" data-tooltip="${tooltipText}">
+                        <title>${tooltipText}</title>
+                    </circle>
+                `;
+            });
+        }
+    });
+
+    container.innerHTML = `
+        <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width: 100%; height: 100%; overflow: visible; font-family: 'Outfit', sans-serif;">
+            ${gridLinesSVG}
+            ${xLabelsSVG}
+            ${pathsSVG}
+            ${nodesSVG}
+        </svg>
+    `;
+
+    // 3. Render Summary Grid
+    if (summaryGrid) {
+        summaryGrid.innerHTML = "";
+        state.selectedSectionsForChart.forEach(sec => {
+            const stats = sectionOverallStats[sec];
+            if (!stats) return;
+            const avgPct = stats.totalConvocated > 0 ? Math.round((stats.totalPresents / stats.totalConvocated) * 100) : 0;
+            const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
+
+            let statusLabel = "Excelente";
+            let statusColor = "var(--color-present)";
+            if (avgPct < 70) {
+                statusLabel = "Atención";
+                statusColor = "var(--color-absent)";
+            } else if (avgPct < 85) {
+                statusLabel = "Aceptable";
+                statusColor = "var(--color-justified)";
+            }
+
+            const card = document.createElement("div");
+            card.style.cssText = `
+                background: var(--bg-card);
+                border: 1px solid var(--border-color);
+                border-left: 4px solid ${color};
+                border-radius: 8px;
+                padding: 10px 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            `;
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${sec}</span>
+                    <span style="font-size: 0.65rem; font-weight: 700; color: ${statusColor}; border: 1px solid ${statusColor}44; background: ${statusColor}15; padding: 1px 5px; border-radius: 4px;">${statusLabel}</span>
+                </div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: ${color}; font-family: 'Outfit', sans-serif;">${avgPct}%</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">Máx. Mes: <strong style="color: var(--text-color);">${stats.bestMonthPct}%</strong> | ${stats.totalPresents}/${stats.totalConvocated} asis.</div>
+            `;
+
+            summaryGrid.appendChild(card);
+        });
+    }
+}
+
 function getRehearsalSubtypeText(sub) {
     if (sub === "trompetas1") return "Trompetas 1ª";
     if (sub === "bajos") return "Bajos";
@@ -10900,7 +13269,7 @@ function getRehearsalSubtypeText(sub) {
 
 function isMusicianConvocated(musicianId, sessionInfo) {
     if (!sessionInfo) return false;
-    const musician = state.musicians.find(m => m.id === musicianId);
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return false;
 
     // Check if it is a section rehearsal
@@ -10925,143 +13294,17 @@ function sendBrowserNotification(title, body) {
     }
 }
 
-function registerDeviceToken(musicianId) {
-    if (!isCloudActive()) return;
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    
-    try {
-        const vapidKey = localStorage.getItem("yacente_vapid_key");
-        if (!vapidKey) {
-            console.warn("[FCM] VAPID Key no configurada. Omitiendo registro de dispositivo.");
-            return;
-        }
-        
-        const messaging = firebase.messaging();
-        messaging.getToken({ vapidKey: vapidKey })
-            .then((currentToken) => {
-                if (currentToken) {
-                    const db = firebase.firestore();
-                    db.collection("musicianTokens").doc(musicianId).set({
-                        tokens: firebase.firestore.FieldValue.arrayUnion(currentToken),
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true })
-                    .then(() => console.log("[FCM] Token registrado correctamente en Firestore"))
-                    .catch(err => console.error("[FCM] Error al guardar token en base de datos:", err));
-                } else {
-                    console.warn("[FCM] No se pudo obtener el token del navegador.");
-                }
-            })
-            .catch((err) => {
-                console.error("[FCM] Error al solicitar el token FCM:", err);
-            });
-    } catch (e) {
-        console.error("[FCM] Mensajería no soportada o error de inicialización:", e);
-    }
-}
 
-function sendPushNotificationToConvocated(sessionData, sessionDate) {
-    if (!isCloudActive()) return;
-    
-    const serverKey = localStorage.getItem("yacente_fcm_server_key");
-    if (!serverKey) {
-        console.warn("[FCM] No se ha configurado la clave de servidor FCM, omitiendo envío de notificaciones push.");
-        return;
-    }
-    
-    const db = firebase.firestore();
-    const formattedDate = formatDateShortSpanish(sessionDate);
-    
-    // 1. Obtener todos los músicos
-    db.collection("musicians").get()
-        .then((querySnapshot) => {
-            const convocatedMusicians = [];
-            querySnapshot.forEach((doc) => {
-                const mus = doc.data();
-                // Convocatoria
-                if (isMusicianConvocated(mus.id, sessionData)) {
-                    convocatedMusicians.push(mus.id);
-                }
-            });
-            
-            if (convocatedMusicians.length === 0) {
-                console.log("[FCM] No hay músicos convocados para esta sesión.");
-                return;
-            }
-            
-            console.log(`[FCM] Se enviará notificación push a ${convocatedMusicians.length} músicos.`);
-            
-            // 2. Obtener tokens de dispositivo para los músicos convocados
-            const tokenPromises = convocatedMusicians.map(mId => 
-                db.collection("musicianTokens").doc(mId).get()
-                    .then(doc => doc.exists ? (doc.data().tokens || []) : [])
-                    .catch(err => {
-                        console.error(`[FCM] Error leyendo tokens del músico ${mId}:`, err);
-                        return [];
-                    })
-            );
-            
-            Promise.all(tokenPromises)
-                .then((results) => {
-                    // Planarizar y eliminar duplicados/vacíos
-                    const allTokens = [...new Set(results.flat().filter(Boolean))];
-                    if (allTokens.length === 0) {
-                        console.log("[FCM] No hay tokens de dispositivos registrados para los músicos convocados.");
-                        return;
-                    }
-                    
-                    console.log(`[FCM] Enviando push a ${allTokens.length} dispositivos.`);
-                    
-                    // 3. Preparar payload
-                    const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
-                    let body = "";
-                    if (sessionData.type === "ensayo") {
-                        const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
-                        const locationVal = sessionData.location || "Parking";
-                        body = `${subtypeText} - ${formattedDate} (${locationVal})`;
-                    } else {
-                        body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
-                    }
-                    
-                    // 4. Enviar mediante la API legacy de FCM (lotes de 500 max)
-                    const chunkSize = 500;
-                    for (let i = 0; i < allTokens.length; i += chunkSize) {
-                        const chunk = allTokens.slice(i, i + chunkSize);
-                        
-                        fetch("https://fcm.googleapis.com/fcm/send", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": "key=" + serverKey
-                            },
-                            body: JSON.stringify({
-                                registration_ids: chunk,
-                                notification: {
-                                    title: title,
-                                    body: body,
-                                    icon: "https://yacente.pages.dev/icons/icon-192-rounded.png",
-                                    badge: "https://yacente.pages.dev/icons/icon-192-rounded.png",
-                                    click_action: "https://yacente.pages.dev/"
-                                }
-                            })
-                        })
-                        .then(res => res.json())
-                        .then(data => {
-                            console.log("[FCM] Lote de notificaciones push enviado con éxito:", data);
-                        })
-                        .catch(err => {
-                            console.error("[FCM] Error en la petición HTTP POST de FCM:", err);
-                        });
-                    }
-                });
-        })
-        .catch(err => console.error("[FCM] Error obteniendo lista de músicos para notificaciones push:", err));
-}
 
 function updateNotificationsBadge() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
-    const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    const deletedIds = getDeletedNotificationIds(musicianId);
+    let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    if (deletedIds.length > 0) {
+        notifs = notifs.filter(n => !deletedIds.includes(n.id));
+    }
     const unseenCount = notifs.filter(n => !n.seen).length;
     
     const badge = document.getElementById("comp-notifications-badge-count");
@@ -11079,7 +13322,16 @@ function renderComponentNotificationsList() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
-    const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    const deletedIds = getDeletedNotificationIds(musicianId);
+    let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
+    if (deletedIds.length > 0) {
+        const filtered = notifs.filter(n => !deletedIds.includes(n.id));
+        if (filtered.length !== notifs.length) {
+            notifs = filtered;
+            localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+        }
+    }
+
     const container = document.getElementById("comp-notif-list-container");
     const countLabel = document.getElementById("comp-notif-count-label");
     
@@ -11122,7 +13374,11 @@ function renderComponentNotificationsList() {
             -webkit-user-select: none;
         `;
 
+        const isAnnouncement = notif.type === "announcement" || (notif.title && notif.title.includes("📢"));
+        const announcementBadge = isAnnouncement ? `<span style="display: inline-block; font-size: 0.65rem; background: rgba(212,175,55,0.2); color: var(--color-gold); border: 1px solid var(--color-gold); padding: 1px 6px; border-radius: 10px; font-weight: 700; margin-bottom: 4px; align-self: flex-start; pointer-events: none;">Aviso Directiva</span>` : '';
+
         itemDiv.innerHTML = `
+            ${announcementBadge}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none;">
                 <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: ${notif.seen ? 'var(--text-primary)' : 'var(--color-gold)'};">${notif.title}</h4>
                 <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(notif.date).toLocaleDateString('es-ES', {hour: '2-digit', minute:'2-digit'})}</span>
@@ -11177,8 +13433,11 @@ function renderComponentNotificationsList() {
                     setTimeout(() => {
                         const index = notifs.findIndex(n => n.id === notif.id);
                         if (index !== -1) {
+                            const deletedId = notif.id;
                             notifs.splice(index, 1);
                             localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+                            saveDeletedNotificationId(musicianId, deletedId);
+
                             renderComponentNotificationsList();
                             updateNotificationsBadge();
                             showToast("Notificación eliminada", "info");
@@ -11243,6 +13502,107 @@ function renderComponentNotificationsList() {
 
         container.appendChild(itemDiv);
     });
+}
+
+function setupAnnouncementEvents() {
+    const btnOpen = document.getElementById("btn-open-announcement-modal");
+    const modal = document.getElementById("modal-send-announcement");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-announcement-modal");
+    const btnCancel = document.getElementById("btn-cancel-announcement-modal");
+    const form = document.getElementById("form-send-announcement");
+    const titleInput = document.getElementById("announcement-title-input");
+    const bodyInput = document.getElementById("announcement-body-input");
+    const targetSelect = document.getElementById("announcement-target-select");
+    const quickPills = document.querySelectorAll("#announcement-quick-pills .quick-announcement-pill");
+
+    const openModal = () => {
+        if (getAuthRole() === "component") {
+            showToast("Solo la dirección puede emitir comunicados.", "error");
+            return;
+        }
+        if (titleInput) titleInput.value = "";
+        if (bodyInput) bodyInput.value = "";
+        if (targetSelect) targetSelect.value = "all";
+        modal.classList.add("active");
+    };
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnOpen) btnOpen.addEventListener("click", openModal);
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    quickPills.forEach(pill => {
+        pill.addEventListener("click", () => {
+            const pTitle = pill.getAttribute("data-title");
+            const pBody = pill.getAttribute("data-body");
+            if (titleInput && pTitle) titleInput.value = pTitle;
+            if (bodyInput && pBody) bodyInput.value = pBody;
+        });
+    });
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const rawTitle = titleInput ? titleInput.value.trim() : "";
+            const body = bodyInput ? bodyInput.value.trim() : "";
+            const targetSection = targetSelect ? targetSelect.value : "all";
+
+            if (!rawTitle || !body) {
+                showToast("Por favor, rellena el título y el mensaje del comunicado.", "error");
+                return;
+            }
+
+            const title = rawTitle.startsWith("📢") ? rawTitle : `📢 ${rawTitle}`;
+
+            const annObj = {
+                id: "ann_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+                title: title,
+                body: body,
+                targetSection: targetSection,
+                date: new Date().toISOString(),
+                seen: false,
+                type: "announcement"
+            };
+
+            // 1. Guardar en Firestore si la nube está activa
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("announcements").add(annObj)
+                    .then(() => {
+                        showToast("Comunicado enviado y publicado en la nube para la banda.", "success");
+                    })
+                    .catch(err => {
+                        console.error("Error al enviar comunicado a Firestore:", err);
+                        showToast("Comunicado enviado en modo local (offline)", "warning");
+                    });
+            } else {
+                showToast("Comunicado enviado localmente a la banda", "success");
+            }
+
+            // 2. Distribuir a las notificaciones locales de los músicos convocados
+            const musicians = state.musicians || [];
+            musicians.forEach(m => {
+                if (targetSection === "all" || m.instrument === targetSection) {
+                    const key = "yacente_notifications_" + m.id;
+                    const notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    notifs.unshift(annObj);
+                    localStorage.setItem(key, JSON.stringify(notifs));
+                }
+            });
+
+            // 3. Notificación del navegador si aplica
+            sendBrowserNotification(annObj.title, annObj.body);
+
+            closeModal();
+            updateNotificationsBadge();
+            renderComponentNotificationsList();
+        });
+    }
 }
 
 
