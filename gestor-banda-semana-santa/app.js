@@ -118,6 +118,7 @@ let state = {
     formacionConcierto: [],
     formacionDesfile: [],
     directorConcierto: null,
+    suggestions: [],
     currentPreavisoDate: "",
     compCalendarYear: undefined,
     compCalendarMonth: undefined,
@@ -222,6 +223,9 @@ function initApp() {
 
     const storedWeeklyGoals = localStorage.getItem("harmonia_weekly_goals");
     state.weeklyGoals = storedWeeklyGoals ? JSON.parse(storedWeeklyGoals) : {};
+
+    const storedSuggestions = localStorage.getItem("harmonia_suggestions");
+    state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
 
     // Cargar formaciones del simulador
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
@@ -413,7 +417,8 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_played_marchas", JSON.stringify(state.playedMarchas || {}));
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
-    
+    localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
+
     if (state.firebaseConfig) {
         localStorage.setItem("yacente_firebase_config", JSON.stringify(state.firebaseConfig));
         localStorage.setItem("yacente_firebase_hash", state.firebasePasswordHash);
@@ -462,6 +467,7 @@ let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
 let unsubAnnouncements = null;
 let unsubDeletedNotifs = null;
+let unsubSuggestions = null;
 
 function getDeletedNotificationIds(musicianId) {
     if (!musicianId) return [];
@@ -982,6 +988,21 @@ function startCloudSync() {
             }
         }, err => console.error("Error sync deleted notifs:", err));
     }
+
+    // Escucha del buzón de sugerencias (directiva)
+    unsubSuggestions = db.collection("suggestions").orderBy("date", "desc").limit(200).onSnapshot(snapshot => {
+        const list = [];
+        snapshot.forEach(doc => {
+            list.push({ ...doc.data(), docId: doc.id });
+        });
+        state.suggestions = list;
+        const suggestionsSection = document.getElementById("section-otros-sugerencias");
+        if (suggestionsSection && suggestionsSection.classList.contains("active")) {
+            renderAdminSuggestionsList();
+        }
+    }, err => {
+        console.error("Error sync sugerencias:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -997,6 +1018,7 @@ function stopCloudSync() {
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
     if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
     if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
+    if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1171,6 +1193,18 @@ function dbDeleteSession(date) {
         db.collection("sessionTypes").doc(date).delete()
             .catch(err => console.error("Error al borrar tipo de sesión en nube:", err));
     } else {
+        saveStateToLocalStorage();
+    }
+}
+
+function dbSaveSuggestion(suggestion) {
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("suggestions").add(suggestion)
+            .catch(err => console.error("Error al guardar sugerencia en nube:", err));
+    } else {
+        state.suggestions = state.suggestions || [];
+        state.suggestions.unshift(suggestion);
         saveStateToLocalStorage();
     }
 }
@@ -2875,6 +2909,7 @@ function setupMarchasDragAndDrop() {
     setupProfilePhotoEvents();
     setupAnnouncementEvents();
     setupMusicianDrawerAndSettingsEvents();
+    setupSuggestionsMailboxEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -2935,6 +2970,7 @@ function setupComponentSwipeNavigation() {
         "section-componente-eventos",
         "section-componente-historial",
         "section-componente-repertorio",
+        "section-componente-sugerencias",
         "section-componente-ajustes"
     ];
 
@@ -3009,6 +3045,7 @@ function renderActiveSection(sectionId, forcedDirection) {
         "section-componente-eventos",
         "section-componente-historial",
         "section-componente-repertorio",
+        "section-componente-sugerencias",
         "section-componente-ajustes"
     ];
 
@@ -3151,10 +3188,26 @@ function renderActiveSection(sectionId, forcedDirection) {
             dateContainer.classList.add("hidden");
             renderComponentRepertorio();
             break;
+        case "section-componente-sugerencias":
+            pageTitle.innerText = "Sugerencias";
+            pageSubtitle.innerText = "Haz llegar tus propuestas a la directiva";
+            dateContainer.classList.add("hidden");
+            break;
         case "section-componente-ajustes":
             pageTitle.innerText = "Ajustes";
             pageSubtitle.innerText = "Seguridad y gestión de la cuenta";
             dateContainer.classList.add("hidden");
+            break;
+        case "section-otros":
+            pageTitle.innerText = "Otros";
+            pageSubtitle.innerText = "Funciones adicionales";
+            dateContainer.classList.add("hidden");
+            break;
+        case "section-otros-sugerencias":
+            pageTitle.innerText = "Buzón de Sugerencias";
+            pageSubtitle.innerText = "Propuestas enviadas por los músicos";
+            dateContainer.classList.add("hidden");
+            renderAdminSuggestionsList();
             break;
         case "section-componente-notificaciones":
             pageTitle.innerText = "Centro de Notificaciones";
@@ -13277,6 +13330,112 @@ function setupMusicianDrawerAndSettingsEvents() {
             e.preventDefault();
             logoutComponent();
         });
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+}
+
+function setupSuggestionsMailboxEvents() {
+    // Formulario de envío de sugerencia (vista músico)
+    const formSuggestion = document.getElementById("form-suggestion-mailbox");
+    if (formSuggestion) {
+        formSuggestion.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const musicianId = getAuthMusicianId();
+            if (!musicianId) {
+                showToast("Sesión de músico no válida", "error");
+                return;
+            }
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+            const textInput = document.getElementById("suggestion-text");
+            const text = textInput ? textInput.value.trim() : "";
+            const anonymous = !!document.getElementById("suggestion-anonymous-toggle")?.checked;
+
+            if (!text) {
+                showToast("Escribe una sugerencia antes de enviarla.", "warning");
+                return;
+            }
+
+            const suggestionObj = {
+                id: "sug_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+                text: text,
+                authorId: musicianId,
+                authorName: musician ? musician.name : "Desconocido",
+                anonymous: anonymous,
+                date: new Date().toISOString()
+            };
+
+            dbSaveSuggestion(suggestionObj);
+
+            if (textInput) textInput.value = "";
+            const toggle = document.getElementById("suggestion-anonymous-toggle");
+            if (toggle) toggle.checked = false;
+            showToast("Sugerencia enviada a la directiva. ¡Gracias!", "success");
+        });
+    }
+
+    // Tarjeta "Buzón de Sugerencias" dentro de Otros (vista admin)
+    document.querySelectorAll(".otros-nav-card").forEach(card => {
+        card.addEventListener("click", () => {
+            const targetId = card.getAttribute("data-target");
+            if (targetId) renderActiveSection(targetId);
+        });
+    });
+
+    // Enlace "Volver a Otros" dentro del detalle del buzón (vista admin)
+    document.querySelectorAll(".otros-back-link").forEach(link => {
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetId = link.getAttribute("data-target");
+            if (targetId) renderActiveSection(targetId);
+        });
+    });
+}
+
+function renderAdminSuggestionsList() {
+    const container = document.getElementById("admin-suggestions-list");
+    const emptyState = document.getElementById("admin-suggestions-empty");
+    if (!container) return;
+
+    const suggestions = state.suggestions || [];
+    container.innerHTML = "";
+
+    if (suggestions.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    const sorted = [...suggestions].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    sorted.forEach(sug => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "card-item";
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        `;
+
+        const authorLabel = sug.anonymous ? "Anónimo" : escapeHtml(sug.authorName || "Desconocido");
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-gold);">${authorLabel}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(sug.date).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: var(--text-color); white-space: pre-wrap;">${escapeHtml(sug.text)}</p>
+        `;
+
+        container.appendChild(itemDiv);
     });
 }
 
