@@ -1884,6 +1884,29 @@ function setupEventListeners() {
         });
     }
 
+    // Event listeners para el modal de detalle de insignia individual
+    const singleInsigniaModal = document.getElementById("modal-single-insignia-detail");
+    const closeSingleInsigniaBtn = document.getElementById("btn-close-insignia-detail-modal");
+    const okSingleInsigniaBtn = document.getElementById("btn-insignia-detail-modal-ok");
+
+    if (closeSingleInsigniaBtn) {
+        closeSingleInsigniaBtn.addEventListener("click", () => {
+            if (singleInsigniaModal) singleInsigniaModal.classList.remove("active");
+        });
+    }
+    if (okSingleInsigniaBtn) {
+        okSingleInsigniaBtn.addEventListener("click", () => {
+            if (singleInsigniaModal) singleInsigniaModal.classList.remove("active");
+        });
+    }
+    if (singleInsigniaModal) {
+        singleInsigniaModal.addEventListener("click", (e) => {
+            if (e.target === singleInsigniaModal) {
+                singleInsigniaModal.classList.remove("active");
+            }
+        });
+    }
+
     // Modal de previsualización de foto de perfil
     const closePhotoPreview = () => {
         const modal = document.getElementById("modal-photo-preview");
@@ -11258,6 +11281,161 @@ function openInsigniasInfoModal() {
     }
 }
 
+const MEDAL_TIER_DEFINITIONS = {
+    racha: [
+        { label: "Bronce 🥉", req: "5 ensayos consecutivos", stars: 1 },
+        { label: "Plata 🥈", req: "10 ensayos consecutivos", stars: 2 },
+        { label: "Oro 🥇", req: "20 ensayos consecutivos", stars: 3 }
+    ],
+    asistencia: [
+        { label: "Bronce 🥉", req: ">80% de asistencia general", stars: 1 },
+        { label: "Plata 🥈", req: ">90% de asistencia general", stars: 2 },
+        { label: "Oro 🥇", req: ">95% de asistencia general", stars: 3 }
+    ],
+    veterano: [
+        { label: "Bronce 🥉", req: "15 asistencias totales", stars: 1 },
+        { label: "Plata 🥈", req: "50 asistencias totales", stars: 2 },
+        { label: "Oro 🥇", req: "100 asistencias totales", stars: 3 }
+    ],
+    estudio: [
+        { label: "Bronce 🥉", req: "50 marchas dominadas", stars: 1 },
+        { label: "Plata 🥈", req: "60 marchas dominadas", stars: 2 },
+        { label: "Oro 🥇", req: "Todas las marchas del repertorio", stars: 3 }
+    ],
+    trotamundos: [
+        { label: "Bronce 🥉", req: "10 viajes fuera de la ciudad", stars: 1 },
+        { label: "Plata 🥈", req: "25 viajes fuera de la ciudad", stars: 2 },
+        { label: "Oro 🥇", req: "50 viajes fuera de la ciudad", stars: 3 }
+    ],
+    titular: [
+        { label: "Bronce 🥉", req: ">90% asistencia a actuaciones (año)", stars: 1 },
+        { label: "Plata 🥈", req: ">95% asistencia a actuaciones (año)", stars: 2 },
+        { label: "Oro 🥇", req: "100% asistencia a actuaciones (año)", stars: 3 }
+    ],
+    ruta: [
+        { label: "Bronce 🥉", req: "5 viajes en bus con la banda", stars: 1 },
+        { label: "Plata 🥈", req: "10 viajes en bus con la banda", stars: 2 },
+        { label: "Oro 🥇", req: "20 viajes en bus con la banda", stars: 3 }
+    ],
+    hermandad: [
+        { label: "Bronce 🥉", req: "1 convivencia / actividad extramusical", stars: 1 },
+        { label: "Plata 🥈", req: "5 convivencias / actividades extramusicales", stars: 2 },
+        { label: "Oro 🥇", req: "10 convivencias / actividades extramusicales", stars: 3 }
+    ]
+};
+
+function openSingleInsigniaDetailModal(medalId) {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const medalsData = getMusicianMedalsData(musicianId);
+    const medal = medalsData.find(m => m.id === medalId);
+    if (!medal) return;
+
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+
+    const titleEl = document.getElementById("modal-insignia-detail-title");
+    const iconEl = document.getElementById("modal-insignia-detail-icon");
+    const statusBadgeEl = document.getElementById("modal-insignia-detail-status-badge");
+    const descEl = document.getElementById("modal-insignia-detail-desc");
+    const progressTextEl = document.getElementById("modal-insignia-detail-progress-text");
+    const progressBarEl = document.getElementById("modal-insignia-detail-progress-bar");
+    const tiersContainerEl = document.getElementById("modal-insignia-detail-tiers-container");
+    const modal = document.getElementById("modal-single-insignia-detail");
+
+    if (titleEl) titleEl.innerText = medal.title;
+    if (iconEl) iconEl.innerText = medal.icon;
+    if (descEl) descEl.innerText = medal.desc;
+    if (progressTextEl) progressTextEl.innerText = medal.progressText;
+    if (progressBarEl) progressBarEl.style.width = `${medal.progressPct}%`;
+
+    // Estado general
+    if (statusBadgeEl) {
+        if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+            statusBadgeEl.innerText = "⚠️ Suspendida (<50% Asistencia)";
+            statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
+            statusBadgeEl.style.color = "var(--color-absent)";
+            statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+        } else if (medal.isNegative && medal.unlocked) {
+            statusBadgeEl.innerText = "⚠️ Alerta Activa (<50% Asistencia)";
+            statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
+            statusBadgeEl.style.color = "var(--color-absent)";
+            statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+        } else if (medal.unlocked) {
+            const starsText = medal.stars ? ` (${'★'.repeat(medal.stars)})` : '';
+            statusBadgeEl.innerText = `Desbloqueada${starsText}`;
+            statusBadgeEl.style.background = "rgba(46, 204, 113, 0.15)";
+            statusBadgeEl.style.color = "#2ecc71";
+            statusBadgeEl.style.border = "1px solid rgba(46, 204, 113, 0.4)";
+        } else {
+            statusBadgeEl.innerText = "Bloqueada";
+            statusBadgeEl.style.background = "rgba(149, 165, 166, 0.15)";
+            statusBadgeEl.style.color = "#95a5a6";
+            statusBadgeEl.style.border = "1px solid rgba(149, 165, 166, 0.4)";
+        }
+    }
+
+    // Generar niveles
+    if (tiersContainerEl) {
+        tiersContainerEl.innerHTML = "";
+        const tierDefs = MEDAL_TIER_DEFINITIONS[medal.id];
+
+        if (tierDefs && tierDefs.length > 0) {
+            // Insignia de 3 niveles (Bronce, Plata, Oro)
+            tierDefs.forEach(tier => {
+                const isAchieved = !hasVolverEnsayar && medal.unlocked && (medal.stars >= tier.stars);
+                const isSuspended = hasVolverEnsayar && medal.unlocked && (medal.stars >= tier.stars);
+
+                let badgeHTML = '';
+                if (isSuspended) {
+                    badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(231, 76, 60, 0.15); color: var(--color-absent);">⚠️ Suspendido</span>';
+                } else if (isAchieved) {
+                    badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71;">✔ Conseguido</span>';
+                } else {
+                    badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">🔒 Pendiente</span>';
+                }
+
+                const tierRow = document.createElement("div");
+                tierRow.style.cssText = "background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;";
+                tierRow.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 700; color: var(--text-primary); font-family: 'Cinzel', serif;">${tier.label}:</span>
+                        <span style="color: var(--text-secondary);">${tier.req}</span>
+                    </div>
+                    <div>${badgeHTML}</div>
+                `;
+                tiersContainerEl.appendChild(tierRow);
+            });
+        } else {
+            // Insignia de 1 único nivel
+            const isAchieved = !hasVolverEnsayar && medal.unlocked;
+            const isSuspended = hasVolverEnsayar && medal.unlocked && !medal.isNegative;
+
+            let badgeHTML = '';
+            if (isSuspended) {
+                badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(231, 76, 60, 0.15); color: var(--color-absent);">⚠️ Suspendido</span>';
+            } else if (isAchieved) {
+                badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71;">✔ Conseguido</span>';
+            } else {
+                badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">🔒 Pendiente</span>';
+            }
+
+            const tierRow = document.createElement("div");
+            tierRow.style.cssText = "background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;";
+            tierRow.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 700; color: var(--text-primary); font-family: 'Cinzel', serif;">Requisito:</span>
+                    <span style="color: var(--text-secondary);">${medal.desc}</span>
+                </div>
+                <div>${badgeHTML}</div>
+            `;
+            tiersContainerEl.appendChild(tierRow);
+        }
+    }
+
+    if (modal) modal.classList.add("active");
+}
+
 
 
 function renderComponentFicha() {
@@ -11415,6 +11593,8 @@ function renderComponentFicha() {
     medalsData.forEach(medal => {
         const medalCard = document.getElementById(`medal-${medal.id}`);
         if (medalCard) {
+            medalCard.style.cursor = "pointer";
+            medalCard.onclick = () => openSingleInsigniaDetailModal(medal.id);
             if (medal.isNegative) {
                 medalCard.className = `medal-card ${medal.unlocked ? 'negative-unlocked' : 'locked'}`;
             } else {

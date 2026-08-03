@@ -1878,6 +1878,54 @@
         </div>
     </div>
 
+    <!-- Modal Detalle de Insignia Individual -->
+    <div id="modal-single-insignia-detail" class="modal-overlay">
+        <div class="modal-card modal-card-standard-size" style="text-align: center;">
+            <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 id="modal-insignia-detail-title" style="margin: 0; font-size: 1.15rem; color: var(--text-primary); font-family: 'Cinzel', serif;">
+                    Detalle de Insignia
+                </h3>
+                <button class="modal-close" id="btn-close-insignia-detail-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;">
+                <!-- Icono Grande y Estado -->
+                <div style="margin: 4px 0 12px 0;">
+                    <div id="modal-insignia-detail-icon" style="font-size: 3.5rem; line-height: 1; margin-bottom: 6px;">🏅</div>
+                    <div id="modal-insignia-detail-status-badge" style="display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Bloqueada
+                    </div>
+                </div>
+
+                <!-- Descripción General -->
+                <div id="modal-insignia-detail-desc" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; font-size: 0.9rem; line-height: 1.45; color: var(--text-primary); margin-bottom: 14px; text-align: center;">
+                    Cargando información...
+                </div>
+
+                <!-- Barra de Progreso y Texto de Progreso -->
+                <div id="modal-insignia-detail-progress-box" style="margin-bottom: 14px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">
+                        <span>Progreso Actual</span>
+                        <span id="modal-insignia-detail-progress-text" style="color: var(--text-primary); font-weight: 700;">0/0</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; overflow: hidden;">
+                        <div id="modal-insignia-detail-progress-bar" style="width: 0%; height: 100%; background: var(--color-gold); transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Requisitos y Niveles (Bronce, Plata, Oro o Nivel único) -->
+                <div style="font-size: 0.82rem; font-weight: 700; text-align: left; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+                    Requisitos y Niveles
+                </div>
+                <div id="modal-insignia-detail-tiers-container" style="display: flex; flex-direction: column; gap: 8px; text-align: left; margin-bottom: 8px;">
+                    <!-- Filas dinámicas -->
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 8px;">
+                <button class="btn btn-primary" id="btn-insignia-detail-modal-ok" style="width: 100%; justify-content: center; padding: 10px 16px;">¡Entendido!</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Flotante de Notificaciones del Músico -->
     <div id="modal-component-notifications" class="modal-overlay">
         <div class="modal-card modal-card-standard-size">
@@ -3239,13 +3287,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=375"></script>
+    <script src="app.js?v=376"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=375
+        // Purga de caché antigua y registro del Service Worker v=376
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v375") {
+                    if (key !== "yacente-v376") {
                         caches.delete(key);
                     }
                 });
@@ -3258,9 +3306,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=375")
+                navigator.serviceWorker.register("sw.js?v=376")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v375 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v376 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

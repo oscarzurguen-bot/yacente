@@ -3679,11 +3679,13 @@ body.component-portal #candle-tribute-container {
     background: rgba(255, 255, 255, 0.015);
     border: 1px solid var(--border-color);
     border-radius: 8px;
+    cursor: pointer;
     transition: all 0.25s ease;
 }
 .medal-card:hover {
-    border-color: rgba(212, 175, 55, 0.2);
-    background: rgba(255, 255, 255, 0.025);
+    border-color: var(--border-active);
+    background: rgba(255, 255, 255, 0.035);
+    transform: translateY(-2px);
 }
 .medal-icon-wrapper {
     width: 44px;
