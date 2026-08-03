@@ -2152,12 +2152,14 @@ svg.chevron {
         font-family: 'Outfit', sans-serif !important;
     }
     
-    /* Ocultar contenedores principales de la app en la impresión */
+    /* Ocultar contenedores principales y elementos flotantes de la app en la impresión */
     .app-container,
     .lock-screen-overlay,
     .modal-overlay,
     .toast-container,
-    .component-mobile-nav {
+    .component-mobile-nav,
+    .btn-back-to-top,
+    #btn-back-to-top {
         display: none !important;
     }
     
