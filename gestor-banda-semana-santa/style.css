@@ -4251,9 +4251,9 @@ body.component-portal #candle-tribute-container {
     align-items: center;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border-color);
-    padding: 10px 14px;
+    padding: 6px 12px;
     border-radius: var(--radius-sm);
-    gap: 15px;
+    gap: 10px;
     transition: background 0.2s ease, transform 0.2s ease;
 }
 .comp-ranking-card:hover {

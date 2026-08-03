@@ -5357,11 +5357,11 @@ function renderStatsRanking(filteredDates) {
         card.style.display = "flex";
         card.style.alignItems = "center";
         card.style.justifyContent = "space-between";
-        card.style.padding = "10px 14px";
+        card.style.padding = "6px 12px";
         card.style.background = "rgba(0, 0, 0, 0.2)";
         card.style.border = "1px solid var(--border-color)";
         card.style.borderRadius = "8px";
-        card.style.gap = "12px";
+        card.style.gap = "10px";
         card.style.flexWrap = "wrap";
 
         let rankBadgeClass = "rank-badge";
@@ -5370,19 +5370,19 @@ function renderStatsRanking(filteredDates) {
         else if (index === 2) rankBadgeClass += " rank-bronze";
 
         card.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 12px; min-width: 180px; flex: 1;">
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px; flex: 1; min-width: 0;">
                 <div class="${rankBadgeClass}">${index + 1}</div>
-                <div style="min-width: 0; flex: 1;">
-                    <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; flex: 1;">
+                    <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                         ${item.name}
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">
-                        ${item.instrument} ${item.role ? `• ${item.role}` : ''}
-                    </div>
+                    </span>
+                    <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500; white-space: nowrap; opacity: 0.88;">
+                        • ${item.instrument}${item.role ? ` (${item.role})` : ''}
+                    </span>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 16px; font-size: 0.88rem; font-weight: 600; flex-shrink: 0;">
-                <div style="color: var(--color-gold); font-family: 'Cinzel', serif; font-size: 1rem;" title="Porcentaje de Asistencia">
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 0.85rem; font-weight: 600; flex-shrink: 0;">
+                <div style="color: var(--color-gold); font-family: 'Cinzel', serif; font-size: 0.95rem;" title="Porcentaje de Asistencia">
                     ${Math.round(item.attendancePct)}%
                 </div>
                 <div style="display: flex; align-items: center; gap: 4px; color: #ff6a00;" title="Racha de asistencia consecutiva">
