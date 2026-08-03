@@ -4432,22 +4432,22 @@ body.component-portal #candle-tribute-container {
     transform: translateY(0);
 }
 
-/* Botón Hamburguesa para el Músico (3 franjas blancas horizontales sobre fondo oscuro) */
+/* Botón Hamburguesa Minimalista para el Músico (3 franjas blancas horizontales al lado del título) */
 .btn-musician-hamburger {
     display: none;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
-    background: rgba(26, 10, 14, 0.95) !important;
-    border: 1px solid rgba(212, 175, 55, 0.3) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+    width: 32px;
+    height: 32px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
     padding: 0;
     margin: 0;
     cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0 !important;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
 }
 body.component-portal .btn-musician-hamburger {
     display: inline-flex !important;
@@ -4456,9 +4456,8 @@ body.component-portal .btn-mobile-menu-toggle {
     display: none !important;
 }
 .btn-musician-hamburger:hover {
-    background: rgba(212, 175, 55, 0.2) !important;
-    border-color: var(--color-gold) !important;
-    transform: scale(1.05);
+    opacity: 0.8;
+    transform: scale(1.08);
 }
 .btn-musician-hamburger:active {
     transform: scale(0.95);
