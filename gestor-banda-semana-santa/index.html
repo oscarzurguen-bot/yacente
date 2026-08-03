@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=345">
+    <link rel="stylesheet" href="style.css?v=346">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3095,6 +3095,27 @@
         </div>
     </div>
 
+    <!-- Modal: Seleccionar Evento cuando hay Múltiples el mismo día -->
+    <div id="modal-comp-multi-event-select" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px; width: 92%; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-multi-event-select" style="position: absolute; top: 16px; right: 16px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            
+            <h3 style="margin: 0 0 6px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.25rem;">Eventos de este día</h3>
+            <p id="multi-event-select-date-subtitle" style="margin: 0 0 16px 0; font-size: 0.84rem; color: var(--text-muted);">Selecciona el evento que deseas consultar:</p>
+            
+            <div id="multi-event-select-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <!-- Inyectado dinámicamente -->
+            </div>
+
+            <button type="button" class="btn btn-secondary" id="btn-close-multi-event-select-footer" style="width: 100%;">Cerrar</button>
+        </div>
+    </div>
+
     <!-- Modal: Preaviso (RSVP) Músicos -->
     <div id="modal-componente-preaviso" class="modal-overlay">
         <div class="modal-card" style="max-width: 400px; width: 90%;">
@@ -3201,13 +3222,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=345"></script>
+    <script src="app.js?v=346"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=345
+        // Purga de caché antigua y registro del Service Worker v=346
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v345") {
+                    if (key !== "yacente-v346") {
                         caches.delete(key);
                     }
                 });
@@ -3220,9 +3241,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=345")
+                navigator.serviceWorker.register("sw.js?v=346")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v345 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v346 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

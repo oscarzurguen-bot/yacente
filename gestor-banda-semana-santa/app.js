@@ -2816,6 +2816,7 @@ function setupMarchasDragAndDrop() {
     // Inicializar eventos de preaviso, detalle de eventos, foto de perfil y comunicados
     setupPreavisoEvents();
     setupUpcomingEventDetailEvents();
+    setupMultiEventSelectModalEvents();
     setupProfilePhotoEvents();
     setupAnnouncementEvents();
 
@@ -12047,46 +12048,65 @@ function renderComponenteCalendario() {
             });
 
         if (daySessions.length > 0) {
-            // Añadir manejador de click para preaviso
+            const isPastDay = dateKey < todayDateKey;
+
+            // Si hay alguna actuación en el día, se resalta la celda en verde
+            const hasActuacion = daySessions.some(s => s.type === "actuacion");
+            if (hasActuacion) {
+                dayCell.classList.add("has-actuacion");
+            }
+
+            // Añadir manejador de click para abrir el modal correspondiente
             dayCell.addEventListener("click", () => {
-                openPreavisoModal(dateKey);
+                if (daySessions.length === 1) {
+                    if (isPastDay) {
+                        openRehearsalDetailModal(dateKey);
+                    } else {
+                        openUpcomingEventDetailModal(dateKey);
+                    }
+                } else {
+                    openMultiEventSelectModal(dateKey, daySessions, isPastDay);
+                }
             });
 
-            // Añadir contenedor de puntos indicadores
+            // Añadir contenedor de etiquetas rectangulares
             const indicatorContainer = document.createElement("div");
             indicatorContainer.className = "comp-calendar-indicator-container";
 
-            const isPastDay = dateKey < todayDateKey;
-
             daySessions.forEach(session => {
-                const dot = document.createElement("span");
-                dot.className = "comp-calendar-dot";
+                const badge = document.createElement("span");
                 
-                // Determinar estado de asistencia del músico
-                const record = state.attendance[dateKey] ? state.attendance[dateKey][musicianId] : null;
+                // Determinar texto de la etiqueta rectangular
+                let labelText = "general";
+                if (session.type === "actuacion") {
+                    labelText = "actuación";
+                } else if (session.subtype === "secciones" || (session.convocatedVoices && session.convocatedVoices.length > 0 && session.subtype !== "general")) {
+                    labelText = "voz";
+                }
+
+                // Determinar estado de preaviso o asistencia para la clase de color
+                let badgeClass = "pending";
+                const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+
                 if (record) {
                     if (record.status === "present") {
-                        dot.classList.add("present");
-                        dot.title = `${session.name || 'Convocatoria'}: ${isPastDay ? 'Asistió' : 'Asistiré'}`;
+                        badgeClass = "present";
                     } else if (record.status === "absent") {
-                        if (record.justified) {
-                            dot.classList.add("justified");
-                            dot.title = `${session.name || 'Convocatoria'}: Ausencia Justificada`;
-                        } else {
-                            dot.classList.add("absent");
-                            dot.title = `${session.name || 'Convocatoria'}: ${isPastDay ? 'No asistió' : 'Ausencia'}`;
-                        }
+                        badgeClass = record.justified ? "justified" : "absent";
                     }
                 } else {
                     if (isPastDay) {
-                        dot.classList.add("absent");
-                        dot.title = `${session.name || 'Convocatoria'}: No asistió (Sin preaviso)`;
+                        badgeClass = "absent";
                     } else {
-                        dot.classList.add("pending");
-                        dot.title = `${session.name || 'Convocatoria'}: Pendiente`;
+                        badgeClass = "pending";
                     }
                 }
-                indicatorContainer.appendChild(dot);
+
+                badge.className = `comp-calendar-badge ${badgeClass}`;
+                badge.innerText = labelText;
+                badge.title = `${session.name || labelText.toUpperCase()}`;
+
+                indicatorContainer.appendChild(badge);
             });
             dayCell.appendChild(indicatorContainer);
         }
@@ -12136,6 +12156,89 @@ function renderComponenteCalendario() {
             renderComponenteCalendario();
         });
     }
+}
+
+function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
+    const modal = document.getElementById("modal-comp-multi-event-select");
+    const subtitleEl = document.getElementById("multi-event-select-date-subtitle");
+    const listEl = document.getElementById("multi-event-select-list");
+    if (!modal || !listEl) return;
+
+    if (subtitleEl) {
+        subtitleEl.innerText = `Eventos del ${formatDateSpanish(dateKey)}:`;
+    }
+
+    listEl.innerHTML = "";
+    const musicianId = getAuthMusicianId();
+
+    daySessions.forEach(session => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn";
+        btn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease;";
+
+        let labelText = "general";
+        if (session.type === "actuacion") {
+            labelText = "actuación";
+        } else if (session.subtype === "secciones" || (session.convocatedVoices && session.convocatedVoices.length > 0 && session.subtype !== "general")) {
+            labelText = "voz";
+        }
+
+        let badgeClass = "pending";
+        const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+
+        if (record) {
+            if (record.status === "present") {
+                badgeClass = "present";
+            } else if (record.status === "absent") {
+                badgeClass = record.justified ? "justified" : "absent";
+            }
+        } else if (isPastDay) {
+            badgeClass = "absent";
+        }
+
+        const titleText = session.name || (session.type === "actuacion" ? "Actuación Oficial" : (labelText === "voz" ? "Ensayo por Voces" : "Ensayo General"));
+
+        btn.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+                <div style="font-weight: 700; font-size: 0.95rem; text-align: left;">${titleText}</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">⏰ ${session.time ? session.time + ' h' : 'Hora por determinar'}</div>
+            </div>
+            <span class="comp-calendar-badge ${badgeClass}" style="padding: 4px 10px; font-size: 0.75rem;">${labelText}</span>
+        `;
+
+        btn.addEventListener("click", () => {
+            modal.classList.remove("active");
+            if (isPastDay) {
+                openRehearsalDetailModal(dateKey);
+            } else {
+                openUpcomingEventDetailModal(dateKey);
+            }
+        });
+
+        listEl.appendChild(btn);
+    });
+
+    modal.classList.add("active");
+}
+
+function setupMultiEventSelectModalEvents() {
+    const modal = document.getElementById("modal-comp-multi-event-select");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-multi-event-select");
+    const btnCloseFooter = document.getElementById("btn-close-multi-event-select-footer");
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
 }
 
 function renderComponentRepertorio() {
