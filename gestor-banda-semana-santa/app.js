@@ -11741,8 +11741,8 @@ function openUpcomingEventDetailModal(date) {
     }
 
     if (badgeEl) {
-        badgeEl.className = `comp-attendance-badge ${badgeClass}`;
-        badgeEl.innerText = badgeText;
+        badgeEl.className = `comp-attendance-badge ${badgeClass} clickable-badge`;
+        badgeEl.innerText = "Preaviso";
     }
 
     // Date
@@ -11782,7 +11782,7 @@ function setupUpcomingEventDetailEvents() {
 
     const btnClose = document.getElementById("btn-close-upcoming-event-detail");
     const btnCloseFooter = document.getElementById("btn-close-upcoming-event-detail-footer");
-    const btnRsvp = document.getElementById("btn-upcoming-event-rsvp");
+    const badgeBtn = document.getElementById("upcoming-event-detail-badge");
 
     const closeModal = () => {
         modal.classList.remove("active");
@@ -11795,8 +11795,8 @@ function setupUpcomingEventDetailEvents() {
         if (e.target === modal) closeModal();
     });
 
-    if (btnRsvp) {
-        btnRsvp.addEventListener("click", () => {
+    if (badgeBtn) {
+        badgeBtn.addEventListener("click", () => {
             closeModal();
             if (currentUpcomingEventDate) {
                 openPreavisoModal(currentUpcomingEventDate);

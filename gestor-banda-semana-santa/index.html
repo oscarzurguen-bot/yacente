@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=344">
+    <link rel="stylesheet" href="style.css?v=345">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3040,18 +3040,11 @@
                 </svg>
             </button>
             
-            <h3 id="upcoming-event-detail-title" style="margin: 0 0 8px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
+            <!-- 1. Título del Ensayo / Evento -->
+            <h3 id="upcoming-event-detail-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
             
-            <p style="margin: 0 0 12px 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45;">
-                Confirma tu asistencia o ausencia haciendo un preaviso a la dirección. De esta forma se podrá hacer una previsión de la asistencia y valorar cambios en la programación.
-            </p>
-
-            <div style="margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
-                <span id="upcoming-event-detail-badge" class="comp-attendance-badge pending">Pendiente</span>
-            </div>
-            
-            <!-- Tarjeta de Detalles del Evento -->
-            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+            <!-- 2. Especificaciones del Evento (Fecha, Hora, Lugar, Convocados) -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📅</div>
                     <div>
@@ -3085,11 +3078,18 @@
                 </div>
             </div>
 
-            <!-- Botones de Acción -->
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <button type="button" class="btn btn-primary" id="btn-upcoming-event-rsvp" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; background: linear-gradient(135deg, var(--color-gold), #b89628); color: #000; border: none; padding: 12px 16px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.95rem;">
-                    <span>📝 Confirmar / Preavisar Asistencia</span>
-                </button>
+            <!-- 3. Texto Explicativo del Preaviso -->
+            <p style="margin: 0 0 14px 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45; text-align: left;">
+                Confirma tu asistencia o ausencia haciendo un preaviso a la dirección. De esta forma se podrá hacer una previsión de la asistencia y valorar cambios en la programación.
+            </p>
+
+            <!-- 4. Etiqueta / Botón de Preaviso Clicable -->
+            <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: center;">
+                <span id="upcoming-event-detail-badge" class="comp-attendance-badge pending clickable-badge" style="padding: 8px 24px; font-size: 0.92rem; font-weight: 700; border-radius: 20px; cursor: pointer; transition: all 0.2s ease;" title="Pulsa para cambiar tu preaviso de asistencia">Preaviso</span>
+            </div>
+
+            <!-- 5. Botón Cerrar -->
+            <div style="display: flex; flex-direction: column;">
                 <button type="button" class="btn btn-secondary" id="btn-close-upcoming-event-detail-footer" style="width: 100%;">Cerrar</button>
             </div>
         </div>
@@ -3201,13 +3201,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=344"></script>
+    <script src="app.js?v=345"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=344
+        // Purga de caché antigua y registro del Service Worker v=345
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v344") {
+                    if (key !== "yacente-v345") {
                         caches.delete(key);
                     }
                 });
@@ -3220,9 +3220,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=344")
+                navigator.serviceWorker.register("sw.js?v=345")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v344 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v345 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
