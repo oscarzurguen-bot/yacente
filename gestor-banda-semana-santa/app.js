@@ -14221,14 +14221,18 @@ function renderComponentNotificationsList() {
 
         // Swipe-to-delete gestures
         let startX = 0;
+        let startY = 0;
         let currentX = 0;
         let isDragging = false;
         let hasMoved = false;
+        let gestureDirection = null;
 
-        const handleStart = (clientX) => {
+        const handleStart = (clientX, clientY) => {
             startX = clientX;
+            startY = clientY;
             isDragging = true;
             hasMoved = false;
+            gestureDirection = null;
             itemDiv.style.transition = 'none';
         };
 
@@ -14284,14 +14288,29 @@ function renderComponentNotificationsList() {
         };
 
         itemDiv.addEventListener("touchstart", (e) => {
-            handleStart(e.touches[0].clientX);
+            handleStart(e.touches[0].clientX, e.touches[0].clientY);
         }, { passive: true });
-        
+
         itemDiv.addEventListener("touchmove", (e) => {
-            if (isDragging) {
-                if (e.cancelable) e.preventDefault();
-                handleMove(e.touches[0].clientX);
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+
+            if (gestureDirection === null) {
+                if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
+                gestureDirection = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+                if (gestureDirection === "vertical") {
+                    // Gesto vertical: se aborta el swipe-to-delete y se deja hacer scroll nativo a la página
+                    isDragging = false;
+                    itemDiv.style.transform = "translateX(0)";
+                    itemDiv.style.opacity = "1";
+                    return;
+                }
             }
+
+            if (e.cancelable) e.preventDefault();
+            handleMove(touch.clientX);
         }, { passive: false });
         
         itemDiv.addEventListener("touchend", handleEnd);
@@ -14299,7 +14318,7 @@ function renderComponentNotificationsList() {
 
         itemDiv.addEventListener("mousedown", (e) => {
             e.preventDefault(); // Prevent text selection and drag start
-            handleStart(e.clientX);
+            handleStart(e.clientX, e.clientY);
             const onMouseMove = (moveEvent) => handleMove(moveEvent.clientX);
             const onMouseUp = () => {
                 handleEnd();
