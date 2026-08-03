@@ -1880,14 +1880,14 @@
 
     <!-- Modal Detalle de Insignia Individual -->
     <div id="modal-single-insignia-detail" class="modal-overlay">
-        <div class="modal-card" style="max-width: 380px; width: 90%; max-height: 72vh; padding: 16px 18px; text-align: center; display: flex; flex-direction: column;">
+        <div class="modal-card" style="max-width: 380px; width: 90%; max-height: 90vh; padding: 16px 18px; text-align: center; display: flex; flex-direction: column; height: auto; align-self: center;">
             <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px; flex-shrink: 0;">
                 <h3 id="modal-insignia-detail-title" style="margin: 0; font-size: 1.1rem; color: var(--text-primary); font-family: 'Cinzel', serif;">
                     Detalle de Insignia
                 </h3>
                 <button class="modal-close" id="btn-close-insignia-detail-modal" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
-            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 2px;">
+            <div class="modal-body" style="display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 2px;">
                 <!-- Icono Grande Circunscrito y Estado -->
                 <div style="display: flex; flex-direction: column; align-items: center; margin: 4px 0 10px 0;">
                     <div id="modal-insignia-detail-icon-wrapper" class="medal-icon-wrapper" style="width: 60px; height: 60px; font-size: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; transition: all 0.25s ease;">
@@ -3291,13 +3291,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=377"></script>
+    <script src="app.js?v=378"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=377
+        // Purga de caché antigua y registro del Service Worker v=378
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v377") {
+                    if (key !== "yacente-v378") {
                         caches.delete(key);
                     }
                 });
@@ -3310,9 +3310,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=377")
+                navigator.serviceWorker.register("sw.js?v=378")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v377 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v378 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
