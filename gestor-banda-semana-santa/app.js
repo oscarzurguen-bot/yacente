@@ -11394,10 +11394,10 @@ function openSingleInsigniaDetailModal(medalId) {
             statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
         } else if (medal.unlocked) {
             const starsText = medal.stars ? ` (${'★'.repeat(medal.stars)})` : '';
-            statusBadgeEl.innerText = `Desbloqueada${starsText}`;
-            statusBadgeEl.style.background = "rgba(46, 204, 113, 0.15)";
-            statusBadgeEl.style.color = "#2ecc71";
-            statusBadgeEl.style.border = "1px solid rgba(46, 204, 113, 0.4)";
+            statusBadgeEl.innerText = `Conseguida${starsText}`;
+            statusBadgeEl.style.background = "rgba(212, 175, 55, 0.15)";
+            statusBadgeEl.style.color = "#D4AF37";
+            statusBadgeEl.style.border = "1px solid rgba(212, 175, 55, 0.4)";
         } else {
             statusBadgeEl.innerText = "Bloqueada";
             statusBadgeEl.style.background = "rgba(149, 165, 166, 0.15)";
