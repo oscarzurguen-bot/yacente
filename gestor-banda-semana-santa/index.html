@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=373">
+    <link rel="stylesheet" href="style.css?v=374">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1288,7 +1288,7 @@
                     <div style="display: flex; flex-direction: column; gap: 25px;">
                         <!-- Categoría: Asistencia -->
                         <div>
-                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                                 📅 Asistencia
                             </h4>
                             <div class="medals-grid">
@@ -1377,7 +1377,7 @@
 
                         <!-- Categoría: Legado -->
                         <div>
-                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                                 📜 Legado
                             </h4>
                             <div class="medals-grid">
@@ -1436,7 +1436,7 @@
 
                         <!-- Categoría: Especiales -->
                         <div>
-                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                                 ✨ Especiales
                             </h4>
                             <div class="medals-grid">
@@ -1852,9 +1852,7 @@
     <div id="modal-insignias-info" class="modal-overlay">
         <div class="modal-card modal-card-standard-size" style="text-align: center;">
             <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">
-                    <span id="modal-insignias-header-icon">🏅</span> Mis Insignias
-                </h3>
+                <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">Mis insignias</h3>
                 <button class="modal-close" id="btn-close-insignias-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
             <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;">
@@ -3241,13 +3239,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=373"></script>
+    <script src="app.js?v=375"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=373
+        // Purga de caché antigua y registro del Service Worker v=375
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v373") {
+                    if (key !== "yacente-v375") {
                         caches.delete(key);
                     }
                 });
@@ -3260,9 +3258,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=373")
+                navigator.serviceWorker.register("sw.js?v=375")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v373 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v375 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

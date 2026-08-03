@@ -3521,20 +3521,21 @@ body.component-portal #candle-tribute-container {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: rgba(212, 175, 55, 0.12);
-    border: 1px solid rgba(212, 175, 55, 0.35);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
     padding: 5px 10px;
     border-radius: 20px;
-    color: var(--color-gold);
-    font-weight: 700;
+    color: var(--text-primary);
+    font-weight: 600;
     font-size: 0.82rem;
-    box-shadow: 0 4px 10px rgba(212, 175, 55, 0.1);
+    box-shadow: none;
     cursor: pointer;
     user-select: none;
-    transition: transform 0.2s ease, background 0.2s ease;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 .profile-insignias-badge:hover {
     transform: scale(1.05);
+    border-color: var(--border-active);
 }
 .profile-insignias-badge.alarm-red {
     background: var(--color-absent-transparent) !important;

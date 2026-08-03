@@ -11200,7 +11200,6 @@ function openInsigniasInfoModal() {
         return acc + (m.stars || 1);
     }, 0);
 
-    const headerIconEl = document.getElementById("modal-insignias-header-icon");
     const iconBigEl = document.getElementById("modal-insignias-icon-big");
     const countBigEl = document.getElementById("modal-insignias-count-big");
     const subtitleEl = document.getElementById("modal-insignias-subtitle");
@@ -11212,7 +11211,6 @@ function openInsigniasInfoModal() {
     if (countBigEl) countBigEl.innerText = unlockedInsigniasCount;
 
     if (hasVolverEnsayar) {
-        if (headerIconEl) headerIconEl.innerText = "⚠️";
         if (iconBigEl) iconBigEl.innerText = "⚠️";
         if (subtitleEl) {
             subtitleEl.innerText = "Insignias Suspendidas";
@@ -11229,7 +11227,6 @@ function openInsigniasInfoModal() {
             statusValEl.innerText = "Anuladas por baja asistencia (<50%)";
         }
     } else {
-        if (headerIconEl) headerIconEl.innerText = "🏅";
         if (iconBigEl) iconBigEl.innerText = "🏅";
         if (subtitleEl) {
             subtitleEl.innerText = "Insignias Desbloqueadas";
