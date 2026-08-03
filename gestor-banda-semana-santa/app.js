@@ -2874,6 +2874,7 @@ function setupMarchasDragAndDrop() {
     setupMultiEventSelectModalEvents();
     setupProfilePhotoEvents();
     setupAnnouncementEvents();
+    setupMusicianDrawerAndSettingsEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -2933,7 +2934,8 @@ function setupComponentSwipeNavigation() {
         "section-componente-ficha",
         "section-componente-eventos",
         "section-componente-historial",
-        "section-componente-repertorio"
+        "section-componente-repertorio",
+        "section-componente-ajustes"
     ];
 
     mainContent.addEventListener("touchstart", (e) => {
@@ -3006,7 +3008,8 @@ function renderActiveSection(sectionId, forcedDirection) {
         "section-componente-ficha",
         "section-componente-eventos",
         "section-componente-historial",
-        "section-componente-repertorio"
+        "section-componente-repertorio",
+        "section-componente-ajustes"
     ];
 
     let direction = forcedDirection;
@@ -13181,6 +13184,95 @@ function setupProfilePhotoEvents() {
     if (compFileInput) {
         compFileInput.addEventListener("change", processPhotoUpload);
     }
+}
+
+function setupMusicianDrawerAndSettingsEvents() {
+    const btnHamburger = document.getElementById("btn-musician-hamburger");
+    const modalDrawer = document.getElementById("modal-musician-drawer");
+    const btnCloseDrawer = document.getElementById("btn-close-musician-drawer");
+
+    const openDrawer = () => {
+        if (modalDrawer) modalDrawer.classList.add("active");
+    };
+
+    const closeDrawer = () => {
+        if (modalDrawer) modalDrawer.classList.remove("active");
+    };
+
+    if (btnHamburger) btnHamburger.addEventListener("click", openDrawer);
+    if (btnCloseDrawer) btnCloseDrawer.addEventListener("click", closeDrawer);
+
+    if (modalDrawer) {
+        modalDrawer.addEventListener("click", (e) => {
+            if (e.target === modalDrawer) closeDrawer();
+        });
+    }
+
+    // Enlaces dentro del menú drawer
+    document.querySelectorAll(".drawer-item").forEach(item => {
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetId = item.getAttribute("data-target");
+            closeDrawer();
+            if (!targetId) return;
+
+            document.querySelectorAll(".drawer-item").forEach(d => d.classList.remove("active"));
+            item.classList.add("active");
+
+            // Sincronizar también con los ítems de la barra inferior
+            document.querySelectorAll(".mobile-nav-item").forEach(nav => {
+                if (nav.getAttribute("data-target") === targetId) {
+                    nav.classList.add("active");
+                } else {
+                    nav.classList.remove("active");
+                }
+            });
+
+            renderActiveSection(targetId);
+        });
+    });
+
+    // Formulario de cambio de PIN en Ajustes
+    const formPin = document.getElementById("form-change-pin-ajustes");
+    if (formPin) {
+        formPin.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const musicianId = getAuthMusicianId();
+            if (!musicianId) {
+                showToast("Sesión de músico no válida", "error");
+                return;
+            }
+
+            const inputPin = document.getElementById("change-pin-new-ajustes");
+            const newPin = inputPin ? inputPin.value.trim() : "";
+
+            if (!/^\d{4}$/.test(newPin)) {
+                showToast("El PIN debe constar exactamente de 4 números.", "warning");
+                return;
+            }
+
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+            if (!musician) {
+                showToast("Músico no encontrado en la base de datos", "error");
+                return;
+            }
+
+            musician.pin = newPin;
+            saveStateToLocalStorage();
+            dbSaveMusician(musician);
+
+            if (inputPin) inputPin.value = "";
+            showToast("PIN de acceso actualizado correctamente", "success");
+        });
+    }
+
+    // Event listeners para botones de cerrar sesión del músico (.btn-logout-component)
+    document.querySelectorAll(".btn-logout-component").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            logoutComponent();
+        });
+    });
 }
 
 function renderGeneralOverviewChart() {
