@@ -1197,6 +1197,21 @@ function dbDeleteSession(date) {
     }
 }
 
+function dbDeleteSuggestion(suggestion) {
+    if (isCloudActive() && suggestion.docId) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").doc(suggestion.docId).delete()
+            .catch(err => {
+                console.error("Error al eliminar sugerencia en nube:", err);
+                throw err;
+            });
+    } else {
+        state.suggestions = (state.suggestions || []).filter(s => s.id !== suggestion.id);
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
 function dbSaveSuggestion(suggestion) {
     if (isCloudActive()) {
         const db = firebase.firestore();
@@ -3196,6 +3211,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageTitle.innerText = "Sugerencias";
             pageSubtitle.innerText = "Haz llegar tus propuestas a la directiva";
             dateContainer.classList.add("hidden");
+            renderComponentSugerenciasPage();
             break;
         case "section-componente-ajustes":
             pageTitle.innerText = "Ajustes";
@@ -13349,6 +13365,39 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+const SUGGESTION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getSuggestionCooldownEnd(musicianId) {
+    const mySuggestions = (state.suggestions || []).filter(s => String(s.authorId) === String(musicianId));
+    if (mySuggestions.length === 0) return null;
+    const lastDate = mySuggestions.reduce((latest, s) => {
+        const t = new Date(s.date).getTime();
+        return t > latest ? t : latest;
+    }, 0);
+    const cooldownEnd = lastDate + SUGGESTION_COOLDOWN_MS;
+    return cooldownEnd > Date.now() ? new Date(cooldownEnd) : null;
+}
+
+function renderComponentSugerenciasPage() {
+    const musicianId = getAuthMusicianId();
+    const form = document.getElementById("form-suggestion-mailbox");
+    const notice = document.getElementById("suggestion-limit-notice");
+    const noticeDate = document.getElementById("suggestion-limit-date");
+    if (!form || !notice) return;
+
+    const cooldownEnd = musicianId ? getSuggestionCooldownEnd(musicianId) : null;
+    if (cooldownEnd) {
+        form.classList.add("hidden");
+        notice.classList.remove("hidden");
+        if (noticeDate) {
+            noticeDate.innerText = cooldownEnd.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+    } else {
+        form.classList.remove("hidden");
+        notice.classList.add("hidden");
+    }
+}
+
 function setupSuggestionsMailboxEvents() {
     // Formulario de envío de sugerencia (vista músico)
     const formSuggestion = document.getElementById("form-suggestion-mailbox");
@@ -13360,6 +13409,13 @@ function setupSuggestionsMailboxEvents() {
                 showToast("Sesión de músico no válida", "error");
                 return;
             }
+            const cooldownEnd = getSuggestionCooldownEnd(musicianId);
+            if (cooldownEnd) {
+                showToast("Solo puedes enviar una sugerencia por semana.", "warning");
+                renderComponentSugerenciasPage();
+                return;
+            }
+
             const musician = state.musicians.find(m => String(m.id) === String(musicianId));
             const textInput = document.getElementById("suggestion-text");
             const text = textInput ? textInput.value.trim() : "";
@@ -13388,6 +13444,7 @@ function setupSuggestionsMailboxEvents() {
                     const toggle = document.getElementById("suggestion-anonymous-toggle");
                     if (toggle) toggle.checked = false;
                     showToast("Sugerencia enviada a la directiva. ¡Gracias!", "success");
+                    renderComponentSugerenciasPage();
                 })
                 .catch(() => {
                     showToast("No se ha podido enviar la sugerencia. Comprueba tu conexión e inténtalo de nuevo.", "error");
@@ -13450,10 +13507,28 @@ function renderAdminSuggestionsList() {
         itemDiv.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
                 <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-gold);">${authorLabel}</span>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(sug.date).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(sug.date).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
+                    <button type="button" class="btn-delete-suggestion" title="Eliminar sugerencia" aria-label="Eliminar sugerencia" style="background: none; border: none; cursor: pointer; color: var(--color-absent); padding: 2px; display: inline-flex; align-items: center;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
             </div>
             <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: var(--text-color); white-space: pre-wrap;">${escapeHtml(sug.text)}</p>
         `;
+
+        const deleteBtn = itemDiv.querySelector(".btn-delete-suggestion");
+        deleteBtn.addEventListener("click", () => {
+            if (!confirm("¿Estás seguro de que quieres eliminar esta sugerencia? Esta acción no se puede deshacer.")) return;
+            dbDeleteSuggestion(sug)
+                .then(() => {
+                    showToast("Sugerencia eliminada", "success");
+                    renderAdminSuggestionsList();
+                })
+                .catch(() => {
+                    showToast("No se ha podido eliminar la sugerencia.", "error");
+                });
+        });
 
         container.appendChild(itemDiv);
     });
