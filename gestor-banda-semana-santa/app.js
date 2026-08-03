@@ -4706,6 +4706,16 @@ function openPhotoPreviewModal(musicianId) {
         initialsEl.classList.remove("hidden");
     }
 
+    const currentMusId = getAuthMusicianId();
+    const btnEditModal = document.getElementById("btn-edit-photo-modal");
+    if (btnEditModal) {
+        if (currentMusId && String(currentMusId) === String(musicianId)) {
+            btnEditModal.classList.remove("hidden");
+        } else {
+            btnEditModal.classList.add("hidden");
+        }
+    }
+
     modal.classList.add("active");
 }
 
@@ -11621,9 +11631,6 @@ function openCompRehearsalDetailModal(date) {
 
     const pctEl = document.getElementById("comp-rehearsal-detail-pct");
     const countsEl = document.getElementById("comp-rehearsal-detail-counts");
-    const badgePresent = document.getElementById("comp-rehearsal-badge-present");
-    const badgeJustified = document.getElementById("comp-rehearsal-badge-justified");
-    const badgeAbsent = document.getElementById("comp-rehearsal-badge-absent");
 
     if (pctEl) {
         pctEl.innerText = `${pct}%`;
@@ -11634,9 +11641,6 @@ function openCompRehearsalDetailModal(date) {
     if (countsEl) {
         countsEl.innerText = `${presentCount} presentes de ${totalConvocated} convocados`;
     }
-    if (badgePresent) badgePresent.innerText = `🟢 ${presentCount} Pres.`;
-    if (badgeJustified) badgeJustified.innerText = `🟡 ${justifiedCount} Just.`;
-    if (badgeAbsent) badgeAbsent.innerText = `🔴 ${absentCount} Aus.`;
 
     // Render Played Marches List
     const marchasContainer = document.getElementById("comp-rehearsal-detail-marchas");
@@ -12404,65 +12408,90 @@ function setupPreavisoEvents() {
 
 function setupProfilePhotoEvents() {
     const avatarContainer = document.getElementById("comp-profile-avatar-container");
-    const btnEditPhoto = document.getElementById("btn-edit-photo");
-    const fileInput = document.getElementById("comp-photo-file-input");
+    const btnEditModal = document.getElementById("btn-edit-photo-modal");
+    const fileInputModal = document.getElementById("modal-photo-file-input");
+    const compFileInput = document.getElementById("comp-photo-file-input");
 
-    if (fileInput) {
-        if (avatarContainer) {
-            avatarContainer.addEventListener("click", () => {
-                fileInput.click();
-            });
-        }
-        if (btnEditPhoto) {
-            btnEditPhoto.addEventListener("click", (e) => {
-                e.stopPropagation();
-                fileInput.click();
-            });
-        }
-
-        fileInput.addEventListener("change", (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
+    // En la ficha del músico, hacer clic en el avatar SOLO abre la foto en grande
+    if (avatarContainer) {
+        avatarContainer.onclick = (e) => {
+            e.stopPropagation();
             const musicianId = getAuthMusicianId();
-            if (!musicianId) return;
+            if (musicianId) {
+                openPhotoPreviewModal(musicianId);
+            }
+        };
+    }
 
-            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
-            if (!musician) return;
+    // Botón "Cambiar foto de perfil" dentro del modal en grande
+    if (btnEditModal && fileInputModal) {
+        btnEditModal.onclick = (e) => {
+            e.stopPropagation();
+            fileInputModal.click();
+        };
+    }
 
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement("canvas");
-                    const maxDim = 200;
-                    let width = img.width;
-                    let height = img.height;
+    const processPhotoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-                    const minDim = Math.min(width, height);
-                    const sx = (width - minDim) / 2;
-                    const sy = (height - minDim) / 2;
+        const musicianId = getAuthMusicianId();
+        if (!musicianId) return;
 
-                    canvas.width = maxDim;
-                    canvas.height = maxDim;
-                    const ctx = canvas.getContext("2d");
-                    ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, maxDim, maxDim);
+        const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+        if (!musician) return;
 
-                    const base64Photo = canvas.toDataURL("image/jpeg", 0.82);
-                    musician.photo = base64Photo;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const maxDim = 800; // Alta resolución HD sin pérdida de calidad visual
+                let width = img.width;
+                let height = img.height;
 
-                    saveStateToLocalStorage();
-                    dbSaveMusician(musician);
+                const minDim = Math.min(width, height);
+                const sx = (width - minDim) / 2;
+                const sy = (height - minDim) / 2;
 
-                    renderComponentFicha();
-                    renderAttendance();
-                    showToast("Foto de perfil actualizada correctamente", "success");
-                };
-                img.src = evt.target.result;
+                canvas.width = maxDim;
+                canvas.height = maxDim;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, maxDim, maxDim);
+
+                const base64Photo = canvas.toDataURL("image/jpeg", 0.88);
+                musician.photo = base64Photo;
+
+                saveStateToLocalStorage();
+                dbSaveMusician(musician);
+
+                // Actualizar imagen en el modal en tiempo real
+                const modalImg = document.getElementById("photo-preview-img");
+                const modalInitials = document.getElementById("photo-preview-initials");
+                if (modalImg) {
+                    modalImg.src = base64Photo;
+                    modalImg.classList.remove("hidden");
+                }
+                if (modalInitials) {
+                    modalInitials.classList.add("hidden");
+                }
+
+                renderComponentFicha();
+                renderAttendance();
+                renderPlantillaTable();
+                showToast("Foto de perfil actualizada con alta calidad", "success");
             };
-            reader.readAsDataURL(file);
-            fileInput.value = "";
-        });
+            img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+        e.target.value = "";
+    };
+
+    if (fileInputModal) {
+        fileInputModal.addEventListener("change", processPhotoUpload);
+    }
+    if (compFileInput) {
+        compFileInput.addEventListener("change", processPhotoUpload);
     }
 }
 

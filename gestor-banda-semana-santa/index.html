@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=341">
+    <link rel="stylesheet" href="style.css?v=342">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3009,12 +3009,7 @@
                     <div>
                         <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Asistencia General</div>
                         <div id="comp-rehearsal-detail-pct" style="font-size: 2.2rem; font-weight: 800; font-family: 'Outfit', sans-serif; color: var(--color-gold); line-height: 1.1; margin-top: 2px;">--%</div>
-                        <div id="comp-rehearsal-detail-counts" style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">-- presentes de -- convocados</div>
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                        <span id="comp-rehearsal-badge-present" class="badge" style="background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); font-size: 0.78rem; padding: 4px 8px; border-radius: 6px;">🟢 -- Pres.</span>
-                        <span id="comp-rehearsal-badge-justified" class="badge" style="background: rgba(241, 196, 15, 0.15); color: #f1c40f; border: 1px solid rgba(241, 196, 15, 0.3); font-size: 0.78rem; padding: 4px 8px; border-radius: 6px;">🟡 -- Just.</span>
-                        <span id="comp-rehearsal-badge-absent" class="badge" style="background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); font-size: 0.78rem; padding: 4px 8px; border-radius: 6px;">🔴 -- Aus.</span>
+                        <div id="comp-rehearsal-detail-counts" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; font-weight: 500;">-- presentes de -- convocados</div>
                     </div>
                 </div>
 
@@ -3141,13 +3136,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=341"></script>
+    <script src="app.js?v=342"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=341
+        // Purga de caché antigua y registro del Service Worker v=342
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v341") {
+                    if (key !== "yacente-v342") {
                         caches.delete(key);
                     }
                 });
@@ -3160,9 +3155,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=341")
+                navigator.serviceWorker.register("sw.js?v=342")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v341 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v342 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
