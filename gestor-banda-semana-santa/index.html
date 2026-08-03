@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=343">
+    <link rel="stylesheet" href="style.css?v=344">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3040,11 +3040,15 @@
                 </svg>
             </button>
             
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                <span id="upcoming-event-badge-type" class="badge" style="background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; font-weight: 700; text-transform: uppercase;">ENSAYO GENERAL</span>
-            </div>
+            <h3 id="upcoming-event-detail-title" style="margin: 0 0 8px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
             
-            <h3 id="upcoming-event-detail-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
+            <p style="margin: 0 0 12px 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.45;">
+                Confirma tu asistencia o ausencia haciendo un preaviso a la dirección. De esta forma se podrá hacer una previsión de la asistencia y valorar cambios en la programación.
+            </p>
+
+            <div style="margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+                <span id="upcoming-event-detail-badge" class="comp-attendance-badge pending">Pendiente</span>
+            </div>
             
             <!-- Tarjeta de Detalles del Evento -->
             <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
@@ -3079,15 +3083,6 @@
                         <div id="upcoming-event-detail-convocated" style="font-size: 0.88rem; color: var(--color-gold); font-weight: 600; margin-top: 1px;">Cornetas 1ª, Trompetas 1ª</div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Estatus de Asistencia del Músico -->
-            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                <div>
-                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Tu Asistencia</div>
-                    <div id="upcoming-event-detail-user-status" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">🟢 Asistencia Confirmada</div>
-                </div>
-                <div id="upcoming-event-detail-user-badge" class="badge" style="font-size: 0.8rem; padding: 4px 10px;">Preavisado</div>
             </div>
 
             <!-- Botones de Acción -->
@@ -3206,13 +3201,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=343"></script>
+    <script src="app.js?v=344"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=343
+        // Purga de caché antigua y registro del Service Worker v=344
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v343") {
+                    if (key !== "yacente-v344") {
                         caches.delete(key);
                     }
                 });
@@ -3225,9 +3220,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=343")
+                navigator.serviceWorker.register("sw.js?v=344")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v343 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v344 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

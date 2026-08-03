@@ -11701,9 +11701,8 @@ function openUpcomingEventDetailModal(date) {
     const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
     const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
 
-    // Title and Badge Type
+    // Title
     const titleEl = document.getElementById("upcoming-event-detail-title");
-    const badgeTypeEl = document.getElementById("upcoming-event-badge-type");
 
     let typeLabel = sessionType === "actuacion" ? "Actuación Oficial" : "Ensayo General";
     if (sessionInfo) {
@@ -11714,21 +11713,36 @@ function openUpcomingEventDetailModal(date) {
         }
     }
 
-    if (badgeTypeEl) {
-        badgeTypeEl.innerText = sessionType === "actuacion" ? "ACTUACIÓN" : "ENSAYO";
-        if (sessionType === "actuacion") {
-            badgeTypeEl.style.background = "rgba(155, 89, 182, 0.18)";
-            badgeTypeEl.style.color = "#9b59b6";
-            badgeTypeEl.style.borderColor = "rgba(155, 89, 182, 0.4)";
-        } else {
-            badgeTypeEl.style.background = "rgba(212, 175, 55, 0.15)";
-            badgeTypeEl.style.color = "var(--color-gold)";
-            badgeTypeEl.style.borderColor = "rgba(212, 175, 55, 0.3)";
+    if (titleEl) {
+        titleEl.innerText = sessionInfo && sessionInfo.name ? sessionInfo.name : typeLabel;
+    }
+
+    // Badge styling & text below explanation
+    const badgeEl = document.getElementById("upcoming-event-detail-badge");
+
+    const record = (state.attendance && state.attendance[date] && musicianId) ? state.attendance[date][musicianId] : null;
+
+    let badgeClass = "pending";
+    let badgeText = "Pendiente";
+
+    if (record) {
+        if (record.status === "present") {
+            badgeClass = "present";
+            badgeText = "Presente";
+        } else if (record.status === "absent") {
+            if (record.justified) {
+                badgeClass = "justified";
+                badgeText = "Justificada";
+            } else {
+                badgeClass = "absent";
+                badgeText = "Ausente";
+            }
         }
     }
 
-    if (titleEl) {
-        titleEl.innerText = sessionInfo && sessionInfo.name ? sessionInfo.name : typeLabel;
+    if (badgeEl) {
+        badgeEl.className = `comp-attendance-badge ${badgeClass}`;
+        badgeEl.innerText = badgeText;
     }
 
     // Date
@@ -11757,58 +11771,6 @@ function openUpcomingEventDetailModal(date) {
         if (convEl) convEl.innerText = sessionInfo.convocatedVoices.join(", ");
     } else {
         if (convBox) convBox.classList.add("hidden");
-    }
-
-    // User Attendance Status
-    const statusTextEl = document.getElementById("upcoming-event-detail-user-status");
-    const statusBadgeEl = document.getElementById("upcoming-event-detail-user-badge");
-
-    const record = (state.attendance && state.attendance[date] && musicianId) ? state.attendance[date][musicianId] : null;
-
-    if (record) {
-        if (record.status === "present") {
-            if (statusTextEl) {
-                statusTextEl.innerHTML = `<span style="color: #2ecc71;">🟢 Asistencia Confirmada</span>`;
-            }
-            if (statusBadgeEl) {
-                statusBadgeEl.innerText = "Confirmado";
-                statusBadgeEl.style.background = "rgba(46, 204, 113, 0.15)";
-                statusBadgeEl.style.color = "#2ecc71";
-                statusBadgeEl.style.border = "1px solid rgba(46, 204, 113, 0.3)";
-            }
-        } else if (record.status === "absent") {
-            if (record.justified) {
-                if (statusTextEl) {
-                    statusTextEl.innerHTML = `<span style="color: #f1c40f;">🟡 Ausencia Justificada</span>`;
-                }
-                if (statusBadgeEl) {
-                    statusBadgeEl.innerText = "Preavisado";
-                    statusBadgeEl.style.background = "rgba(241, 196, 15, 0.15)";
-                    statusBadgeEl.style.color = "#f1c40f";
-                    statusBadgeEl.style.border = "1px solid rgba(241, 196, 15, 0.3)";
-                }
-            } else {
-                if (statusTextEl) {
-                    statusTextEl.innerHTML = `<span style="color: #e74c3c;">🔴 Ausente (Sin justificar)</span>`;
-                }
-                if (statusBadgeEl) {
-                    statusBadgeEl.innerText = "Ausente";
-                    statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
-                    statusBadgeEl.style.color = "#e74c3c";
-                    statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.3)";
-                }
-            }
-        }
-    } else {
-        if (statusTextEl) {
-            statusTextEl.innerHTML = `<span style="color: var(--text-muted);">⚪ Pendiente de responder</span>`;
-        }
-        if (statusBadgeEl) {
-            statusBadgeEl.innerText = "Pendiente";
-            statusBadgeEl.style.background = "rgba(255, 255, 255, 0.08)";
-            statusBadgeEl.style.color = "var(--text-secondary)";
-            statusBadgeEl.style.border = "1px solid rgba(255, 255, 255, 0.15)";
-        }
     }
 
     modal.classList.add("active");
