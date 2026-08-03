@@ -931,34 +931,42 @@ input:checked + .slider:before {
 }
 .plantilla-group-table-card .data-table th,
 .plantilla-group-table-card .data-table td {
-    padding: 8px 6px !important;
+    padding: 8px 4px !important;
     box-sizing: border-box;
 }
-.plantilla-group-table-card .data-table th.col-pin,
-.plantilla-group-table-card .data-table td.col-pin {
-    width: 95px !important;
-    min-width: 95px !important;
-    max-width: 95px !important;
-    text-align: center !important;
-    white-space: nowrap !important;
-}
-.plantilla-group-table-card .data-table th.col-actions,
-.plantilla-group-table-card .data-table td.col-actions {
-    width: 75px !important;
-    min-width: 75px !important;
-    max-width: 75px !important;
-    text-align: center !important;
+.plantilla-group-table-card .data-table th.col-name,
+.plantilla-group-table-card .data-table td.col-name {
+    padding-left: 10px !important;
+    padding-right: 2px !important;
     white-space: nowrap !important;
 }
 .plantilla-group-table-card .data-table th.col-role,
 .plantilla-group-table-card .data-table td.col-role {
-    width: 90px !important;
-    min-width: 80px !important;
+    padding-left: 2px !important;
+    padding-right: 14px !important;
+    width: 80px !important;
+    min-width: 75px !important;
     white-space: nowrap !important;
 }
-.plantilla-group-table-card .data-table th.col-name,
-.plantilla-group-table-card .data-table td.col-name {
+.plantilla-group-table-card .data-table th.col-pin,
+.plantilla-group-table-card .data-table td.col-pin {
+    width: 90px !important;
+    min-width: 90px !important;
+    max-width: 90px !important;
+    text-align: center !important;
     white-space: nowrap !important;
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+}
+.plantilla-group-table-card .data-table th.col-actions,
+.plantilla-group-table-card .data-table td.col-actions {
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    padding-left: 2px !important;
+    padding-right: 8px !important;
 }
 
 /* ==========================================================================
