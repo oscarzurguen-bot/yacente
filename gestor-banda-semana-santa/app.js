@@ -4527,13 +4527,13 @@ function renderPlantillaTable() {
             
             <div class="card-table plantilla-group-table-card">
                 <div class="table-responsive">
-                    <table class="data-table">
+                    <table class="data-table" style="table-layout: fixed; width: 100%;">
                         <thead>
                             <tr>
-                                <th>Nombre</th>
-                                <th>Rol</th>
-                                <th style="text-align: center; width: 100px;">Acceso PIN</th>
-                                <th style="width: 100px; text-align: center;">Acciones</th>
+                                <th style="width: 44%;">Nombre</th>
+                                <th style="width: 28%;">Rol</th>
+                                <th style="text-align: center; width: 75px; padding-left: 2px; padding-right: 2px;">Acceso PIN</th>
+                                <th style="width: 65px; text-align: center; padding-left: 2px; padding-right: 6px;">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4549,23 +4549,23 @@ function renderPlantillaTable() {
         musiciansInVoice.forEach(musician => {
             const initials = getInitials(musician.name);
             const avatarMarkup = musician.photo
-                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 50%; display: block; border: 1.5px solid var(--color-gold); box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);">`
-                : `<div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 50%; display: block; border: 1.5px solid var(--color-gold); box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);">`
+                : `<div style="width: 30px; height: 30px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
 
             const tr = document.createElement("tr");
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
                         <div class="musician-avatar-clickable" data-id="${musician.id}" style="cursor: pointer; flex-shrink: 0; transition: transform 0.2s ease;" title="Ver foto en grande">
                             ${avatarMarkup}
                         </div>
-                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; min-width: 0;" title="${musician.name}">${musician.name}</div>
                     </div>
                 </td>
-                <td style="white-space: nowrap;">
-                    <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
+                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; padding-right: 2px;">
+                    <span class="text-muted" title="${musician.role || 'Músico de fila'}" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; max-width: 100%;">${musician.role || 'Músico de fila'}</span>
                 </td>
-                <td style="white-space: nowrap; text-align: center; width: 100px;">
+                <td style="white-space: nowrap; text-align: center; width: 75px; padding-left: 2px; padding-right: 2px;">
                     <div style="display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">
                         ${musician.pin ? `
                             <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="PIN configurado. Pulsa para borrar/restablecer PIN">
@@ -4584,16 +4584,16 @@ function renderPlantillaTable() {
                         `}
                     </div>
                 </td>
-                <td style="white-space: nowrap; width: 100px; text-align: center;">
-                    <div style="display: inline-flex; gap: 8px; justify-content: center; align-items: center; vertical-align: middle;">
+                <td style="white-space: nowrap; width: 65px; text-align: center; padding-left: 2px; padding-right: 6px;">
+                    <div style="display: inline-flex; gap: 6px; justify-content: center; align-items: center; vertical-align: middle;">
                         <button class="btn-action edit-musician-btn" data-id="${musician.id}" title="Editar">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
                         <button class="btn-action delete delete-musician-btn" data-id="${musician.id}" title="Eliminar">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                             </svg>
