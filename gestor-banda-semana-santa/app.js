@@ -1200,12 +1200,16 @@ function dbDeleteSession(date) {
 function dbSaveSuggestion(suggestion) {
     if (isCloudActive()) {
         const db = firebase.firestore();
-        db.collection("suggestions").add(suggestion)
-            .catch(err => console.error("Error al guardar sugerencia en nube:", err));
+        return db.collection("suggestions").add(suggestion)
+            .catch(err => {
+                console.error("Error al guardar sugerencia en nube:", err);
+                throw err;
+            });
     } else {
         state.suggestions = state.suggestions || [];
         state.suggestions.unshift(suggestion);
         saveStateToLocalStorage();
+        return Promise.resolve();
     }
 }
 
@@ -13251,6 +13255,11 @@ function setupMusicianDrawerAndSettingsEvents() {
 
     const openDrawer = () => {
         if (modalDrawer) modalDrawer.classList.add("active");
+        const currentSection = document.querySelector(".app-section.active");
+        const currentId = currentSection ? currentSection.id : null;
+        document.querySelectorAll(".drawer-item").forEach(d => {
+            d.classList.toggle("active", d.getAttribute("data-target") === currentId);
+        });
     };
 
     const closeDrawer = () => {
@@ -13325,7 +13334,8 @@ function setupMusicianDrawerAndSettingsEvents() {
     }
 
     // Event listeners para botones de cerrar sesión del músico (.btn-logout-component)
-    document.querySelectorAll(".btn-logout-component").forEach(btn => {
+    // Se excluyen los de la barra inferior (.mobile-nav-item), que ya gestiona su propio handler genérico
+    document.querySelectorAll(".btn-logout-component:not(.mobile-nav-item)").forEach(btn => {
         btn.addEventListener("click", (e) => {
             e.preventDefault();
             logoutComponent();
@@ -13369,12 +13379,22 @@ function setupSuggestionsMailboxEvents() {
                 date: new Date().toISOString()
             };
 
-            dbSaveSuggestion(suggestionObj);
+            const submitBtn = formSuggestion.querySelector("button[type=submit]");
+            if (submitBtn) submitBtn.disabled = true;
 
-            if (textInput) textInput.value = "";
-            const toggle = document.getElementById("suggestion-anonymous-toggle");
-            if (toggle) toggle.checked = false;
-            showToast("Sugerencia enviada a la directiva. ¡Gracias!", "success");
+            dbSaveSuggestion(suggestionObj)
+                .then(() => {
+                    if (textInput) textInput.value = "";
+                    const toggle = document.getElementById("suggestion-anonymous-toggle");
+                    if (toggle) toggle.checked = false;
+                    showToast("Sugerencia enviada a la directiva. ¡Gracias!", "success");
+                })
+                .catch(() => {
+                    showToast("No se ha podido enviar la sugerencia. Comprueba tu conexión e inténtalo de nuevo.", "error");
+                })
+                .finally(() => {
+                    if (submitBtn) submitBtn.disabled = false;
+                });
         });
     }
 
