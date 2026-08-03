@@ -4541,7 +4541,7 @@ function renderPlantillaTable() {
                             <tr>
                                 <th class="col-name">Nombre</th>
                                 <th class="col-role">Rol</th>
-                                <th class="col-pin">Acceso PIN</th>
+                                <th class="col-pin">Pin</th>
                                 <th class="col-actions">Acciones</th>
                             </tr>
                         </thead>
