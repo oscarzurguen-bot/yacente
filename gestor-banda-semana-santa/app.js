@@ -11336,10 +11336,12 @@ function openSingleInsigniaDetailModal(medalId) {
 
     const titleEl = document.getElementById("modal-insignia-detail-title");
     const iconEl = document.getElementById("modal-insignia-detail-icon");
+    const iconWrapperEl = document.getElementById("modal-insignia-detail-icon-wrapper");
     const statusBadgeEl = document.getElementById("modal-insignia-detail-status-badge");
     const descEl = document.getElementById("modal-insignia-detail-desc");
     const progressTextEl = document.getElementById("modal-insignia-detail-progress-text");
     const progressBarEl = document.getElementById("modal-insignia-detail-progress-bar");
+    const tiersSectionEl = document.getElementById("modal-insignia-detail-tiers-section");
     const tiersContainerEl = document.getElementById("modal-insignia-detail-tiers-container");
     const modal = document.getElementById("modal-single-insignia-detail");
 
@@ -11349,15 +11351,44 @@ function openSingleInsigniaDetailModal(medalId) {
     if (progressTextEl) progressTextEl.innerText = medal.progressText;
     if (progressBarEl) progressBarEl.style.width = `${medal.progressPct}%`;
 
+    // Estilo del icono circunscrito principal
+    if (iconWrapperEl) {
+        if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+            iconWrapperEl.style.background = "rgba(231, 76, 60, 0.15)";
+            iconWrapperEl.style.border = "2px solid #E74C3C";
+            iconWrapperEl.style.boxShadow = "0 0 12px rgba(231, 76, 60, 0.3)";
+            iconWrapperEl.style.opacity = "1";
+            iconWrapperEl.style.filter = "none";
+        } else if (medal.isNegative && medal.unlocked) {
+            iconWrapperEl.style.background = "rgba(231, 76, 60, 0.15)";
+            iconWrapperEl.style.border = "2px solid #E74C3C";
+            iconWrapperEl.style.boxShadow = "0 0 12px rgba(231, 76, 60, 0.3)";
+            iconWrapperEl.style.opacity = "1";
+            iconWrapperEl.style.filter = "none";
+        } else if (medal.unlocked) {
+            iconWrapperEl.style.background = "rgba(212, 175, 55, 0.15)";
+            iconWrapperEl.style.border = "2px solid #D4AF37";
+            iconWrapperEl.style.boxShadow = "0 0 12px rgba(212, 175, 55, 0.3)";
+            iconWrapperEl.style.opacity = "1";
+            iconWrapperEl.style.filter = "none";
+        } else {
+            iconWrapperEl.style.background = "rgba(255, 255, 255, 0.03)";
+            iconWrapperEl.style.border = "2px solid rgba(255, 255, 255, 0.12)";
+            iconWrapperEl.style.boxShadow = "none";
+            iconWrapperEl.style.opacity = "0.5";
+            iconWrapperEl.style.filter = "grayscale(1)";
+        }
+    }
+
     // Estado general
     if (statusBadgeEl) {
         if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
-            statusBadgeEl.innerText = "⚠️ Suspendida (<50% Asistencia)";
+            statusBadgeEl.innerText = "Anulada";
             statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
             statusBadgeEl.style.color = "var(--color-absent)";
             statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
         } else if (medal.isNegative && medal.unlocked) {
-            statusBadgeEl.innerText = "⚠️ Alerta Activa (<50% Asistencia)";
+            statusBadgeEl.innerText = "Alerta Activa";
             statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
             statusBadgeEl.style.color = "var(--color-absent)";
             statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
@@ -11375,62 +11406,50 @@ function openSingleInsigniaDetailModal(medalId) {
         }
     }
 
-    // Generar niveles
-    if (tiersContainerEl) {
-        tiersContainerEl.innerHTML = "";
-        const tierDefs = MEDAL_TIER_DEFINITIONS[medal.id];
+    // Generar niveles solo si la insignia tiene sistema de estrellas
+    const tierDefs = MEDAL_TIER_DEFINITIONS[medal.id];
+    if (tierDefs && tierDefs.length > 0) {
+        if (tiersSectionEl) tiersSectionEl.style.display = "block";
+        if (tiersContainerEl) {
+            tiersContainerEl.innerHTML = "";
+            const TIER_COLORS = {
+                1: { color: "#CD7F32", bg: "rgba(205, 127, 50, 0.15)", border: "#CD7F32" }, // Bronce
+                2: { color: "#C0C0C0", bg: "rgba(192, 192, 192, 0.15)", border: "#C0C0C0" }, // Plata
+                3: { color: "#FFD700", bg: "rgba(255, 215, 0, 0.15)", border: "#FFD700" }   // Oro
+            };
 
-        if (tierDefs && tierDefs.length > 0) {
-            // Insignia de 3 niveles (Bronce, Plata, Oro)
             tierDefs.forEach(tier => {
                 const isAchieved = !hasVolverEnsayar && medal.unlocked && (medal.stars >= tier.stars);
                 const isSuspended = hasVolverEnsayar && medal.unlocked && (medal.stars >= tier.stars);
 
                 let badgeHTML = '';
                 if (isSuspended) {
-                    badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(231, 76, 60, 0.15); color: var(--color-absent);">⚠️ Suspendido</span>';
+                    badgeHTML = '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; background: rgba(231, 76, 60, 0.15); color: var(--color-absent);">⚠️ Anulada</span>';
                 } else if (isAchieved) {
-                    badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71;">✔ Conseguido</span>';
+                    badgeHTML = '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71;">✔ Conseguido</span>';
                 } else {
-                    badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">🔒 Pendiente</span>';
+                    badgeHTML = '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">🔒 Pendiente</span>';
                 }
 
+                const tc = TIER_COLORS[tier.stars] || TIER_COLORS[1];
+
                 const tierRow = document.createElement("div");
-                tierRow.style.cssText = "background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;";
+                tierRow.style.cssText = "background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; display: flex; align-items: center; justify-content: space-between; gap: 10px;";
                 tierRow.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-weight: 700; color: var(--text-primary); font-family: 'Cinzel', serif;">${tier.label}:</span>
-                        <span style="color: var(--text-secondary);">${tier.req}</span>
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${tc.border}; background: ${tc.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <span style="font-size: 0.95rem; line-height: 1;">${medal.icon}</span>
+                            <span style="font-size: 0.58rem; color: ${tc.color}; font-weight: 800; line-height: 1; margin-top: 1px;">${'★'.repeat(tier.stars)}</span>
+                        </div>
+                        <span style="color: var(--text-primary); font-size: 0.82rem; font-weight: 500; line-height: 1.3;">${tier.req}</span>
                     </div>
-                    <div>${badgeHTML}</div>
+                    <div style="flex-shrink: 0;">${badgeHTML}</div>
                 `;
                 tiersContainerEl.appendChild(tierRow);
             });
-        } else {
-            // Insignia de 1 único nivel
-            const isAchieved = !hasVolverEnsayar && medal.unlocked;
-            const isSuspended = hasVolverEnsayar && medal.unlocked && !medal.isNegative;
-
-            let badgeHTML = '';
-            if (isSuspended) {
-                badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(231, 76, 60, 0.15); color: var(--color-absent);">⚠️ Suspendido</span>';
-            } else if (isAchieved) {
-                badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71;">✔ Conseguido</span>';
-            } else {
-                badgeHTML = '<span style="font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">🔒 Pendiente</span>';
-            }
-
-            const tierRow = document.createElement("div");
-            tierRow.style.cssText = "background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 8px;";
-            tierRow.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: 700; color: var(--text-primary); font-family: 'Cinzel', serif;">Requisito:</span>
-                    <span style="color: var(--text-secondary);">${medal.desc}</span>
-                </div>
-                <div>${badgeHTML}</div>
-            `;
-            tiersContainerEl.appendChild(tierRow);
         }
+    } else {
+        if (tiersSectionEl) tiersSectionEl.style.display = "none";
     }
 
     if (modal) modal.classList.add("active");
