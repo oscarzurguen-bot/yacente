@@ -12047,6 +12047,9 @@ function renderComponenteCalendario() {
                 return true;
             });
 
+        const indicatorContainer = document.createElement("div");
+        indicatorContainer.className = "comp-calendar-indicator-container";
+
         if (daySessions.length > 0) {
             const isPastDay = dateKey < todayDateKey;
 
@@ -12068,10 +12071,6 @@ function renderComponenteCalendario() {
                     openMultiEventSelectModal(dateKey, daySessions, isPastDay);
                 }
             });
-
-            // Añadir contenedor de etiquetas rectangulares
-            const indicatorContainer = document.createElement("div");
-            indicatorContainer.className = "comp-calendar-indicator-container";
 
             daySessions.forEach(session => {
                 const badge = document.createElement("span");
@@ -12103,13 +12102,13 @@ function renderComponenteCalendario() {
                 }
 
                 badge.className = `comp-calendar-badge ${badgeClass}`;
-                badge.innerText = labelText;
                 badge.title = `${session.name || labelText.toUpperCase()}`;
 
                 indicatorContainer.appendChild(badge);
             });
-            dayCell.appendChild(indicatorContainer);
         }
+
+        dayCell.appendChild(indicatorContainer);
 
         cells.push(dayCell);
     }

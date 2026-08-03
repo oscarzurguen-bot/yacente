@@ -3971,9 +3971,9 @@ body.component-portal #candle-tribute-container {
 
 /* Botón de Preaviso de Asistencia */
 .btn-preaviso-rsvp {
-    background-color: transparent;
-    border: 1px solid var(--color-gold);
-    color: var(--color-gold);
+    background-color: rgba(149, 165, 166, 0.15);
+    border: 1px solid rgba(149, 165, 166, 0.35);
+    color: #95A5A6;
     padding: 4px 10px;
     border-radius: 20px;
     font-size: 0.72rem;
@@ -3983,15 +3983,15 @@ body.component-portal #candle-tribute-container {
     white-space: nowrap;
 }
 .btn-preaviso-rsvp:hover {
-    background-color: var(--color-gold);
+    background-color: #95A5A6;
     color: #000;
-    box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+    box-shadow: 0 0 8px rgba(149, 165, 166, 0.3);
 }
 
 .comp-attendance-badge.pending {
-    background-color: rgba(212, 175, 55, 0.12);
-    color: var(--color-gold);
-    border-color: rgba(212, 175, 55, 0.3);
+    background-color: rgba(149, 165, 166, 0.18);
+    color: #95A5A6;
+    border-color: rgba(149, 165, 166, 0.35);
 }
 
 .comp-attendance-badge.clickable-badge {
@@ -4010,15 +4010,18 @@ body.component-portal #candle-tribute-container {
     background-color: rgba(255, 255, 255, 0.015);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 6px 4px;
+    padding: 5px 2px 4px 2px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
-    height: 58px;
+    height: 52px;
+    min-height: 52px;
+    max-height: 52px;
     box-sizing: border-box;
     position: relative;
     cursor: pointer;
+    overflow: hidden;
     transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 .comp-calendar-day-card:hover {
@@ -4040,6 +4043,8 @@ body.component-portal #candle-tribute-container {
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--text-muted);
+    line-height: 1;
+    margin-bottom: 2px;
 }
 .comp-calendar-day-card.today .comp-calendar-day-number {
     color: var(--color-gold);
@@ -4055,58 +4060,55 @@ body.component-portal #candle-tribute-container {
 .comp-calendar-indicator-container {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
     justify-content: center;
     align-items: center;
     width: 100%;
-    margin-top: 2px;
-    overflow: hidden;
+    height: 16px;
+    min-height: 16px;
+    margin-top: 3px;
+    box-sizing: border-box;
 }
 
+/* Tarjeta rectangular de color sólido sin texto */
 .comp-calendar-badge {
-    display: inline-block;
-    font-size: 0.62rem;
-    font-weight: 700;
-    padding: 1px 4px;
-    border-radius: 4px;
-    text-transform: lowercase;
-    line-height: 1.15;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 95%;
-    text-align: center;
-    border: 1px solid transparent;
+    display: block;
+    width: 18px;
+    height: 4px;
+    border-radius: 2px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
 }
 
 .comp-calendar-badge.present {
-    background-color: var(--color-present-transparent);
-    color: var(--color-present);
-    border-color: rgba(46, 204, 113, 0.3);
+    background-color: #2ECC71;
+    box-shadow: 0 0 4px rgba(46, 204, 113, 0.5);
 }
 
 .comp-calendar-badge.justified {
-    background-color: rgba(230, 126, 34, 0.18);
-    color: #E67E22;
-    border-color: rgba(230, 126, 34, 0.35);
+    background-color: #E67E22;
+    box-shadow: 0 0 4px rgba(230, 126, 34, 0.5);
 }
 
 .comp-calendar-badge.absent {
-    background-color: var(--color-absent-transparent);
-    color: var(--color-absent);
-    border-color: rgba(231, 76, 60, 0.3);
+    background-color: #E74C3C;
+    box-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
 }
 
 .comp-calendar-badge.pending {
-    background-color: rgba(212, 175, 55, 0.15);
-    color: var(--color-gold);
-    border-color: rgba(212, 175, 55, 0.3);
+    background-color: #95A5A6;
+    box-shadow: 0 0 4px rgba(149, 165, 166, 0.5);
 }
 
 .comp-calendar-badge.actuacion {
-    background-color: rgba(155, 89, 182, 0.2);
-    color: #a569bd;
-    border-color: rgba(155, 89, 182, 0.4);
+    background-color: #2ECC71;
+    box-shadow: 0 0 5px rgba(46, 204, 113, 0.7);
+}
+
+.comp-calendar-badge.actuacion {
+    background-color: #2ECC71;
+    box-shadow: 0 0 5px rgba(46, 204, 113, 0.7);
 }
 
 /* Ranking Cards styles */
