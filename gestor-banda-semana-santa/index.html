@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=349">
+    <link rel="stylesheet" href="style.css?v=350">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1577,9 +1577,9 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
                         <h3 id="comp-calendar-month-year" style="margin: 0; font-family: inherit; font-size: 1.1rem; color: var(--color-gold);">Julio 2026</h3>
                         <div style="display: flex; gap: 6px;">
-                            <button id="btn-comp-calendar-prev" class="btn btn-secondary btn-sm" style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Ant.</button>
+                            <button id="btn-comp-calendar-prev" class="btn btn-secondary btn-sm" style="padding: 4px 12px; border-radius: 4px; font-size: 0.9rem; font-weight: 700;" title="Mes anterior">&lt;</button>
                             <button id="btn-comp-calendar-today" class="btn btn-secondary btn-sm" style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Hoy</button>
-                            <button id="btn-comp-calendar-next" class="btn btn-secondary btn-sm" style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Sig.</button>
+                            <button id="btn-comp-calendar-next" class="btn btn-secondary btn-sm" style="padding: 4px 12px; border-radius: 4px; font-size: 0.9rem; font-weight: 700;" title="Mes siguiente">&gt;</button>
                         </div>
                     </div>
                     
@@ -3222,13 +3222,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=349"></script>
+    <script src="app.js?v=350"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=349
+        // Purga de caché antigua y registro del Service Worker v=350
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v349") {
+                    if (key !== "yacente-v350") {
                         caches.delete(key);
                     }
                 });
@@ -3241,9 +3241,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=349")
+                navigator.serviceWorker.register("sw.js?v=350")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v349 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v350 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
