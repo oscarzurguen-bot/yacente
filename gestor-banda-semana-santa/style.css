@@ -399,10 +399,16 @@ input:checked + .slider:before {
 
 /* Period Filter Card styling */
 .period-filter-card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    box-sizing: border-box;
+    clear: both;
     background-color: var(--bg-glass);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 16px 24px;
+    padding: 14px 20px;
+    margin-top: 0;
     margin-bottom: 24px;
     display: flex;
     justify-content: space-between;
@@ -968,13 +974,20 @@ input:checked + .slider:before {
 
 /* Quick Navigation Links for Statistics */
 .stats-quick-nav-card {
-    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    box-sizing: border-box;
+    clear: both;
+    margin-top: 0;
+    margin-bottom: 20px;
     background: linear-gradient(135deg, rgba(63, 6, 17, 0.8), rgba(25, 4, 9, 0.9));
     padding: 14px 18px;
     border-radius: 14px;
     border: 1px solid rgba(184, 27, 52, 0.45);
     backdrop-filter: blur(10px);
-    box-shadow: 0 6px 20px rgba(63, 6, 17, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .btn-stats-quick-link {
     background: rgba(114, 12, 33, 0.5);
