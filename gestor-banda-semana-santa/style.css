@@ -3501,6 +3501,12 @@ body.component-portal #candle-tribute-container {
     color: #ff8c1a;
     font-weight: 700;
     font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+.profile-streak-badge:hover {
+    transform: scale(1.05);
 }
 .profile-insignias-badge {
     display: flex;
@@ -3514,6 +3520,12 @@ body.component-portal #candle-tribute-container {
     font-weight: 700;
     font-size: 0.82rem;
     box-shadow: 0 4px 10px rgba(212, 175, 55, 0.1);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+.profile-insignias-badge:hover {
+    transform: scale(1.05);
 }
 .profile-insignias-badge.alarm-red {
     background: var(--color-absent-transparent) !important;

@@ -1861,6 +1861,29 @@ function setupEventListeners() {
         });
     }
 
+    // Event listeners para el modal de insignias
+    const insigniasModal = document.getElementById("modal-insignias-info");
+    const closeInsigniasBtn = document.getElementById("btn-close-insignias-modal");
+    const okInsigniasBtn = document.getElementById("btn-insignias-modal-ok");
+
+    if (closeInsigniasBtn) {
+        closeInsigniasBtn.addEventListener("click", () => {
+            if (insigniasModal) insigniasModal.classList.remove("active");
+        });
+    }
+    if (okInsigniasBtn) {
+        okInsigniasBtn.addEventListener("click", () => {
+            if (insigniasModal) insigniasModal.classList.remove("active");
+        });
+    }
+    if (insigniasModal) {
+        insigniasModal.addEventListener("click", (e) => {
+            if (e.target === insigniasModal) {
+                insigniasModal.classList.remove("active");
+            }
+        });
+    }
+
     // Modal de previsualización de foto de perfil
     const closePhotoPreview = () => {
         const modal = document.getElementById("modal-photo-preview");
@@ -11165,6 +11188,79 @@ function openStreakInfoModal() {
     }
 }
 
+function openInsigniasInfoModal() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const medalsData = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+
+    const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+
+    const headerIconEl = document.getElementById("modal-insignias-header-icon");
+    const iconBigEl = document.getElementById("modal-insignias-icon-big");
+    const countBigEl = document.getElementById("modal-insignias-count-big");
+    const subtitleEl = document.getElementById("modal-insignias-subtitle");
+    const msgEl = document.getElementById("modal-insignias-message");
+    const statusBoxEl = document.getElementById("modal-insignias-status-box");
+    const statusValEl = document.getElementById("modal-insignias-status-val");
+    const modal = document.getElementById("modal-insignias-info");
+
+    if (countBigEl) countBigEl.innerText = unlockedInsigniasCount;
+
+    if (hasVolverEnsayar) {
+        if (headerIconEl) headerIconEl.innerText = "⚠️";
+        if (iconBigEl) iconBigEl.innerText = "⚠️";
+        if (subtitleEl) {
+            subtitleEl.innerText = "Insignias Suspendidas";
+            subtitleEl.style.color = "var(--color-absent)";
+        }
+        if (msgEl) {
+            msgEl.innerText = "⚠️ Tus insignias conseguidas están temporalmente suspendidas por una asistencia inferior al 50%. Recuerda que ERES IMPORTANTE para el grupo. Acude a los próximos ensayos para recuperar tu porcentaje y reactivar todos tus reconocimientos. ¡Tus compañeros cuentan contigo!";
+        }
+        if (statusBoxEl) {
+            statusBoxEl.style.background = "rgba(231, 76, 60, 0.12)";
+            statusBoxEl.style.color = "var(--color-absent)";
+        }
+        if (statusValEl) {
+            statusValEl.innerText = "Anuladas por baja asistencia (<50%)";
+        }
+    } else {
+        if (headerIconEl) headerIconEl.innerText = "🏅";
+        if (iconBigEl) iconBigEl.innerText = "🏅";
+        if (subtitleEl) {
+            subtitleEl.innerText = "Insignias Desbloqueadas";
+            subtitleEl.style.color = "var(--text-secondary)";
+        }
+        if (statusBoxEl) {
+            statusBoxEl.style.background = "rgba(212, 175, 55, 0.1)";
+            statusBoxEl.style.color = "var(--color-gold)";
+        }
+        if (statusValEl) {
+            statusValEl.innerText = `Medallero Activo (${unlockedInsigniasCount} ${unlockedInsigniasCount === 1 ? 'insignia' : 'insignias'})`;
+        }
+
+        if (msgEl) {
+            if (unlockedInsigniasCount === 0) {
+                msgEl.innerText = "¡Empieza tu colección de reconocimientos! Asiste a los ensayos y actuaciones y completa temporadas para desbloquear tus primeras insignias.";
+            } else if (unlockedInsigniasCount <= 3) {
+                msgEl.innerText = `¡Buen trabajo! Has acumulado ${unlockedInsigniasCount} ${unlockedInsigniasCount === 1 ? 'insignia' : 'insignias'}. Vas por muy buen camino en tu trayectoria con la banda. ¡Sigue sumando logros!`;
+            } else if (unlockedInsigniasCount <= 7) {
+                msgEl.innerText = `¡Excelente trayectoria! Cuentas con ${unlockedInsigniasCount} insignias en tu medallero. Tu constancia y compromiso enriquecen enormemente a la agrupación.`;
+            } else {
+                msgEl.innerText = `🏆 ¡Colección legendaria! Tienes ${unlockedInsigniasCount} insignias conseguidas. Eres un ejemplo de dedicación y fidelidad absoluta para toda la banda.`;
+            }
+        }
+    }
+
+    if (modal) {
+        modal.classList.add("active");
+    }
+}
+
 
 
 function renderComponentFicha() {
@@ -11398,6 +11494,8 @@ function renderComponentFicha() {
     }
     const compInsigniasBadge = document.getElementById("comp-insignias-badge");
     if (compInsigniasBadge) {
+        compInsigniasBadge.style.cursor = "pointer";
+        compInsigniasBadge.onclick = () => openInsigniasInfoModal();
         const iconEl = compInsigniasBadge.querySelector(".insignias-badge-icon");
         if (hasVolverEnsayar) {
             compInsigniasBadge.classList.add("alarm-red");
