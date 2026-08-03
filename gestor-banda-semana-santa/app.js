@@ -2813,8 +2813,9 @@ function setupMarchasDragAndDrop() {
         });
     });
     
-    // Inicializar eventos de preaviso, foto de perfil y comunicados
+    // Inicializar eventos de preaviso, detalle de eventos, foto de perfil y comunicados
     setupPreavisoEvents();
+    setupUpcomingEventDetailEvents();
     setupProfilePhotoEvents();
     setupAnnouncementEvents();
 
@@ -11689,6 +11690,159 @@ function openCompRehearsalDetailModal(date) {
     modal.classList.add("active");
 }
 
+let currentUpcomingEventDate = null;
+
+function openUpcomingEventDetailModal(date) {
+    currentUpcomingEventDate = date;
+    const modal = document.getElementById("modal-comp-upcoming-event-detail");
+    if (!modal) return;
+
+    const musicianId = getAuthMusicianId();
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
+    const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
+
+    // Title and Badge Type
+    const titleEl = document.getElementById("upcoming-event-detail-title");
+    const badgeTypeEl = document.getElementById("upcoming-event-badge-type");
+
+    let typeLabel = sessionType === "actuacion" ? "Actuación Oficial" : "Ensayo General";
+    if (sessionInfo) {
+        if (sessionType === "ensayo" && sessionInfo.subtype && sessionInfo.subtype !== "general") {
+            typeLabel = "Ensayo por Voces";
+        } else if (sessionInfo.name) {
+            typeLabel = sessionInfo.name;
+        }
+    }
+
+    if (badgeTypeEl) {
+        badgeTypeEl.innerText = sessionType === "actuacion" ? "ACTUACIÓN" : "ENSAYO";
+        if (sessionType === "actuacion") {
+            badgeTypeEl.style.background = "rgba(155, 89, 182, 0.18)";
+            badgeTypeEl.style.color = "#9b59b6";
+            badgeTypeEl.style.borderColor = "rgba(155, 89, 182, 0.4)";
+        } else {
+            badgeTypeEl.style.background = "rgba(212, 175, 55, 0.15)";
+            badgeTypeEl.style.color = "var(--color-gold)";
+            badgeTypeEl.style.borderColor = "rgba(212, 175, 55, 0.3)";
+        }
+    }
+
+    if (titleEl) {
+        titleEl.innerText = sessionInfo && sessionInfo.name ? sessionInfo.name : typeLabel;
+    }
+
+    // Date
+    const dateEl = document.getElementById("upcoming-event-detail-date");
+    if (dateEl) {
+        dateEl.innerText = formatDateSpanish(date);
+    }
+
+    // Time
+    const timeEl = document.getElementById("upcoming-event-detail-time");
+    if (timeEl) {
+        timeEl.innerText = sessionInfo && sessionInfo.time ? `${sessionInfo.time} h` : "Por determinar";
+    }
+
+    // Location
+    const locEl = document.getElementById("upcoming-event-detail-location");
+    if (locEl) {
+        locEl.innerText = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking de la Sede" : "Por determinar");
+    }
+
+    // Convocated Voices Box
+    const convBox = document.getElementById("upcoming-event-detail-convocated-box");
+    const convEl = document.getElementById("upcoming-event-detail-convocated");
+    if (sessionInfo && sessionType === "ensayo" && sessionInfo.subtype !== "general" && sessionInfo.convocatedVoices && sessionInfo.convocatedVoices.length > 0) {
+        if (convBox) convBox.classList.remove("hidden");
+        if (convEl) convEl.innerText = sessionInfo.convocatedVoices.join(", ");
+    } else {
+        if (convBox) convBox.classList.add("hidden");
+    }
+
+    // User Attendance Status
+    const statusTextEl = document.getElementById("upcoming-event-detail-user-status");
+    const statusBadgeEl = document.getElementById("upcoming-event-detail-user-badge");
+
+    const record = (state.attendance && state.attendance[date] && musicianId) ? state.attendance[date][musicianId] : null;
+
+    if (record) {
+        if (record.status === "present") {
+            if (statusTextEl) {
+                statusTextEl.innerHTML = `<span style="color: #2ecc71;">🟢 Asistencia Confirmada</span>`;
+            }
+            if (statusBadgeEl) {
+                statusBadgeEl.innerText = "Confirmado";
+                statusBadgeEl.style.background = "rgba(46, 204, 113, 0.15)";
+                statusBadgeEl.style.color = "#2ecc71";
+                statusBadgeEl.style.border = "1px solid rgba(46, 204, 113, 0.3)";
+            }
+        } else if (record.status === "absent") {
+            if (record.justified) {
+                if (statusTextEl) {
+                    statusTextEl.innerHTML = `<span style="color: #f1c40f;">🟡 Ausencia Justificada</span>`;
+                }
+                if (statusBadgeEl) {
+                    statusBadgeEl.innerText = "Preavisado";
+                    statusBadgeEl.style.background = "rgba(241, 196, 15, 0.15)";
+                    statusBadgeEl.style.color = "#f1c40f";
+                    statusBadgeEl.style.border = "1px solid rgba(241, 196, 15, 0.3)";
+                }
+            } else {
+                if (statusTextEl) {
+                    statusTextEl.innerHTML = `<span style="color: #e74c3c;">🔴 Ausente (Sin justificar)</span>`;
+                }
+                if (statusBadgeEl) {
+                    statusBadgeEl.innerText = "Ausente";
+                    statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
+                    statusBadgeEl.style.color = "#e74c3c";
+                    statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.3)";
+                }
+            }
+        }
+    } else {
+        if (statusTextEl) {
+            statusTextEl.innerHTML = `<span style="color: var(--text-muted);">⚪ Pendiente de responder</span>`;
+        }
+        if (statusBadgeEl) {
+            statusBadgeEl.innerText = "Pendiente";
+            statusBadgeEl.style.background = "rgba(255, 255, 255, 0.08)";
+            statusBadgeEl.style.color = "var(--text-secondary)";
+            statusBadgeEl.style.border = "1px solid rgba(255, 255, 255, 0.15)";
+        }
+    }
+
+    modal.classList.add("active");
+}
+
+function setupUpcomingEventDetailEvents() {
+    const modal = document.getElementById("modal-comp-upcoming-event-detail");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-upcoming-event-detail");
+    const btnCloseFooter = document.getElementById("btn-close-upcoming-event-detail-footer");
+    const btnRsvp = document.getElementById("btn-upcoming-event-rsvp");
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    if (btnRsvp) {
+        btnRsvp.addEventListener("click", () => {
+            closeModal();
+            if (currentUpcomingEventDate) {
+                openPreavisoModal(currentUpcomingEventDate);
+            }
+        });
+    }
+}
+
 function renderComponentEventos() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
@@ -11788,11 +11942,13 @@ function renderComponentEventos() {
         const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
-        row.className = "comp-session-row";
+        row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
         row.style.gap = "10px";
         row.style.width = "100%";
+        row.style.cursor = "pointer";
+        row.title = "Ver detalle del evento y responder asistencia";
         
         const dateParts = date.split("-");
         const yr = dateParts[0];
@@ -11820,9 +11976,14 @@ function renderComponentEventos() {
             </div>
         `;
         
+        row.addEventListener("click", () => {
+            openUpcomingEventDetailModal(date);
+        });
+
         const badge = row.querySelector(".comp-attendance-badge");
         if (badge) {
-            badge.addEventListener("click", () => {
+            badge.addEventListener("click", (e) => {
+                e.stopPropagation();
                 openPreavisoModal(date);
             });
         }

@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=342">
+    <link rel="stylesheet" href="style.css?v=343">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3030,6 +3030,76 @@
         </div>
     </div>
 
+    <!-- Modal: Detalle de Próximo Evento para Músicos -->
+    <div id="modal-comp-upcoming-event-detail" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px; width: 92%; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-upcoming-event-detail" style="position: absolute; top: 16px; right: 16px;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span id="upcoming-event-badge-type" class="badge" style="background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); font-size: 0.78rem; padding: 4px 10px; border-radius: 6px; font-weight: 700; text-transform: uppercase;">ENSAYO GENERAL</span>
+            </div>
+            
+            <h3 id="upcoming-event-detail-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
+            
+            <!-- Tarjeta de Detalles del Evento -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📅</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Fecha</div>
+                        <div id="upcoming-event-detail-date" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Viernes, 14 de Marzo de 2026</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">⏰</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Hora</div>
+                        <div id="upcoming-event-detail-time" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">21:00 h</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📍</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Lugar</div>
+                        <div id="upcoming-event-detail-location" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Parking de la Sede</div>
+                    </div>
+                </div>
+
+                <div id="upcoming-event-detail-convocated-box" class="hidden" style="display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">🎺</div>
+                    <div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Voces Convocadas</div>
+                        <div id="upcoming-event-detail-convocated" style="font-size: 0.88rem; color: var(--color-gold); font-weight: 600; margin-top: 1px;">Cornetas 1ª, Trompetas 1ª</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estatus de Asistencia del Músico -->
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                <div>
+                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Tu Asistencia</div>
+                    <div id="upcoming-event-detail-user-status" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">🟢 Asistencia Confirmada</div>
+                </div>
+                <div id="upcoming-event-detail-user-badge" class="badge" style="font-size: 0.8rem; padding: 4px 10px;">Preavisado</div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-primary" id="btn-upcoming-event-rsvp" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; background: linear-gradient(135deg, var(--color-gold), #b89628); color: #000; border: none; padding: 12px 16px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.95rem;">
+                    <span>📝 Confirmar / Preavisar Asistencia</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-close-upcoming-event-detail-footer" style="width: 100%;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Preaviso (RSVP) Músicos -->
     <div id="modal-componente-preaviso" class="modal-overlay">
         <div class="modal-card" style="max-width: 400px; width: 90%;">
@@ -3136,13 +3206,13 @@
         </a>
     </nav>
 
-    <script src="app.js?v=342"></script>
+    <script src="app.js?v=343"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=342
+        // Purga de caché antigua y registro del Service Worker v=343
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v342") {
+                    if (key !== "yacente-v343") {
                         caches.delete(key);
                     }
                 });
@@ -3155,9 +3225,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=342")
+                navigator.serviceWorker.register("sw.js?v=343")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v342 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v343 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
