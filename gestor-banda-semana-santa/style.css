@@ -1531,6 +1531,15 @@ svg.chevron {
     transform: translateY(-20px);
     transition: transform var(--transition-normal);
 }
+.modal-card-standard-size {
+    max-width: 440px !important;
+    width: 90% !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 22px 20px !important;
+    box-sizing: border-box !important;
+}
 .modal-overlay.active .modal-card {
     transform: translateY(0);
 }

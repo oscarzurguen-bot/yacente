@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=372">
+    <link rel="stylesheet" href="style.css?v=373">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1813,16 +1813,16 @@
 
     <!-- Modal de Explicación de Racha de Asistencia -->
     <div id="modal-streak-info" class="modal-overlay">
-        <div class="modal-card" style="max-width: 400px; text-align: center; padding: 24px 20px;">
+        <div class="modal-card modal-card-standard-size" style="text-align: center;">
             <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                 <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">
                     <span>🔥</span> Racha de Asistencia
                 </h3>
                 <button class="modal-close" id="btn-close-streak-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;">
                 <!-- Indicador Racha en Grande -->
-                <div style="margin: 10px 0 16px 0;">
+                <div style="margin: 6px 0 14px 0;">
                     <div style="font-size: 3.5rem; font-weight: 800; font-family: 'Cinzel', serif; color: #E67E22; line-height: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         <span>🔥</span>
                         <span id="modal-streak-count-big">0</span>
@@ -1833,12 +1833,12 @@
                 </div>
 
                 <!-- Mensaje Motivacional Dinámico -->
-                <div id="modal-streak-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 18px; text-align: center;">
+                <div id="modal-streak-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 16px; text-align: center;">
                     Cargando mensaje...
                 </div>
 
                 <!-- Récord Personal de Racha -->
-                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 14px;">
                     <span>🏆</span> Récord Personal: <span id="modal-streak-best-val" style="font-weight: 700;">0</span> ensayos seguidos
                 </div>
             </div>
@@ -1850,16 +1850,16 @@
 
     <!-- Modal de Explicación de Insignias del Músico -->
     <div id="modal-insignias-info" class="modal-overlay">
-        <div class="modal-card" style="max-width: 400px; text-align: center; padding: 24px 20px;">
+        <div class="modal-card modal-card-standard-size" style="text-align: center;">
             <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                 <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">
                     <span id="modal-insignias-header-icon">🏅</span> Mis Insignias
                 </h3>
                 <button class="modal-close" id="btn-close-insignias-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;">
                 <!-- Indicador Insignias en Grande -->
-                <div style="margin: 10px 0 16px 0;">
+                <div style="margin: 6px 0 14px 0;">
                     <div style="font-size: 3.5rem; font-weight: 800; font-family: 'Cinzel', serif; color: var(--color-gold); line-height: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         <span id="modal-insignias-icon-big">🏅</span>
                         <span id="modal-insignias-count-big">0</span>
@@ -1870,13 +1870,8 @@
                 </div>
 
                 <!-- Mensaje Motivacional / Explicativo Dinámico -->
-                <div id="modal-insignias-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 18px; text-align: center;">
+                <div id="modal-insignias-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 16px; text-align: center;">
                     Cargando información...
-                </div>
-
-                <!-- Estado del Medallero -->
-                <div id="modal-insignias-status-box" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 16px;">
-                    <span>✨</span> Estado: <span id="modal-insignias-status-val" style="font-weight: 700;">Activas</span>
                 </div>
             </div>
             <div class="modal-actions" style="justify-content: center; margin-top: 8px;">
@@ -1887,7 +1882,7 @@
 
     <!-- Modal Flotante de Notificaciones del Músico -->
     <div id="modal-component-notifications" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;">
+        <div class="modal-card modal-card-standard-size">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
                 <h3 style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <span>🔔</span> Notificaciones
@@ -3246,13 +3241,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=372"></script>
+    <script src="app.js?v=373"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=372
+        // Purga de caché antigua y registro del Service Worker v=373
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v372") {
+                    if (key !== "yacente-v373") {
                         caches.delete(key);
                     }
                 });
@@ -3265,9 +3260,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=372")
+                navigator.serviceWorker.register("sw.js?v=373")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v372 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v373 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
