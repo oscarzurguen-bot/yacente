@@ -395,48 +395,8 @@ function updateSessionBadge() {
 function updateAttendanceSessionSelector() {
     const select = document.getElementById("attendance-session-select");
     if (!select) return;
-    
-    // Obtener la fecha base sin sufijos
-    const rawDate = state.currentDate.split("_")[0];
-    
-    // Encontrar todas las sesiones creadas para esta fecha
-    const sessionKeys = Object.keys(state.sessionTypes).filter(key => key.startsWith(rawDate));
-    
-    if (sessionKeys.length <= 1) {
-        select.classList.add("hidden");
-        return;
-    }
-    
-    select.innerHTML = "";
-    sessionKeys.forEach(key => {
-        const sessionInfo = state.sessionTypes[key];
-        const option = document.createElement("option");
-        option.value = key;
-        
-        let label = "General";
-        if (sessionInfo) {
-            if (sessionInfo.type === "actuacion") {
-                label = `⭐ Act: ${sessionInfo.name || 'Sin nombre'}`;
-            } else if (sessionInfo.type === "ensayo") {
-                const sub = sessionInfo.subtype;
-                if (sub === "trompetas1") label = "👥 Trompetas 1ª";
-                else if (sub === "bajos") label = "👥 Bajos";
-                else if (sub === "trompetas2y3") label = "👥 Trompetas 2ª y 3ª";
-                else if (sub === "cornetas") label = "👥 Cornetas";
-                else if (sub === "percusion") label = "👥 Percusión";
-                else if (sub === "voces") label = `👥 Voces (${sessionInfo.convocatedVoices.length})`;
-                else if (sub === "primeras") label = "👥 Primeras";
-            }
-        }
-        
-        option.innerText = label;
-        if (key === state.currentDate) {
-            option.selected = true;
-        }
-        select.appendChild(option);
-    });
-    
-    select.classList.remove("hidden");
+    select.classList.add("hidden");
+    select.style.display = "none";
 }
 
 function isSectionRehearsal(sessionInfo) {
@@ -942,10 +902,21 @@ function startCloudSync() {
 
     // Escucha de comunicados de la directiva
     unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
+        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
         snapshot.docChanges().forEach(change => {
+            const data = change.doc.data();
+            const docId = change.doc.id;
+
+            // Purga automática: eliminar comunicados caducados (+7 días) de Firestore
+            const notifTime = data.date ? new Date(data.date).getTime() : 0;
+            if (notifTime && !isNaN(notifTime) && (now - notifTime > ONE_WEEK_MS)) {
+                db.collection("announcements").doc(docId).delete().catch(err => console.error("Error al purgar comunicado caducado en Firestore:", err));
+                return;
+            }
+
             if (change.type === "added") {
-                const data = change.doc.data();
-                const docId = change.doc.id;
                 const musicianId = getAuthMusicianId();
                 if (!musicianId) return;
 
@@ -958,7 +929,9 @@ function startCloudSync() {
 
                 if (data.targetSection === "all" || (instrument && data.targetSection === instrument)) {
                     const key = "yacente_notifications_" + musicianId;
-                    const notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    let notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    notifs = purgeExpiredNotifications(notifs);
+
                     const exists = notifs.some(n => n.id === targetId);
                     if (!exists) {
                         const newItem = {
@@ -1474,17 +1447,20 @@ function setupEventListeners() {
         }
     });
 
-    // Control de múltiples sesiones en el mismo día
-    document.getElementById("attendance-session-select").addEventListener("change", (e) => {
-        const selectedSessionKey = e.target.value;
-        if (selectedSessionKey) {
-            state.currentDate = selectedSessionKey;
-            initializeAttendanceForDate(selectedSessionKey);
-            renderAttendance();
-            renderRehearsalMarchasWidget();
-            updateSessionBadge();
-        }
-    });
+    // Control de múltiples sesiones en el mismo día (si existiera elemento)
+    const attendanceSessionSelect = document.getElementById("attendance-session-select");
+    if (attendanceSessionSelect) {
+        attendanceSessionSelect.addEventListener("change", (e) => {
+            const selectedSessionKey = e.target.value;
+            if (selectedSessionKey) {
+                state.currentDate = selectedSessionKey;
+                initializeAttendanceForDate(selectedSessionKey);
+                renderAttendance();
+                renderRehearsalMarchasWidget();
+                updateSessionBadge();
+            }
+        });
+    }
 
     // Cambio de Tema Claro/Oscuro
     document.getElementById("theme-switch").addEventListener("change", (e) => {
@@ -13296,16 +13272,33 @@ function sendBrowserNotification(title, body) {
 
 
 
+function purgeExpiredNotifications(notifs) {
+    if (!Array.isArray(notifs)) return [];
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
+    const now = Date.now();
+    return notifs.filter(n => {
+        if (!n) return false;
+        if (!n.date) return true;
+        const notifTime = new Date(n.date).getTime();
+        if (isNaN(notifTime)) return true;
+        return (now - notifTime) <= ONE_WEEK_MS;
+    });
+}
+
 function updateNotificationsBadge() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
     const deletedIds = getDeletedNotificationIds(musicianId);
     let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-    if (deletedIds.length > 0) {
-        notifs = notifs.filter(n => !deletedIds.includes(n.id));
+    
+    // Purga de notificaciones mayores a 7 días y filtro de eliminadas
+    const validNotifs = purgeExpiredNotifications(notifs).filter(n => !deletedIds.includes(n.id));
+    if (validNotifs.length !== notifs.length) {
+        localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(validNotifs));
     }
-    const unseenCount = notifs.filter(n => !n.seen).length;
+
+    const unseenCount = validNotifs.filter(n => !n.seen).length;
     
     const badge = document.getElementById("comp-notifications-badge-count");
     if (badge) {
@@ -13324,12 +13317,14 @@ function renderComponentNotificationsList() {
 
     const deletedIds = getDeletedNotificationIds(musicianId);
     let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-    if (deletedIds.length > 0) {
-        const filtered = notifs.filter(n => !deletedIds.includes(n.id));
-        if (filtered.length !== notifs.length) {
-            notifs = filtered;
-            localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
-        }
+    
+    // Purga de notificaciones mayores a 7 días y filtro de eliminadas
+    const validNotifs = purgeExpiredNotifications(notifs).filter(n => !deletedIds.includes(n.id));
+    if (validNotifs.length !== notifs.length) {
+        notifs = validNotifs;
+        localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
+    } else {
+        notifs = validNotifs;
     }
 
     const container = document.getElementById("comp-notif-list-container");
