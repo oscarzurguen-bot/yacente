@@ -4803,6 +4803,7 @@ function renderStatistics() {
         document.getElementById("alerts-table-body").innerHTML = "<tr><td colspan='5' class='text-center text-muted'>Sin alertas de asistencia en este período.</td></tr>";
         renderStatsMarchasTop10([]);
         renderStatsStreaks([]);
+        renderStatsRanking([]);
         renderStatsMarchasOlvidadas();
         renderGeneralOverviewChart();
         return;
@@ -4954,8 +4955,10 @@ function renderStatistics() {
         `;
     }
 
+    window.lastFilteredDatesForStats = filteredDates;
     renderStatsMarchasTop10(filteredDates);
     renderStatsStreaks(filteredDates);
+    renderStatsRanking(filteredDates);
     renderStatsMarchasOlvidadas();
     renderGeneralOverviewChart();
     renderSectionAttendanceComparisonChart();
@@ -5225,6 +5228,154 @@ function renderStatsStreaks(filteredDates) {
                 ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
             </div>
         `;
+        container.appendChild(card);
+    });
+}
+
+let showAllRankingAsistencia = false;
+
+function renderStatsRanking(filteredDates) {
+    const container = document.getElementById("stats-ranking-container");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (!window.statsRankingToggleBound) {
+        window.statsRankingToggleBound = true;
+        const btnToggle = document.getElementById("btn-toggle-all-ranking-asistencia");
+        if (btnToggle) {
+            btnToggle.addEventListener("click", (e) => {
+                e.stopPropagation();
+                showAllRankingAsistencia = !showAllRankingAsistencia;
+                btnToggle.innerText = showAllRankingAsistencia ? "-" : "+";
+                btnToggle.title = showAllRankingAsistencia ? "Ver solo los 5 primeros" : "Ver todos los componentes";
+                renderStatsRanking(window.lastFilteredDatesForStats || []);
+            });
+        }
+    }
+
+    if (!state.musicians || state.musicians.length === 0 || !filteredDates || filteredDates.length === 0) {
+        container.innerHTML = "<p class='text-muted text-center' style='padding: 20px;'>No hay datos para calcular el ranking en este período.</p>";
+        return;
+    }
+
+    // Filtrar y ordenar ensayos (de más reciente a más antiguo) para calcular racha
+    const rehearsalDates = filteredDates.filter(date => {
+        const session = state.sessionTypes[date];
+        return !session || session.type === "ensayo";
+    }).sort((a, b) => b.localeCompare(a));
+
+    const rankingData = state.musicians.map(m => {
+        const musicianId = m.id;
+
+        // 1. Asistencia en el período filtrado
+        let totalConvocated = 0;
+        let presentsCount = 0;
+
+        filteredDates.forEach(date => {
+            const dayRecord = state.attendance[date];
+            const record = dayRecord ? dayRecord[musicianId] : null;
+            if (record) {
+                totalConvocated++;
+                if (record.status === "present") presentsCount++;
+            }
+        });
+
+        const attendancePct = totalConvocated > 0 ? (presentsCount / totalConvocated) * 100 : 0;
+
+        // 2. Racha consecutiva de ensayos asistidos en el período
+        let streak = 0;
+        for (let i = 0; i < rehearsalDates.length; i++) {
+            const date = rehearsalDates[i];
+            const dayRecord = state.attendance[date];
+            const record = dayRecord ? dayRecord[musicianId] : null;
+            if (record && record.status === "present") {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        // 3. Insignias obtenidas
+        const medals = getMusicianMedalsData(musicianId);
+        const badgesCount = medals.filter(med => med.unlocked && !med.isNegative).reduce((acc, med) => acc + (med.stars || 1), 0);
+
+        return {
+            id: m.id,
+            name: m.name,
+            instrument: m.instrument,
+            role: m.role,
+            attendancePct,
+            streak,
+            badgesCount
+        };
+    });
+
+    // Criterio de ordenación:
+    // 1. Mayor porcentaje de asistencia (redondeado a entero)
+    // 2. En caso de empate en el %, priorizar el que tenga mayor racha de asistencia
+    // 3. En caso de empate en racha, mayor número de insignias
+    // 4. Porcentaje decimal exacto
+    // 5. Orden alfabético
+    rankingData.sort((a, b) => {
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) return roundDiff;
+
+        if (b.streak !== a.streak) return b.streak - a.streak;
+
+        if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+
+    const itemsToDisplay = showAllRankingAsistencia ? rankingData : rankingData.slice(0, 5);
+
+    itemsToDisplay.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "comp-ranking-card";
+        card.style.display = "flex";
+        card.style.alignItems = "center";
+        card.style.justifyContent = "space-between";
+        card.style.padding = "10px 14px";
+        card.style.background = "rgba(0, 0, 0, 0.2)";
+        card.style.border = "1px solid var(--border-color)";
+        card.style.borderRadius = "8px";
+        card.style.gap = "12px";
+        card.style.flexWrap = "wrap";
+
+        let rankBadgeClass = "rank-badge";
+        if (index === 0) rankBadgeClass += " rank-gold";
+        else if (index === 1) rankBadgeClass += " rank-silver";
+        else if (index === 2) rankBadgeClass += " rank-bronze";
+
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 180px; flex: 1;">
+                <div class="${rankBadgeClass}">${index + 1}</div>
+                <div style="min-width: 0; flex: 1;">
+                    <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${item.name}
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">
+                        ${item.instrument} ${item.role ? `• ${item.role}` : ''}
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; font-size: 0.88rem; font-weight: 600; flex-shrink: 0;">
+                <div style="color: var(--color-gold); font-family: 'Cinzel', serif; font-size: 1rem;" title="Porcentaje de Asistencia">
+                    ${Math.round(item.attendancePct)}%
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: #ff6a00;" title="Racha de asistencia consecutiva">
+                    🔥 <span>${item.streak}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: var(--color-gold);" title="Insignias obtenidas">
+                    🏅 <span>${item.badgesCount}</span>
+                </div>
+            </div>
+        `;
+
         container.appendChild(card);
     });
 }
