@@ -4451,9 +4451,14 @@ body.component-portal #candle-tribute-container {
 }
 body.component-portal .btn-musician-hamburger {
     display: inline-flex !important;
+    align-self: flex-start;
+    margin-top: 8px;
 }
 body.component-portal .btn-mobile-menu-toggle {
     display: none !important;
+}
+body.component-portal .header-title-container {
+    align-items: flex-start !important;
 }
 .btn-musician-hamburger:hover {
     opacity: 0.8;
