@@ -4992,6 +4992,7 @@ function renderStatistics() {
         renderStatsRanking([]);
         renderStatsMarchasOlvidadas();
         renderGeneralOverviewChart();
+        renderDayHeatmap([]);
         return;
     }
 
@@ -5148,6 +5149,7 @@ function renderStatistics() {
     renderStatsMarchasOlvidadas();
     renderGeneralOverviewChart();
     renderSectionAttendanceComparisonChart();
+    renderDayHeatmap(filteredDates);
 }
 
 let showAllMarchasEnsayadas = false;
@@ -14561,6 +14563,158 @@ function setupAnnouncementEvents() {
             renderComponentNotificationsList();
         });
     }
+}
+
+// ==========================================================================
+// MAPA DE CALOR DE ASISTENCIA POR DÍAS DE LA SEMANA
+// ==========================================================================
+function renderDayHeatmap(filteredDates) {
+    const container = document.getElementById("stats-day-heatmap-container");
+    if (!container) return;
+
+    if (!filteredDates || filteredDates.length === 0 || !state.musicians || state.musicians.length === 0) {
+        container.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0;">No hay datos de convocatorias para generar el mapa de calor por días de la semana en este período.</p>`;
+        return;
+    }
+
+    const dayNames = [
+        { name: "Lunes", short: "LUN" },
+        { name: "Martes", short: "MAR" },
+        { name: "Miércoles", short: "MIÉ" },
+        { name: "Jueves", short: "JUE" },
+        { name: "Viernes", short: "VIE" },
+        { name: "Sábado", short: "SÁB" },
+        { name: "Domingo", short: "DOM" }
+    ];
+
+    const dayStats = Array.from({ length: 7 }, (_, i) => ({
+        index: i,
+        name: dayNames[i].name,
+        short: dayNames[i].short,
+        sessionsCount: 0,
+        totalPossible: 0,
+        totalPresents: 0,
+        avgPct: 0
+    }));
+
+    filteredDates.forEach(dateStr => {
+        const dateObj = new Date(dateStr.replace(/-/g, "/"));
+        const jsDay = dateObj.getDay(); // 0 = Domingo, 1 = Lunes, ...
+        const dayIdx = jsDay === 0 ? 6 : jsDay - 1; // 0 = Lunes ... 6 = Domingo
+
+        const attendanceForDay = state.attendance[dateStr] || {};
+        let dayPresents = 0;
+        let dayPossible = 0;
+
+        state.musicians.forEach(m => {
+            if (m.status === "inactive") return;
+            dayPossible++;
+            const rec = attendanceForDay[m.id];
+            if (rec && rec.status === "present") {
+                dayPresents++;
+            }
+        });
+
+        if (dayPossible > 0) {
+            dayStats[dayIdx].sessionsCount++;
+            dayStats[dayIdx].totalPossible += dayPossible;
+            dayStats[dayIdx].totalPresents += dayPresents;
+        }
+    });
+
+    let bestDay = null;
+    let worstDay = null;
+    let maxPct = -1;
+    let minPct = 101;
+
+    dayStats.forEach(stat => {
+        if (stat.totalPossible > 0) {
+            stat.avgPct = Math.round((stat.totalPresents / stat.totalPossible) * 100);
+            if (stat.avgPct > maxPct) {
+                maxPct = stat.avgPct;
+                bestDay = stat;
+            }
+            if (stat.avgPct < minPct) {
+                minPct = stat.avgPct;
+                worstDay = stat;
+            }
+        }
+    });
+
+    let cardsHTML = "";
+    dayStats.forEach(stat => {
+        const hasData = stat.sessionsCount > 0;
+        let statusClass = "heatmap-empty";
+        let statusBadge = "Sin datos";
+        let statusColor = "var(--text-muted)";
+        let heatIcon = "⚪";
+
+        if (hasData) {
+            if (stat.avgPct >= 80) {
+                statusClass = "heatmap-high";
+                statusBadge = "Alta asistencia";
+                statusColor = "var(--color-present, #2ecc71)";
+                heatIcon = "🔥";
+            } else if (stat.avgPct >= 60) {
+                statusClass = "heatmap-medium";
+                statusBadge = "Media asistencia";
+                statusColor = "var(--color-gold, #D4AF37)";
+                heatIcon = "⚡";
+            } else {
+                statusClass = "heatmap-low";
+                statusBadge = "Baja asistencia";
+                statusColor = "var(--color-absent, #e74c3c)";
+                heatIcon = "⚠️";
+            }
+        }
+
+        const pctDisplay = hasData ? `${stat.avgPct}%` : "--";
+        const sessionsDisplay = hasData 
+            ? `${stat.sessionsCount} ${stat.sessionsCount === 1 ? 'convocatoria' : 'convocatorias'}` 
+            : 'Sin convocatorias';
+
+        cardsHTML += `
+            <div class="day-heatmap-card ${statusClass}">
+                <div class="day-heatmap-header">
+                    <span class="day-name">${stat.name}</span>
+                    <span class="day-heat-icon">${heatIcon}</span>
+                </div>
+                <div class="day-heatmap-value" style="color: ${statusColor};">
+                    ${pctDisplay}
+                </div>
+                <div class="day-heatmap-bar-bg">
+                    <div class="day-heatmap-bar-fill" style="width: ${hasData ? stat.avgPct : 0}%; background-color: ${statusColor};"></div>
+                </div>
+                <div class="day-heatmap-footer">
+                    <span class="day-sessions-count">${sessionsDisplay}</span>
+                    <span class="day-badge-tag" style="color: ${statusColor};">${statusBadge}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    let insightsHTML = "";
+    if (bestDay && bestDay.avgPct > 0) {
+        let insightText = `El día preferido y con mayor asistencia media del grupo es el <strong>${bestDay.name}</strong> con un <strong>${bestDay.avgPct}%</strong>.`;
+        if (worstDay && worstDay.sessionsCount > 0 && worstDay.name !== bestDay.name) {
+            insightText += ` El día con menor concurrencia es el <strong>${worstDay.name}</strong> (<strong>${worstDay.avgPct}%</strong>).`;
+        }
+        insightsHTML = `
+            <div class="day-heatmap-insight-box">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.2rem;">💡</span>
+                    <span style="font-size: 0.88rem; color: var(--text-primary);">${insightText}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="day-heatmap-grid">
+            ${cardsHTML}
+        </div>
+        ${insightsHTML}
+    `;
 }
 
 
