@@ -887,10 +887,10 @@
                     </div>
                 </div>
 
-                <!-- Mapa de Calor por Días de la Semana -->
+                <!-- Gráfico de Barras por Días de la Semana -->
                 <div class="card-collapsible" id="card-stats-day-heatmap" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
-                        <h3>📅 Mapa de Calor por Días de la Semana</h3>
+                        <h3>📊 Asistencia por Días de la Semana</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
@@ -3460,13 +3460,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=392"></script>
+    <script src="app.js?v=393"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=392
+        // Purga de caché antigua y registro del Service Worker v=393
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v392") {
+                    if (key !== "yacente-v393") {
                         caches.delete(key);
                     }
                 });
@@ -3479,9 +3479,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=392")
+                navigator.serviceWorker.register("sw.js?v=393")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v392 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v393 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

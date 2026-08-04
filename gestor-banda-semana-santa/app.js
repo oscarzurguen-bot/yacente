@@ -14566,14 +14566,14 @@ function setupAnnouncementEvents() {
 }
 
 // ==========================================================================
-// MAPA DE CALOR DE ASISTENCIA POR DÍAS DE LA SEMANA
+// GRÁFICO DE BARRAS DE ASISTENCIA POR DÍAS DE LA SEMANA
 // ==========================================================================
 function renderDayHeatmap(filteredDates) {
     const container = document.getElementById("stats-day-heatmap-container");
     if (!container) return;
 
     if (!filteredDates || filteredDates.length === 0 || !state.musicians || state.musicians.length === 0) {
-        container.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0;">No hay datos de convocatorias para generar el mapa de calor por días de la semana en este período.</p>`;
+        container.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0;">No hay datos de convocatorias para generar el gráfico de barras por días de la semana en este período.</p>`;
         return;
     }
 
@@ -14641,30 +14641,30 @@ function renderDayHeatmap(filteredDates) {
         }
     });
 
-    let cardsHTML = "";
+    let rowsHTML = "";
     dayStats.forEach(stat => {
         const hasData = stat.sessionsCount > 0;
-        let statusClass = "heatmap-empty";
-        let statusBadge = "Sin datos";
+        let barGradient = "linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.15))";
         let statusColor = "var(--text-muted)";
         let heatIcon = "⚪";
+        let statusTag = "Sin datos";
 
         if (hasData) {
             if (stat.avgPct >= 80) {
-                statusClass = "heatmap-high";
-                statusBadge = "Alta asistencia";
-                statusColor = "var(--color-present, #2ecc71)";
+                barGradient = "linear-gradient(90deg, #2ecc71, #27ae60)";
+                statusColor = "#2ecc71";
                 heatIcon = "🔥";
+                statusTag = "Alta asistencia";
             } else if (stat.avgPct >= 60) {
-                statusClass = "heatmap-medium";
-                statusBadge = "Media asistencia";
-                statusColor = "var(--color-gold, #D4AF37)";
+                barGradient = "linear-gradient(90deg, #f1c40f, #D4AF37)";
+                statusColor = "#D4AF37";
                 heatIcon = "⚡";
+                statusTag = "Media asistencia";
             } else {
-                statusClass = "heatmap-low";
-                statusBadge = "Baja asistencia";
-                statusColor = "var(--color-absent, #e74c3c)";
+                barGradient = "linear-gradient(90deg, #e74c3c, #c0392b)";
+                statusColor = "#e74c3c";
                 heatIcon = "⚠️";
+                statusTag = "Baja asistencia";
             }
         }
 
@@ -14673,21 +14673,21 @@ function renderDayHeatmap(filteredDates) {
             ? `${stat.sessionsCount} ${stat.sessionsCount === 1 ? 'convocatoria' : 'convocatorias'}` 
             : 'Sin convocatorias';
 
-        cardsHTML += `
-            <div class="day-heatmap-card ${statusClass}">
-                <div class="day-heatmap-header">
-                    <span class="day-name">${stat.name}</span>
-                    <span class="day-heat-icon">${heatIcon}</span>
+        rowsHTML += `
+            <div class="day-bar-row">
+                <div class="day-bar-meta">
+                    <div class="day-bar-title-group">
+                        <span class="day-bar-icon">${heatIcon}</span>
+                        <span class="day-bar-name">${stat.name}</span>
+                        <span class="day-bar-sessions-badge">${sessionsDisplay}</span>
+                    </div>
+                    <div class="day-bar-value-group">
+                        <span class="day-bar-tag" style="color: ${statusColor};">${statusTag}</span>
+                        <span class="day-bar-pct" style="color: ${statusColor};">${pctDisplay}</span>
+                    </div>
                 </div>
-                <div class="day-heatmap-value" style="color: ${statusColor};">
-                    ${pctDisplay}
-                </div>
-                <div class="day-heatmap-bar-bg">
-                    <div class="day-heatmap-bar-fill" style="width: ${hasData ? stat.avgPct : 0}%; background-color: ${statusColor};"></div>
-                </div>
-                <div class="day-heatmap-footer">
-                    <span class="day-sessions-count">${sessionsDisplay}</span>
-                    <span class="day-badge-tag" style="color: ${statusColor};">${statusBadge}</span>
+                <div class="day-bar-track">
+                    <div class="day-bar-fill" data-pct="${hasData ? stat.avgPct : 0}" style="width: 0%; background: ${barGradient};"></div>
                 </div>
             </div>
         `;
@@ -14695,7 +14695,7 @@ function renderDayHeatmap(filteredDates) {
 
     let insightsHTML = "";
     if (bestDay && bestDay.avgPct > 0) {
-        let insightText = `El día preferido y con mayor asistencia media del grupo es el <strong>${bestDay.name}</strong> con un <strong>${bestDay.avgPct}%</strong>.`;
+        let insightText = `El día preferido y con mayor asistencia media del grupo es el <strong>${bestDay.name}</strong> con un <strong>${bestDay.avgPct}%</strong> (${bestDay.sessionsCount} ${bestDay.sessionsCount === 1 ? 'convocatoria' : 'convocatorias'}).`;
         if (worstDay && worstDay.sessionsCount > 0 && worstDay.name !== bestDay.name) {
             insightText += ` El día con menor concurrencia es el <strong>${worstDay.name}</strong> (<strong>${worstDay.avgPct}%</strong>).`;
         }
@@ -14710,11 +14710,21 @@ function renderDayHeatmap(filteredDates) {
     }
 
     container.innerHTML = `
-        <div class="day-heatmap-grid">
-            ${cardsHTML}
+        <div class="day-bar-chart-wrapper">
+            <div class="day-bar-chart-container">
+                ${rowsHTML}
+            </div>
+            ${insightsHTML}
         </div>
-        ${insightsHTML}
     `;
+
+    setTimeout(() => {
+        const fills = container.querySelectorAll(".day-bar-fill");
+        fills.forEach(fill => {
+            const targetPct = fill.getAttribute("data-pct");
+            fill.style.width = `${targetPct}%`;
+        });
+    }, 80);
 }
 
 
