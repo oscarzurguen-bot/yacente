@@ -14566,7 +14566,7 @@ function setupAnnouncementEvents() {
 }
 
 // ==========================================================================
-// GRÁFICO DE BARRAS DE ASISTENCIA POR DÍAS DE LA SEMANA
+// GRÁFICO DE BARRAS DE ASISTENCIA POR DÍAS DE LA SEMANA (ESTILO VISIÓN GENERAL)
 // ==========================================================================
 function renderDayHeatmap(filteredDates) {
     const container = document.getElementById("stats-day-heatmap-container");
@@ -14578,13 +14578,13 @@ function renderDayHeatmap(filteredDates) {
     }
 
     const dayNames = [
-        { name: "Lunes", short: "LUN" },
-        { name: "Martes", short: "MAR" },
-        { name: "Miércoles", short: "MIÉ" },
-        { name: "Jueves", short: "JUE" },
-        { name: "Viernes", short: "VIE" },
-        { name: "Sábado", short: "SÁB" },
-        { name: "Domingo", short: "DOM" }
+        { name: "Lunes", short: "Lun" },
+        { name: "Martes", short: "Mar" },
+        { name: "Miércoles", short: "Mié" },
+        { name: "Jueves", short: "Jue" },
+        { name: "Viernes", short: "Vie" },
+        { name: "Sábado", short: "Sáb" },
+        { name: "Domingo", short: "Dom" }
     ];
 
     const dayStats = Array.from({ length: 7 }, (_, i) => ({
@@ -14641,54 +14641,38 @@ function renderDayHeatmap(filteredDates) {
         }
     });
 
-    let rowsHTML = "";
+    let barsHTML = "";
     dayStats.forEach(stat => {
         const hasData = stat.sessionsCount > 0;
-        let barGradient = "linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.15))";
-        let statusColor = "var(--text-muted)";
-        let heatIcon = "⚪";
-        let statusTag = "Sin datos";
+        const heightPct = hasData ? stat.avgPct : 0;
+        const displayValue = hasData ? `${stat.avgPct}%` : "-";
+        const tooltip = `${stat.name}: ${hasData ? stat.avgPct + '%' : 'Sin convocatorias'} (${stat.sessionsCount} convocatoria${stat.sessionsCount !== 1 ? 's' : ''})`;
+
+        let barGradient = "linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 100%)";
+        let valColor = "var(--text-muted)";
 
         if (hasData) {
             if (stat.avgPct >= 80) {
-                barGradient = "linear-gradient(90deg, #2ecc71, #27ae60)";
-                statusColor = "#2ecc71";
-                heatIcon = "🔥";
-                statusTag = "Alta asistencia";
+                barGradient = "linear-gradient(180deg, #2ecc71 0%, rgba(46, 204, 113, 0.35) 100%)";
+                valColor = "#2ecc71";
             } else if (stat.avgPct >= 60) {
-                barGradient = "linear-gradient(90deg, #f1c40f, #D4AF37)";
-                statusColor = "#D4AF37";
-                heatIcon = "⚡";
-                statusTag = "Media asistencia";
+                barGradient = "linear-gradient(180deg, var(--color-gold) 0%, rgba(212, 175, 55, 0.35) 100%)";
+                valColor = "var(--color-gold)";
             } else {
-                barGradient = "linear-gradient(90deg, #e74c3c, #c0392b)";
-                statusColor = "#e74c3c";
-                heatIcon = "⚠️";
-                statusTag = "Baja asistencia";
+                barGradient = "linear-gradient(180deg, #e74c3c 0%, rgba(231, 76, 60, 0.35) 100%)";
+                valColor = "#e74c3c";
             }
         }
 
-        const pctDisplay = hasData ? `${stat.avgPct}%` : "--";
-        const sessionsDisplay = hasData 
-            ? `${stat.sessionsCount} ${stat.sessionsCount === 1 ? 'convocatoria' : 'convocatorias'}` 
-            : 'Sin convocatorias';
-
-        rowsHTML += `
-            <div class="day-bar-row">
-                <div class="day-bar-meta">
-                    <div class="day-bar-title-group">
-                        <span class="day-bar-icon">${heatIcon}</span>
-                        <span class="day-bar-name">${stat.name}</span>
-                        <span class="day-bar-sessions-badge">${sessionsDisplay}</span>
-                    </div>
-                    <div class="day-bar-value-group">
-                        <span class="day-bar-tag" style="color: ${statusColor};">${statusTag}</span>
-                        <span class="day-bar-pct" style="color: ${statusColor};">${pctDisplay}</span>
-                    </div>
-                </div>
-                <div class="day-bar-track">
-                    <div class="day-bar-fill" data-pct="${hasData ? stat.avgPct : 0}" style="width: 0%; background: ${barGradient};"></div>
-                </div>
+        barsHTML += `
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: 60px; height: 100%; justify-content: flex-end; position: relative;">
+                <span class="bar-value" style="font-size: 0.75rem; font-weight: 700; color: ${valColor}; margin-bottom: 6px; z-index: 2; transition: opacity 0.2s;">
+                    ${displayValue}
+                </span>
+                <div class="bar-fill" style="width: 55%; height: ${heightPct}%; background: ${barGradient}; border-radius: 4px 4px 0 0; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: help; min-height: ${hasData ? '4px' : '0px'}" title="${tooltip}"></div>
+                <span class="bar-label" style="position: absolute; bottom: -24px; font-size: 0.75rem; color: var(--text-color); font-weight: 600; white-space: nowrap;">
+                    ${stat.short}
+                </span>
             </div>
         `;
     });
@@ -14700,7 +14684,7 @@ function renderDayHeatmap(filteredDates) {
             insightText += ` El día con menor concurrencia es el <strong>${worstDay.name}</strong> (<strong>${worstDay.avgPct}%</strong>).`;
         }
         insightsHTML = `
-            <div class="day-heatmap-insight-box">
+            <div class="day-heatmap-insight-box" style="margin-top: 28px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 1.2rem;">💡</span>
                     <span style="font-size: 0.88rem; color: var(--text-primary);">${insightText}</span>
@@ -14710,21 +14694,29 @@ function renderDayHeatmap(filteredDates) {
     }
 
     container.innerHTML = `
-        <div class="day-bar-chart-wrapper">
-            <div class="day-bar-chart-container">
-                ${rowsHTML}
+        <div class="custom-vertical-chart" style="display: flex; height: 260px; width: 100%; border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); position: relative; padding: 20px 10px 0 45px; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+            <div class="y-axis" style="position: absolute; left: 0; top: 0; bottom: 30px; width: 35px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 0.72rem; color: var(--text-muted); padding-right: 6px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
             </div>
-            ${insightsHTML}
-        </div>
-    `;
+            
+            <div class="grid-lines" style="position: absolute; left: 35px; right: 0; top: 0; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px solid var(--border-color); width: 100%;"></div>
+            </div>
 
-    setTimeout(() => {
-        const fills = container.querySelectorAll(".day-bar-fill");
-        fills.forEach(fill => {
-            const targetPct = fill.getAttribute("data-pct");
-            fill.style.width = `${targetPct}%`;
-        });
-    }, 80);
+            <div class="bars-container" style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 30px; box-sizing: border-box; gap: 8px;">
+                ${barsHTML}
+            </div>
+        </div>
+        ${insightsHTML}
+    `;
 }
 
 
