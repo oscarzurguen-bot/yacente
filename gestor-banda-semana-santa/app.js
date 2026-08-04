@@ -6235,6 +6235,116 @@ function downloadMusicianPDFReport() {
     const filterTextMonth = monthFilter === "all" ? "Todos los meses" : monthsNames[parseInt(monthFilter)];
     const filterTextType = typeFilter === "all" ? "Ensayos y Actuaciones" : (typeFilter === "ensayo" ? "Solo Ensayos" : "Solo Actuaciones");
 
+    // Calcular datos de evolución mensual para el informe impreso
+    const todayPrint = new Date();
+    const curYPrint = todayPrint.getFullYear();
+    const curMPrint = todayPrint.getMonth() + 1;
+    const todayStrPrint = `${todayPrint.getFullYear()}-${String(todayPrint.getMonth() + 1).padStart(2, '0')}-${String(todayPrint.getDate()).padStart(2, '0')}`;
+
+    let y1Print = yearFilter === "all" ? (curMPrint >= 9 ? curYPrint : curYPrint - 1) : parseInt(yearFilter, 10);
+    let y2Print = y1Print + 1;
+
+    const seasonMonthsPrint = [
+        { label: "Sep", monthNum: 9, year: String(y1Print) },
+        { label: "Oct", monthNum: 10, year: String(y1Print) },
+        { label: "Nov", monthNum: 11, year: String(y1Print) },
+        { label: "Dic", monthNum: 12, year: String(y1Print) },
+        { label: "Ene", monthNum: 1, year: String(y2Print) },
+        { label: "Feb", monthNum: 2, year: String(y2Print) },
+        { label: "Mar", monthNum: 3, year: String(y2Print) },
+        { label: "Abr", monthNum: 4, year: String(y2Print) },
+        { label: "May", monthNum: 5, year: String(y2Print) },
+        { label: "Jun", monthNum: 6, year: String(y2Print) },
+        { label: "Jul", monthNum: 7, year: String(y2Print) },
+        { label: "Ago", monthNum: 8, year: String(y2Print) }
+    ];
+
+    const monthlyDataForPrint = seasonMonthsPrint.map(sm => {
+        let presents = 0;
+        let total = 0;
+
+        Object.keys(state.attendance).forEach(dateStr => {
+            if (dateStr > todayStrPrint) return;
+            const dateParts = dateStr.split("-");
+            const y = dateParts[0];
+            const m = parseInt(dateParts[1], 10);
+
+            if (y === sm.year && m === sm.monthNum) {
+                const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
+                if (typeFilter !== "all" && sessionType !== typeFilter) return;
+
+                const rec = state.attendance[dateStr][musicianId];
+                if (rec) {
+                    total++;
+                    if (rec.status === "present") presents++;
+                }
+            }
+        });
+
+        const pct = total > 0 ? Math.round((presents / total) * 100) : null;
+        return { label: sm.label, presents, total, pct };
+    });
+
+    let printMonthlyBarsHTML = "";
+    monthlyDataForPrint.forEach(item => {
+        const hasData = item.pct !== null;
+        const heightPct = hasData ? item.pct : 0;
+        const displayValue = hasData ? `${item.pct}%` : "-";
+        
+        let barBg = "#d0d0d0";
+        let valColor = "#666666";
+
+        if (hasData) {
+            if (item.pct >= 80) {
+                barBg = "#2ecc71";
+                valColor = "#27ae60";
+            } else if (item.pct >= 60) {
+                barBg = "#d4af37";
+                valColor = "#b89628";
+            } else {
+                barBg = "#e74c3c";
+                valColor = "#c0392b";
+            }
+        }
+
+        printMonthlyBarsHTML += `
+            <div style="display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; position: relative;">
+                <span style="font-size: 7pt; font-weight: 700; color: ${valColor}; margin-bottom: 2px; z-index: 2;">
+                    ${displayValue}
+                </span>
+                <div style="width: 55%; height: ${heightPct}%; background-color: ${barBg}; border-radius: 2px 2px 0 0; min-height: ${hasData ? '2px' : '0px'};"></div>
+                <span style="position: absolute; bottom: -17px; font-size: 7pt; color: #333; font-weight: 600; white-space: nowrap;">
+                    ${item.label}
+                </span>
+            </div>
+        `;
+    });
+
+    const printMonthlyChartSectionHTML = `
+        <div class="print-section-title" style="margin-top: 14px;">Evolución Temporal Mensual</div>
+        <div style="display: flex; height: 110px; width: 100%; border-bottom: 1.5px solid #ccc; border-left: 1.5px solid #ccc; position: relative; padding: 10px 5px 0 28px; box-sizing: border-box; margin-bottom: 22px; background: #fdfdfd; border-radius: 4px;">
+            <div style="position: absolute; left: 0; top: 0; bottom: 20px; width: 24px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 6.5pt; color: #666; padding-right: 4px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+            
+            <div style="position: absolute; left: 24px; right: 0; top: 0; bottom: 20px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px solid #ccc; width: 100%;"></div>
+            </div>
+
+            <div style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 20px; box-sizing: border-box; gap: 2px;">
+                ${printMonthlyBarsHTML}
+            </div>
+        </div>
+    `;
+
     let tableRowsHTML = "";
     if (sessionsList.length === 0) {
         tableRowsHTML = `<tr><td colspan="4" style="text-align: center; color: #666;">Sin sesiones registradas en este período.</td></tr>`;
@@ -6312,6 +6422,8 @@ function downloadMusicianPDFReport() {
                 <div class="print-stat-value" style="color: #e74c3c; font-size: 11.5pt; font-weight: 600;">${absentUnjustified} sin justificar</div>
             </div>
         </div>
+
+        ${printMonthlyChartSectionHTML}
 
         ${reasonsHTML}
 
@@ -10939,6 +11051,33 @@ function getMusicianMedalsData(musicianId) {
         });
     }
 
+    let starsGod = 0;
+    let descGod = "";
+    let unlockedGod = false;
+    let nextGoalGod = 1;
+
+    if (maxConsecutiveMonths >= 12) {
+        starsGod = 3;
+        descGod = "¡Insignia de Oro conseguida! 1 año completo de asistencia perfecta a los ensayos.";
+        unlockedGod = true;
+        nextGoalGod = 12;
+    } else if (maxConsecutiveMonths >= 6) {
+        starsGod = 2;
+        descGod = "Insignia de Plata conseguida. 6 meses de asistencia perfecta a los ensayos. Alcanza 12 meses para el nivel Oro.";
+        unlockedGod = true;
+        nextGoalGod = 12;
+    } else if (maxConsecutiveMonths >= 1) {
+        starsGod = 1;
+        descGod = "Insignia de Bronce conseguida. 1 mes de asistencia perfecta a los ensayos. Alcanza 6 meses para el nivel Plata.";
+        unlockedGod = true;
+        nextGoalGod = 6;
+    } else {
+        starsGod = 0;
+        descGod = "Asiste a todos los ensayos durante 1 mes natural para desbloquear Bronce.";
+        unlockedGod = false;
+        nextGoalGod = 1;
+    }
+
     // Doblete
     const performanceDateCounts = {};
     Object.keys(state.attendance).forEach(dateKey => {
@@ -11219,7 +11358,7 @@ function getMusicianMedalsData(musicianId) {
         { id: "veterano", title: "Paso firme", icon: "👣", desc: descVeterano, unlocked: unlockedVeterano, stars: starsVeterano, progressPct: Math.min((attended / nextGoalVeterano) * 100, 100), progressText: `${attended}/${nextGoalVeterano}` },
         { id: "comprometido", title: "Comprometido", icon: "📝", desc: "Cero ausencias injustificadas.", unlocked: absent === 0 && totalConvocated > 0, progressPct: (absent === 0 && totalConvocated > 0) ? 100 : 0, progressText: (absent === 0 && totalConvocated > 0) ? 'Sin faltas injustificadas' : `Faltas: ${absent}` },
         { id: "estudio", title: "Estudio musical", icon: "📚", desc: descEstudio, unlocked: unlockedEstudio, stars: starsEstudio, progressPct: Math.min((greenMarchas / nextGoalEstudio) * 100, 100), progressText: `${greenMarchas}/${nextGoalEstudio} dominada${greenMarchas === 1 ? '' : 's'}` },
-        { id: "god", title: "Alma de la banda", icon: "👑", desc: "Asiste a todos los ensayos durante 1 año.", unlocked: godUnlocked, progressPct: godUnlocked ? 100 : Math.min((maxConsecutiveMonths / 12) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, 12)}/12 meses` },
+        { id: "god", title: "Alma de la banda", icon: "👑", desc: descGod, unlocked: unlockedGod, stars: starsGod, progressPct: Math.min((maxConsecutiveMonths / nextGoalGod) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, nextGoalGod)}/${nextGoalGod} mes${nextGoalGod === 1 ? '' : 'es'}` },
         { id: "marea", title: "Contra viento y marea", icon: "⛈️", desc: "Ensaya bajo condiciones climáticas extremas.", unlocked: !!musician.badgeWeather, progressPct: !!musician.badgeWeather ? 100 : 0, progressText: !!musician.badgeWeather ? "¡Otorgado!" : "No otorgada" },
         { id: "doblete", title: "Doblete", icon: "👥", desc: "Toca en dos actuaciones el mismo día.", unlocked: dobleteUnlocked, progressPct: dobleteUnlocked ? 100 : 0, progressText: dobleteUnlocked ? "¡Conseguido!" : "0/2 salidas" },
         { id: "trotamundos", title: "Catador de paellas", icon: "✈️", desc: descTrotamundos, unlocked: unlockedTrotamundos, stars: starsTrotamundos, progressPct: Math.min((tripCount / nextGoalTrotamundos) * 100, 100), progressText: `${tripCount}/${nextGoalTrotamundos} viaje${tripCount === 1 ? '' : 's'}` },
@@ -11412,6 +11551,11 @@ const MEDAL_TIER_DEFINITIONS = {
         { label: "Bronce 🥉", req: "5 ensayos consecutivos", stars: 1 },
         { label: "Plata 🥈", req: "10 ensayos consecutivos", stars: 2 },
         { label: "Oro 🥇", req: "20 ensayos consecutivos", stars: 3 }
+    ],
+    god: [
+        { label: "Bronce 🥉", req: "Asiste a todos los ensayos durante 1 mes", stars: 1 },
+        { label: "Plata 🥈", req: "Asiste a todos los ensayos durante 6 meses", stars: 2 },
+        { label: "Oro 🥇", req: "Asiste a todos los ensayos durante 1 año", stars: 3 }
     ],
     asistencia: [
         { label: "Bronce 🥉", req: ">80% de asistencia general", stars: 1 },

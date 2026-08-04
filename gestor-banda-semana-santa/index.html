@@ -1399,7 +1399,7 @@
                                     <div class="medal-icon-wrapper">👑</div>
                                     <div class="medal-info">
                                         <div class="medal-title">Alma de la banda</div>
-                                        <div class="medal-desc">Asiste a todos los ensayos durante 1 año.</div>
+                                        <div class="medal-desc">Asiste a todos los ensayos durante 1 mes (1⭐), 6 meses (2⭐) o 1 año (3⭐).</div>
                                         <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
                                         <div class="medal-progress-text">Progreso</div>
                                     </div>
@@ -3470,13 +3470,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=395"></script>
+    <script src="app.js?v=397"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=395
+        // Purga de caché antigua y registro del Service Worker v=397
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v395") {
+                    if (key !== "yacente-v397") {
                         caches.delete(key);
                     }
                 });
@@ -3489,9 +3489,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=395")
+                navigator.serviceWorker.register("sw.js?v=397")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v395 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v397 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
