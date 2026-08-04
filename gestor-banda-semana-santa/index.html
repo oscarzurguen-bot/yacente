@@ -3315,7 +3315,7 @@
 
     <!-- Modal: Seleccionar Evento cuando hay Múltiples el mismo día -->
     <div id="modal-comp-multi-event-select" class="modal-overlay">
-        <div class="modal-card" style="max-width: 440px; width: 92%; padding: 24px; position: relative;">
+        <div class="modal-card" style="max-width: 440px; width: 92%; padding: 22px 18px; position: relative; box-sizing: border-box;">
             <button class="modal-close" id="btn-close-multi-event-select" style="position: absolute; top: 16px; right: 16px;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -3324,7 +3324,7 @@
             </button>
             
             <h3 style="margin: 0 0 6px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.25rem;">Eventos de este día</h3>
-            <p id="multi-event-select-date-subtitle" style="margin: 0 0 16px 0; font-size: 0.84rem; color: var(--text-muted);">Selecciona el evento que deseas consultar:</p>
+            <p id="multi-event-select-date-subtitle" style="margin: 0 0 16px 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.4; word-break: break-word;">Selecciona el evento que deseas consultar:</p>
             
             <div id="multi-event-select-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                 <!-- Inyectado dinámicamente -->
@@ -3470,13 +3470,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=397"></script>
+    <script src="app.js?v=398"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=397
+        // Purga de caché antigua y registro del Service Worker v=398
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v397") {
+                    if (key !== "yacente-v398") {
                         caches.delete(key);
                     }
                 });
@@ -3489,9 +3489,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=397")
+                navigator.serviceWorker.register("sw.js?v=398")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v397 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v398 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

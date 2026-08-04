@@ -12796,7 +12796,7 @@ function renderComponenteCalendario() {
             dayCell.addEventListener("click", () => {
                 if (daySessions.length === 1) {
                     if (isPastDay) {
-                        openRehearsalDetailModal(dateKey);
+                        openCompRehearsalDetailModal(dateKey);
                     } else {
                         openUpcomingEventDetailModal(dateKey);
                     }
@@ -12907,16 +12907,18 @@ function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn";
-        btn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease;";
+        btn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease; box-sizing: border-box; gap: 12px; text-align: left;";
 
         let labelText = "general";
+        let badgeClass = "pending";
+
         if (session.type === "actuacion") {
             labelText = "actuación";
+            badgeClass = "actuacion";
         } else if (session.subtype === "secciones" || (session.convocatedVoices && session.convocatedVoices.length > 0 && session.subtype !== "general")) {
             labelText = "voz";
         }
 
-        let badgeClass = "pending";
         const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
 
         if (record) {
@@ -12932,17 +12934,20 @@ function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
         const titleText = session.name || (session.type === "actuacion" ? "Actuación Oficial" : (labelText === "voz" ? "Ensayo por Voces" : "Ensayo General"));
 
         btn.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
-                <div style="font-weight: 700; font-size: 0.95rem; text-align: left;">${titleText}</div>
-                <div style="font-size: 0.78rem; color: var(--text-muted);">⏰ ${session.time ? session.time + ' h' : 'Hora por determinar'}</div>
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; word-break: break-word; overflow-wrap: anywhere;">
+                <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary); line-height: 1.35; text-align: left; width: 100%;">${titleText}</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; font-weight: 500;">
+                    <span>⏰</span>
+                    <span>${session.time ? session.time + ' h' : 'Hora por determinar'}</span>
+                </div>
             </div>
-            <span class="comp-calendar-badge ${badgeClass}" style="padding: 4px 10px; font-size: 0.75rem;">${labelText}</span>
+            <span class="comp-multi-event-badge ${badgeClass}">${labelText}</span>
         `;
 
         btn.addEventListener("click", () => {
             modal.classList.remove("active");
             if (isPastDay) {
-                openRehearsalDetailModal(dateKey);
+                openCompRehearsalDetailModal(dateKey);
             } else {
                 openUpcomingEventDetailModal(dateKey);
             }
