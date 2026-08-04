@@ -6116,6 +6116,8 @@ function renderMusicianDetailContent() {
             `;
         }).join("");
     }
+
+    renderMusicianMonthlyEvolution(musicianId);
 }
 
 function downloadMusicianPDFReport() {
@@ -14716,6 +14718,147 @@ function renderDayHeatmap(filteredDates) {
             </div>
         </div>
         ${insightsHTML}
+    `;
+}
+
+// ==========================================================================
+// GRÁFICO DE EVOLUCIÓN TEMPORAL MENSUAL INDIVIDUAL
+// ==========================================================================
+function renderMusicianMonthlyEvolution(musicianId) {
+    const container = document.getElementById("detail-monthly-chart-container");
+    if (!container) return;
+
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return;
+
+    const yearFilter = document.getElementById("detail-filter-year").value;
+    const typeFilter = document.getElementById("detail-filter-type").value;
+
+    const today = new Date();
+    const curY = today.getFullYear();
+    const curM = today.getMonth() + 1;
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let y1 = yearFilter === "all" ? (curM >= 9 ? curY : curY - 1) : parseInt(yearFilter, 10);
+    let y2 = y1 + 1;
+
+    const seasonMonths = [
+        { label: "Sep", monthNum: 9, year: String(y1) },
+        { label: "Oct", monthNum: 10, year: String(y1) },
+        { label: "Nov", monthNum: 11, year: String(y1) },
+        { label: "Dic", monthNum: 12, year: String(y1) },
+        { label: "Ene", monthNum: 1, year: String(y2) },
+        { label: "Feb", monthNum: 2, year: String(y2) },
+        { label: "Mar", monthNum: 3, year: String(y2) },
+        { label: "Abr", monthNum: 4, year: String(y2) },
+        { label: "May", monthNum: 5, year: String(y2) },
+        { label: "Jun", monthNum: 6, year: String(y2) },
+        { label: "Jul", monthNum: 7, year: String(y2) },
+        { label: "Ago", monthNum: 8, year: String(y2) }
+    ];
+
+    let maxMonthPct = -1;
+    let bestMonth = null;
+
+    const monthsData = seasonMonths.map(sm => {
+        let presents = 0;
+        let total = 0;
+
+        Object.keys(state.attendance).forEach(dateStr => {
+            if (dateStr > todayStr) return;
+            const dateParts = dateStr.split("-");
+            const y = dateParts[0];
+            const m = parseInt(dateParts[1], 10);
+
+            if (y === sm.year && m === sm.monthNum) {
+                const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
+                if (typeFilter !== "all" && sessionType !== typeFilter) return;
+
+                const rec = state.attendance[dateStr][musicianId];
+                if (rec) {
+                    total++;
+                    if (rec.status === "present") presents++;
+                }
+            }
+        });
+
+        const pct = total > 0 ? Math.round((presents / total) * 100) : null;
+        if (pct !== null && pct > maxMonthPct) {
+            maxMonthPct = pct;
+            bestMonth = sm.label;
+        }
+        return { label: sm.label, monthNum: sm.monthNum, year: sm.year, presents, total, pct };
+    });
+
+    let barsHTML = "";
+    monthsData.forEach(item => {
+        const hasData = item.pct !== null;
+        const heightPct = hasData ? item.pct : 0;
+        const displayValue = hasData ? `${item.pct}%` : "-";
+        const tooltip = `${item.label} ${item.year}: ${hasData ? item.pct + '%' : 'Sin datos'} (${item.presents} de ${item.total} convocatorias)`;
+
+        let barGradient = "linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%)";
+        let valColor = "var(--text-muted)";
+
+        if (hasData) {
+            if (item.pct >= 80) {
+                barGradient = "linear-gradient(180deg, #2ecc71 0%, rgba(46, 204, 113, 0.35) 100%)";
+                valColor = "#2ecc71";
+            } else if (item.pct >= 60) {
+                barGradient = "linear-gradient(180deg, var(--color-gold) 0%, rgba(212, 175, 55, 0.35) 100%)";
+                valColor = "var(--color-gold)";
+            } else {
+                barGradient = "linear-gradient(180deg, #e74c3c 0%, rgba(231, 76, 60, 0.35) 100%)";
+                valColor = "#e74c3c";
+            }
+        }
+
+        barsHTML += `
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 20px; max-width: 40px; height: 100%; justify-content: flex-end; position: relative;">
+                <span class="bar-value" style="font-size: 0.65rem; font-weight: 700; color: ${valColor}; margin-bottom: 4px; z-index: 2;">
+                    ${displayValue}
+                </span>
+                <div class="bar-fill" style="width: 55%; height: ${heightPct}%; background: ${barGradient}; border-radius: 3px 3px 0 0; transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: help; min-height: ${hasData ? '3px' : '0px'}" title="${tooltip}"></div>
+                <span class="bar-label" style="position: absolute; bottom: -22px; font-size: 0.65rem; color: var(--text-color); font-weight: 600; white-space: nowrap;">
+                    ${item.label}
+                </span>
+            </div>
+        `;
+    });
+
+    let trendNote = "";
+    if (bestMonth && maxMonthPct >= 0) {
+        trendNote = `
+            <div style="margin-top: 24px; font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; background: rgba(212, 175, 55, 0.06); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.15);">
+                <span>💡</span>
+                <span>Pico máximo del período: <strong>${bestMonth} (${maxMonthPct}%)</strong>.</span>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="custom-vertical-chart" style="display: flex; height: 180px; width: 100%; border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); position: relative; padding: 15px 5px 0 35px; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+            <div class="y-axis" style="position: absolute; left: 0; top: 0; bottom: 26px; width: 28px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 0.65rem; color: var(--text-muted); padding-right: 4px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+            
+            <div class="grid-lines" style="position: absolute; left: 28px; right: 0; top: 0; bottom: 26px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px solid var(--border-color); width: 100%;"></div>
+            </div>
+
+            <div class="bars-container" style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 26px; box-sizing: border-box; gap: 4px;">
+                ${barsHTML}
+            </div>
+        </div>
+        ${trendNote}
     `;
 }
 

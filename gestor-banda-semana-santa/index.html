@@ -2827,6 +2827,16 @@
                 </div>
             </div>
 
+            <!-- Gráfico de Evolución Temporal Mensual -->
+            <div class="card" style="padding: 16px; margin-bottom: 16px;">
+                <h3 style="font-size: 0.95rem; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px;">
+                    📈 Evolución Temporal Mensual
+                </h3>
+                <div id="detail-monthly-chart-container" style="width: 100%;">
+                    <!-- Renderizado dinámico desde JS -->
+                </div>
+            </div>
+
             <!-- Tabla de faltas -->
             <div class="card card-table" style="margin-bottom: 0;">
                 <h3 style="padding: 14px 16px 8px; font-size: 0.95rem; margin: 0;">Historial de Faltas</h3>
@@ -3460,13 +3470,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=394"></script>
+    <script src="app.js?v=395"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=394
+        // Purga de caché antigua y registro del Service Worker v=395
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v394") {
+                    if (key !== "yacente-v395") {
                         caches.delete(key);
                     }
                 });
@@ -3479,9 +3489,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=394")
+                navigator.serviceWorker.register("sw.js?v=395")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v394 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v395 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
