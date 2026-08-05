@@ -4360,8 +4360,8 @@ function getSessionPrevision(date) {
 
         const dayRecord = state.attendance[date];
         const r = dayRecord ? dayRecord[m.id] : null;
-        // Solo cuenta como preaviso de no asistencia si el músico ha hecho un preaviso explícito (ausencia justificada o con motivo)
-        const isExplicitPreavisoFalta = r && r.status === "absent" && (r.justified === true || (r.reason && r.reason.trim().length > 0));
+        // Solo cuenta como preaviso de no asistencia si el músico ha realizado un preaviso explícito indicando ausencia (preaviso === true, justificada o con motivo)
+        const isExplicitPreavisoFalta = r && r.status === "absent" && (r.preaviso === true || r.isPreaviso === true || r.justified === true || (r.reason && r.reason.trim().length > 0));
         if (isExplicitPreavisoFalta) {
             preavisoAbsences++;
             voicePrevision[voice].absent++;
@@ -13346,24 +13346,26 @@ function openUpcomingEventDetailModal(date) {
     let badgeClass = "pending";
     let badgeText = "Pendiente";
 
-    if (record) {
+    const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
+
+    if (isExplicitPreaviso) {
         if (record.status === "present") {
             badgeClass = "present";
-            badgeText = "Presente";
+            badgeText = "Asistiré";
         } else if (record.status === "absent") {
             if (record.justified) {
                 badgeClass = "justified";
                 badgeText = "Justificada";
             } else {
                 badgeClass = "absent";
-                badgeText = "Ausente";
+                badgeText = "Faltaré";
             }
         }
     }
 
     if (badgeEl) {
         badgeEl.className = `comp-attendance-badge ${badgeClass} clickable-badge`;
-        badgeEl.innerText = "Preaviso";
+        badgeEl.innerText = badgeText;
     }
 
     // Date
@@ -13522,17 +13524,24 @@ function renderComponentEventos() {
         let badgeClass = "pending clickable-badge";
         let badgeText = "Pendiente";
 
-        if (record) {
-            badgeText = "Preaviso";
+        const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
+
+        if (isExplicitPreaviso) {
             if (record.status === "present") {
                 badgeClass = "present clickable-badge";
+                badgeText = "Asistiré";
             } else if (record.status === "absent") {
                 if (record.justified) {
                     badgeClass = "justified clickable-badge";
+                    badgeText = "Justificada";
                 } else {
                     badgeClass = "absent clickable-badge";
+                    badgeText = "Faltaré";
                 }
             }
+        } else {
+            badgeClass = "pending clickable-badge";
+            badgeText = "Pendiente";
         }
         
         const typeClass = session.type === "ensayo" ? "ensayo" : "actuacion";
@@ -13750,8 +13759,9 @@ function renderComponenteCalendario() {
                 // Determinar estado de preaviso o asistencia para la clase de color
                 let badgeClass = "pending";
                 const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+                const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
 
-                if (record) {
+                if (isExplicitPreaviso) {
                     if (record.status === "present") {
                         badgeClass = "present";
                     } else if (record.status === "absent") {
@@ -13759,7 +13769,7 @@ function renderComponenteCalendario() {
                     }
                 } else {
                     if (isPastDay) {
-                        badgeClass = "absent";
+                        badgeClass = (record && record.status === "present") ? "present" : ((record && record.justified) ? "justified" : "absent");
                     } else {
                         badgeClass = "pending";
                     }
@@ -14312,7 +14322,9 @@ function openPreavisoModal(date) {
         justifiedCheckbox.checked = true; // Default to true
     }
 
-    if (record) {
+    const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
+
+    if (isExplicitPreaviso) {
         if (record.status === "present") {
             setActiveRsvpButton("present");
         } else if (record.status === "absent") {
@@ -14478,7 +14490,8 @@ function setupPreavisoEvents() {
                 recordObj = {
                     status: "present",
                     justified: false,
-                    reason: ""
+                    reason: "",
+                    preaviso: true
                 };
             } else {
                 const justifiedCheckbox = document.getElementById("preaviso-justified-checkbox");
@@ -14492,7 +14505,8 @@ function setupPreavisoEvents() {
                 recordObj = {
                     status: "absent",
                     justified: isJustified,
-                    reason: reason
+                    reason: reason,
+                    preaviso: true
                 };
             }
             
