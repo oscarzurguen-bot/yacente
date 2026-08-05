@@ -1303,6 +1303,10 @@ function updateSuggestionsBadge() {
     });
 }
 
+function updateNotificationsBadge() {
+    updateSuggestionsBadge();
+}
+
 function dbSaveSuggestion(suggestion) {
     if (suggestion && suggestion.authorId && suggestion.date) {
         localStorage.setItem("yacente_last_suggestion_date_" + suggestion.authorId, suggestion.date);
@@ -13861,9 +13865,15 @@ function renderMySuggestionHistory() {
     const emptyState = document.getElementById("my-suggestions-history-empty");
     if (!container || !musicianId) return;
 
+    const getTimestamp = (d) => {
+        if (!d) return 0;
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+    };
+
     const mine = (state.suggestions || [])
         .filter(s => String(s.authorId) === String(musicianId) && !s.deletedByMusician)
-        .sort((a, b) => new Date(b.date) - new Date(a.date));
+        .sort((a, b) => getTimestamp(b.date) - getTimestamp(a.date));
 
     container.innerHTML = "";
 
@@ -14009,7 +14019,13 @@ function renderAdminSuggestionsList() {
     }
     if (emptyState) emptyState.classList.add("hidden");
 
-    const sorted = [...visibleSuggestions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const getTimestamp = (d) => {
+        if (!d) return 0;
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+    };
+
+    const sorted = [...visibleSuggestions].sort((a, b) => getTimestamp(b.date) - getTimestamp(a.date));
 
     sorted.forEach(sug => {
         const itemDiv = document.createElement("div");
