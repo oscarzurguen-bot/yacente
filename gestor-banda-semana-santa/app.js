@@ -3069,6 +3069,8 @@ function setupMarchasDragAndDrop() {
     setupAnnouncementEvents();
     setupMusicianDrawerAndSettingsEvents();
     setupSuggestionsMailboxEvents();
+    setupMarchaAudioLinksModalEvents();
+    setupMarchaModalEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -13324,6 +13326,7 @@ function renderComponentRepertorio() {
         
         const card = document.createElement("div");
         card.className = "comp-marcha-card";
+        card.style.cursor = "pointer";
         card.innerHTML = `
             <div class="comp-marcha-info">
                 <h4 class="comp-marcha-title">${marcha.title}</h4>
@@ -13333,7 +13336,8 @@ function renderComponentRepertorio() {
         `;
         
         const btn = card.querySelector(".comp-status-btn-single");
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
             let nextStatus = "";
             if (currentStatus === "") nextStatus = "red";
             else if (currentStatus === "red") nextStatus = "yellow";
@@ -13342,7 +13346,11 @@ function renderComponentRepertorio() {
             
             updateMusicianMarchaStatus(musicianId, marcha.id, nextStatus);
         });
-        
+
+        card.addEventListener("click", () => {
+            openMarchaAudioLinksModal(marcha.id);
+        });
+
         container.appendChild(card);
     });
 }
@@ -13377,6 +13385,236 @@ function updateMusicianMarchaStatus(musicianId, marchaId, status) {
     
     showToast("Dominio personal actualizado", "success");
     renderComponentRepertorio();
+}
+
+function openAddMarchaModal() {
+    const form = document.getElementById("form-marcha");
+    if (form) form.reset();
+    document.getElementById("marcha-id").value = "";
+    document.getElementById("marcha-title-input").value = "";
+    document.getElementById("marcha-status-input").value = "green";
+    document.getElementById("marcha-difficulty-input").value = "1";
+    if (document.getElementById("marcha-audio-youtube-input")) document.getElementById("marcha-audio-youtube-input").value = "";
+    if (document.getElementById("marcha-audio-spotify-input")) document.getElementById("marcha-audio-spotify-input").value = "";
+    if (document.getElementById("marcha-audio-custom-input")) document.getElementById("marcha-audio-custom-input").value = "";
+    
+    const titleEl = document.getElementById("modal-marcha-title");
+    if (titleEl) titleEl.innerText = "Añadir Nueva Marcha";
+    
+    const modal = document.getElementById("modal-marcha");
+    if (modal) modal.classList.add("active");
+}
+
+function openEditMarchaModal(id) {
+    const m = (state.marchas || []).find(item => String(item.id) === String(id));
+    if (!m) return;
+    
+    document.getElementById("marcha-id").value = m.id;
+    document.getElementById("marcha-title-input").value = m.title || "";
+    document.getElementById("marcha-status-input").value = m.status || "green";
+    document.getElementById("marcha-difficulty-input").value = m.difficulty || 1;
+    
+    if (document.getElementById("marcha-audio-youtube-input")) {
+        document.getElementById("marcha-audio-youtube-input").value = m.youtubeUrl || "";
+    }
+    if (document.getElementById("marcha-audio-spotify-input")) {
+        document.getElementById("marcha-audio-spotify-input").value = m.spotifyUrl || "";
+    }
+    if (document.getElementById("marcha-audio-custom-input")) {
+        document.getElementById("marcha-audio-custom-input").value = m.audioUrl || "";
+    }
+    
+    const titleEl = document.getElementById("modal-marcha-title");
+    if (titleEl) titleEl.innerText = "Editar Marcha";
+    
+    const modal = document.getElementById("modal-marcha");
+    if (modal) modal.classList.add("active");
+}
+
+function setupMarchaModalEvents() {
+    const btnAdd = document.getElementById("btn-add-marcha");
+    const modal = document.getElementById("modal-marcha");
+    const btnClose = document.getElementById("btn-close-marcha-modal");
+    const btnCancel = document.getElementById("btn-cancel-marcha-modal");
+    const form = document.getElementById("form-marcha");
+
+    if (btnAdd) {
+        btnAdd.addEventListener("click", () => {
+            openAddMarchaModal();
+        });
+    }
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (modal) {
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const id = document.getElementById("marcha-id").value;
+            const title = document.getElementById("marcha-title-input").value.trim();
+            const status = document.getElementById("marcha-status-input").value;
+            const difficulty = document.getElementById("marcha-difficulty-input").value;
+            const youtubeUrl = document.getElementById("marcha-audio-youtube-input") ? document.getElementById("marcha-audio-youtube-input").value.trim() : "";
+            const spotifyUrl = document.getElementById("marcha-audio-spotify-input") ? document.getElementById("marcha-audio-spotify-input").value.trim() : "";
+            const audioUrl = document.getElementById("marcha-audio-custom-input") ? document.getElementById("marcha-audio-custom-input").value.trim() : "";
+
+            if (!title) return;
+
+            if (id) {
+                const index = (state.marchas || []).findIndex(m => String(m.id) === String(id));
+                if (index !== -1) {
+                    state.marchas[index] = {
+                        ...state.marchas[index],
+                        title,
+                        status,
+                        difficulty,
+                        youtubeUrl,
+                        spotifyUrl,
+                        audioUrl
+                    };
+                    dbSaveMarcha(state.marchas[index]);
+                    showToast("Marcha actualizada", "success");
+                }
+            } else {
+                const newId = "marcha-" + Date.now();
+                const newMarcha = {
+                    id: newId,
+                    title,
+                    status,
+                    difficulty,
+                    youtubeUrl,
+                    spotifyUrl,
+                    audioUrl,
+                    notes: ""
+                };
+                if (!state.marchas) state.marchas = [];
+                state.marchas.push(newMarcha);
+                dbSaveMarcha(newMarcha);
+                showToast("Marcha añadida al repertorio", "success");
+            }
+
+            saveStateToLocalStorage();
+            closeModal();
+
+            renderMarchasList();
+            renderComponentRepertorio();
+            renderRehearsalMarchasWidget();
+        });
+    }
+}
+
+function openMarchaAudioLinksModal(marchaId) {
+    const marcha = (state.marchas || []).find(m => String(m.id) === String(marchaId));
+    if (!marcha) return;
+
+    const modal = document.getElementById("modal-marcha-audio-links");
+    if (!modal) return;
+
+    const titleEl = document.getElementById("modal-audio-links-title");
+    const composerEl = document.getElementById("modal-audio-links-composer");
+    const container = document.getElementById("modal-audio-links-container");
+
+    if (titleEl) titleEl.innerText = `🎧 ${marcha.title}`;
+    if (composerEl) composerEl.innerText = marcha.composer || marcha.author || "Repertorio Oficial";
+
+    if (container) {
+        container.innerHTML = "";
+        const youtubeUrl = (marcha.youtubeUrl || "").trim();
+        const spotifyUrl = (marcha.spotifyUrl || "").trim();
+        const audioUrl = (marcha.audioUrl || "").trim();
+
+        const hasLinks = youtubeUrl || spotifyUrl || audioUrl;
+
+        if (!hasLinks) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 24px 14px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 10px;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">🎧</div>
+                    <p class="text-muted" style="margin: 0; font-size: 0.88rem; line-height: 1.4;">
+                        La directiva aún no ha añadido enlaces de audio para esta marcha.
+                    </p>
+                </div>
+            `;
+        } else {
+            if (youtubeUrl) {
+                const linkBtn = document.createElement("a");
+                linkBtn.href = youtubeUrl;
+                linkBtn.target = "_blank";
+                linkBtn.rel = "noopener noreferrer";
+                linkBtn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.35); border-radius: 10px; color: #ff4d4d; font-weight: 700; text-decoration: none; box-sizing: border-box; transition: transform 0.2s ease, background 0.2s ease;";
+                linkBtn.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.25rem;">🔴</span>
+                        <span style="font-size: 0.92rem;">Escuchar en YouTube</span>
+                    </div>
+                    <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
+                `;
+                container.appendChild(linkBtn);
+            }
+
+            if (spotifyUrl) {
+                const linkBtn = document.createElement("a");
+                linkBtn.href = spotifyUrl;
+                linkBtn.target = "_blank";
+                linkBtn.rel = "noopener noreferrer";
+                linkBtn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(29, 185, 84, 0.1); border: 1px solid rgba(29, 185, 84, 0.35); border-radius: 10px; color: #1db954; font-weight: 700; text-decoration: none; box-sizing: border-box; transition: transform 0.2s ease, background 0.2s ease;";
+                linkBtn.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.25rem;">🟢</span>
+                        <span style="font-size: 0.92rem;">Escuchar en Spotify</span>
+                    </div>
+                    <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
+                `;
+                container.appendChild(linkBtn);
+            }
+
+            if (audioUrl) {
+                const linkBtn = document.createElement("a");
+                linkBtn.href = audioUrl;
+                linkBtn.target = "_blank";
+                linkBtn.rel = "noopener noreferrer";
+                linkBtn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 10px; color: var(--color-gold); font-weight: 700; text-decoration: none; box-sizing: border-box; transition: transform 0.2s ease, background 0.2s ease;";
+                linkBtn.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.25rem;">🎵</span>
+                        <span style="font-size: 0.92rem;">Enlace de Audio / Directo</span>
+                    </div>
+                    <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
+                `;
+                container.appendChild(linkBtn);
+            }
+        }
+    }
+
+    modal.classList.add("active");
+}
+
+function setupMarchaAudioLinksModalEvents() {
+    const modal = document.getElementById("modal-marcha-audio-links");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-marcha-audio-links-modal");
+    const btnFooter = document.getElementById("btn-close-marcha-audio-links-footer");
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnFooter) btnFooter.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
 }
 
 function logoutComponent() {

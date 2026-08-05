@@ -1895,6 +1895,31 @@
                         <option value="5">Nivel 5</option>
                     </select>
                 </div>
+                <div class="form-group" style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                    <label style="font-size: 0.85rem; font-weight: 700; color: var(--color-gold); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                        <span>🎧</span> Enlaces de Audio para Escuchar (Opcional)
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div>
+                            <label for="marcha-audio-youtube-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+                                <span style="color: #FF0000;">🔴</span> Enlace a YouTube / Vídeo
+                            </label>
+                            <input type="url" id="marcha-audio-youtube-input" placeholder="https://www.youtube.com/watch?v=..." style="width: 100%; font-size: 0.82rem;">
+                        </div>
+                        <div>
+                            <label for="marcha-audio-spotify-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+                                <span style="color: #1DB954;">🟢</span> Enlace a Spotify / Álbum
+                            </label>
+                            <input type="url" id="marcha-audio-spotify-input" placeholder="https://open.spotify.com/track/..." style="width: 100%; font-size: 0.82rem;">
+                        </div>
+                        <div>
+                            <label for="marcha-audio-custom-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+                                <span>🎵</span> Otro Enlace de Audio / Directo
+                            </label>
+                            <input type="url" id="marcha-audio-custom-input" placeholder="https://..." style="width: 100%; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-marcha-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar Marcha</button>
@@ -1961,6 +1986,29 @@
                     <button type="button" class="btn btn-secondary" id="btn-cancel-marcha-notes-modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" id="btn-save-marcha-notes-modal">Guardar Notas</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Escuchar Enlaces de Audio de una Marcha (Portal Músicos) -->
+    <div id="modal-marcha-audio-links" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px; width: 90%;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <h3 id="modal-audio-links-title" style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                        <span>🎧</span> Marcha
+                    </h3>
+                    <span id="modal-audio-links-composer" class="text-muted" style="font-size: 0.82rem; font-weight: 500;"></span>
+                </div>
+                <button class="modal-close" id="btn-close-marcha-audio-links-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; padding: 4px 0 10px 0;">
+                <div id="modal-audio-links-container" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Audio links populating here -->
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 6px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btn-close-marcha-audio-links-footer">Cerrar</button>
             </div>
         </div>
     </div>
@@ -3488,13 +3536,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=406"></script>
+    <script src="app.js?v=407"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=406
+        // Purga de caché antigua y registro del Service Worker v=407
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v406") {
+                    if (key !== "yacente-v407") {
                         caches.delete(key);
                     }
                 });
@@ -3507,9 +3555,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=406")
+                navigator.serviceWorker.register("sw.js?v=407")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v406 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v407 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
