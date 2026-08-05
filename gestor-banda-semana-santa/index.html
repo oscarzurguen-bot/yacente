@@ -2248,16 +2248,20 @@
     </div>
 
 
-    <!-- Modal: Crear Ensayo -->
+    <!-- Modal: Crear / Editar Ensayo -->
     <div id="modal-rehearsal" class="modal-overlay">
-        <div class="modal-card" style="max-width: 380px;">
+        <div class="modal-card" style="max-width: 400px;">
             <div class="modal-header">
-                <h3>Nuevo Ensayo</h3>
+                <h3 id="modal-rehearsal-title">Nuevo Ensayo</h3>
                 <button class="modal-close" id="btn-close-rehearsal-modal">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
             </div>
             <form id="form-rehearsal">
+                <input type="hidden" id="rehearsal-editing-key" value="">
                 <div class="form-group">
                     <label for="rehearsal-date-input">Selecciona la Fecha del Ensayo</label>
                     <input type="date" id="rehearsal-date-input" required style="width: 100%;">
@@ -2285,9 +2289,10 @@
                     <label for="rehearsal-time-input">Hora del Ensayo</label>
                     <input type="text" id="rehearsal-time-input" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
                 </div>
-                <div class="modal-actions">
+                <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
+                    <button type="button" class="btn btn-secondary hidden" id="btn-shortcut-pasar-lista-rehearsal" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--color-gold); color: var(--color-gold); font-weight: 600;">📋 Pase de Lista</button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-rehearsal-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Crear Ensayo</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-rehearsal-modal">Crear Ensayo</button>
                 </div>
             </form>
         </div>
@@ -2431,11 +2436,11 @@
         </div>
     </div>
 
-    <!-- Modal: Crear Actuación -->
+    <!-- Modal: Crear / Editar Actuación -->
     <div id="modal-actuacion" class="modal-overlay">
         <div class="modal-card" style="max-width: 420px;">
             <div class="modal-header">
-                <h3>Nueva Actuación</h3>
+                <h3 id="modal-actuacion-title">Nueva Actuación</h3>
                 <button class="modal-close" id="btn-close-actuacion-modal">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -2444,6 +2449,7 @@
                 </button>
             </div>
             <form id="form-actuacion">
+                <input type="hidden" id="actuacion-editing-key" value="">
                 <div class="form-group">
                     <label for="actuacion-name-input">Nombre de la Actuación</label>
                     <input type="text" id="actuacion-name-input" placeholder="Ej: Domingo de Ramos, Madrugá..." required style="width: 100%;">
@@ -2460,9 +2466,10 @@
                     <input type="checkbox" id="actuacion-trip-input" style="width: auto; margin: 0;">
                     <label for="actuacion-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
                 </div>
-                <div class="modal-actions">
+                <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
+                    <button type="button" class="btn btn-secondary hidden" id="btn-shortcut-pasar-lista-actuacion" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--color-gold); color: var(--color-gold); font-weight: 600;">📋 Pase de Lista</button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-actuacion-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Crear Actuación</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-actuacion-modal">Crear Actuación</button>
                 </div>
             </form>
         </div>
@@ -3632,13 +3639,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=417"></script>
+    <script src="app.js?v=419"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=417
+        // Purga de caché antigua y registro del Service Worker v=419
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v417") {
+                    if (key !== "yacente-v419") {
                         caches.delete(key);
                     }
                 });
@@ -3651,9 +3658,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=417")
+                navigator.serviceWorker.register("sw.js?v=419")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v417 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v419 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

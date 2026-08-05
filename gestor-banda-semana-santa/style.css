@@ -4719,6 +4719,12 @@ body.component-portal .header-title-container {
     margin-top: 6px;
 }
 
+#upcoming-event-detail-map-content a:hover img {
+    transform: scale(1.06);
+    filter: brightness(1.1);
+}
+
+
 
 
 

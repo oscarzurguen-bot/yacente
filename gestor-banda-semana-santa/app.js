@@ -2197,10 +2197,18 @@ function setupEventListeners() {
     // ==========================================
     // MODAL DE CREAR ENSAYO
     // ==========================================
+    // ==========================================
+    // MODAL DE CREAR / EDITAR ENSAYO
+    // ==========================================
     const modalRehearsal = document.getElementById("modal-rehearsal");
     
     document.getElementById("btn-add-rehearsal").addEventListener("click", () => {
         renderRehearsalLocationOptions();
+        if (document.getElementById("rehearsal-editing-key")) document.getElementById("rehearsal-editing-key").value = "";
+        if (document.getElementById("modal-rehearsal-title")) document.getElementById("modal-rehearsal-title").innerText = "Nuevo Ensayo";
+        if (document.getElementById("btn-submit-rehearsal-modal")) document.getElementById("btn-submit-rehearsal-modal").innerText = "Crear Ensayo";
+        if (document.getElementById("btn-shortcut-pasar-lista-rehearsal")) document.getElementById("btn-shortcut-pasar-lista-rehearsal").classList.add("hidden");
+        
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
         if (document.getElementById("rehearsal-time-input")) {
@@ -2215,23 +2223,10 @@ function setupEventListeners() {
 
     document.getElementById("form-rehearsal").addEventListener("submit", (e) => {
         e.preventDefault();
+        const editingKey = document.getElementById("rehearsal-editing-key") ? document.getElementById("rehearsal-editing-key").value : "";
         const selectedDate = document.getElementById("rehearsal-date-input").value;
         const subtype = document.getElementById("rehearsal-type-input").value;
         if (!selectedDate) return;
-
-        let sessionKey = selectedDate;
-        if (state.sessionTypes[sessionKey]) {
-            const existing = state.sessionTypes[sessionKey];
-            if (existing.type === "ensayo" && existing.subtype === subtype) {
-                showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
-                return;
-            }
-            sessionKey = `${selectedDate}_${subtype}`;
-            if (state.sessionTypes[sessionKey]) {
-                showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
-                return;
-            }
-        }
 
         let convocatedVoices = [];
         if (subtype === "trompetas1") {
@@ -2245,60 +2240,136 @@ function setupEventListeners() {
         } else if (subtype === "percusion") {
             convocatedVoices = ["Tambores", "Bombos", "Platos"];
         } else if (subtype === "primeras") {
-            convocatedVoices = ["Trompetas 1ª", "Cornetas"]; // Fallback histórico
+            convocatedVoices = ["Trompetas 1ª", "Cornetas"];
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
         const timeVal = document.getElementById("rehearsal-time-input") ? document.getElementById("rehearsal-time-input").value.trim() : "";
-        const createdAtIso = new Date().toISOString();
-        state.sessionTypes[sessionKey] = { 
-            type: "ensayo", 
-            subtype: subtype, 
-            name: "", 
-            convocatedVoices: convocatedVoices,
-            location: locationVal,
-            time: timeVal,
-            createdAt: createdAtIso
-        };
-        initializeAttendanceForDate(sessionKey, convocatedVoices);
-        
-        dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
-        dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
-        if (isCloudActive()) {
-            const db = firebase.firestore();
-            db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
 
-        } else {
-            saveStateToLocalStorage();
+        let targetKey = selectedDate;
+        if (subtype !== "general") {
+            targetKey = `${selectedDate}_${subtype}`;
         }
-        
-        closeModalRehearsal();
-        renderEnsayosList();
-        renderStatistics();
-        
-        state.currentDate = sessionKey;
-        document.getElementById("attendance-date").value = selectedDate;
-        
-        document.querySelectorAll(".nav-item").forEach(nav => {
-            if(nav.getAttribute("data-target") === "section-pasar-lista") {
-                nav.classList.add("active");
+
+        if (editingKey) {
+            // Modo Edición
+            if (editingKey !== targetKey) {
+                if (state.sessionTypes[targetKey]) {
+                    showToast("Ya existe un ensayo registrado para esta fecha y tipo", "error");
+                    return;
+                }
+                const oldSession = state.sessionTypes[editingKey] || {};
+                state.sessionTypes[targetKey] = {
+                    ...oldSession,
+                    type: "ensayo",
+                    subtype: subtype,
+                    convocatedVoices: convocatedVoices,
+                    location: locationVal,
+                    time: timeVal
+                };
+                if (state.attendance[editingKey]) {
+                    state.attendance[targetKey] = state.attendance[editingKey];
+                    delete state.attendance[editingKey];
+                }
+                delete state.sessionTypes[editingKey];
+                dbDeleteSession(editingKey);
             } else {
-                nav.classList.remove("active");
+                state.sessionTypes[targetKey] = {
+                    ...state.sessionTypes[targetKey],
+                    type: "ensayo",
+                    subtype: subtype,
+                    convocatedVoices: convocatedVoices,
+                    location: locationVal,
+                    time: timeVal
+                };
             }
-        });
-        
-        renderActiveSection("section-pasar-lista");
-        renderAttendance();
-        showToast(`Ensayo creado. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+
+            dbSaveSessionType(targetKey, state.sessionTypes[targetKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                if (state.attendance[targetKey]) {
+                    db.collection("attendance").doc(targetKey).set(state.attendance[targetKey]);
+                }
+            } else {
+                saveStateToLocalStorage();
+            }
+
+            closeModalRehearsal();
+            renderEnsayosList();
+            renderStatistics();
+            renderCalendar();
+            showToast(`Ensayo del ${formatDateSpanish(selectedDate)} actualizado con éxito`, "success");
+        } else {
+            // Modo Creación
+            let sessionKey = selectedDate;
+            if (state.sessionTypes[sessionKey]) {
+                const existing = state.sessionTypes[sessionKey];
+                if (existing.type === "ensayo" && existing.subtype === subtype) {
+                    showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
+                    return;
+                }
+                sessionKey = `${selectedDate}_${subtype}`;
+                if (state.sessionTypes[sessionKey]) {
+                    showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
+                    return;
+                }
+            }
+
+            const createdAtIso = new Date().toISOString();
+            state.sessionTypes[sessionKey] = { 
+                type: "ensayo", 
+                subtype: subtype, 
+                name: "", 
+                convocatedVoices: convocatedVoices,
+                location: locationVal,
+                time: timeVal,
+                createdAt: createdAtIso
+            };
+            initializeAttendanceForDate(sessionKey, convocatedVoices);
+            
+            dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
+            dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            } else {
+                saveStateToLocalStorage();
+            }
+            
+            closeModalRehearsal();
+            renderEnsayosList();
+            renderStatistics();
+            renderCalendar();
+            
+            state.currentDate = sessionKey;
+            document.getElementById("attendance-date").value = selectedDate;
+            
+            document.querySelectorAll(".nav-item").forEach(nav => {
+                if(nav.getAttribute("data-target") === "section-pasar-lista") {
+                    nav.classList.add("active");
+                } else {
+                    nav.classList.remove("active");
+                }
+            });
+            
+            renderActiveSection("section-pasar-lista");
+            renderAttendance();
+            showToast(`Ensayo creado. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+        }
     });
 
     // ==========================================
-    // MODAL DE CREAR ACTUACIÓN
+    // MODAL DE CREAR / EDITAR ACTUACIÓN
     // ==========================================
     const modalActuacion = document.getElementById("modal-actuacion");
     
     document.getElementById("btn-add-actuacion").addEventListener("click", () => {
         renderRehearsalLocationOptions();
+        if (document.getElementById("actuacion-editing-key")) document.getElementById("actuacion-editing-key").value = "";
+        if (document.getElementById("modal-actuacion-title")) document.getElementById("modal-actuacion-title").innerText = "Nueva Actuación";
+        if (document.getElementById("btn-submit-actuacion-modal")) document.getElementById("btn-submit-actuacion-modal").innerText = "Crear Actuación";
+        if (document.getElementById("btn-shortcut-pasar-lista-actuacion")) document.getElementById("btn-shortcut-pasar-lista-actuacion").classList.add("hidden");
+
         document.getElementById("actuacion-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("actuacion-name-input").value = "";
         if (document.getElementById("actuacion-trip-input")) {
@@ -2313,59 +2384,115 @@ function setupEventListeners() {
 
     document.getElementById("form-actuacion").addEventListener("submit", (e) => {
         e.preventDefault();
+        const editingKey = document.getElementById("actuacion-editing-key") ? document.getElementById("actuacion-editing-key").value : "";
         const selectedDate = document.getElementById("actuacion-date-input").value;
         const actuacionName = document.getElementById("actuacion-name-input").value.trim();
         if (!selectedDate || !actuacionName) return;
 
-        let sessionKey = selectedDate;
-        if (state.sessionTypes[sessionKey]) {
-            sessionKey = `${selectedDate}_actuacion`;
-            if (state.sessionTypes[sessionKey]) {
-                showToast("Ya existe una actuación registrada para esta fecha", "error");
-                return;
-            }
-        }
-
-        initializeAttendanceForDate(sessionKey);
         const isTrip = document.getElementById("actuacion-trip-input") ? document.getElementById("actuacion-trip-input").checked : false;
         const locationVal = document.getElementById("actuacion-location-input") ? document.getElementById("actuacion-location-input").value : "";
-        const createdAtIso = new Date().toISOString();
-        state.sessionTypes[sessionKey] = { 
-            type: "actuacion", 
-            name: actuacionName, 
-            isTrip: isTrip,
-            location: locationVal,
-            createdAt: createdAtIso
-        };
-        
-        dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
-        dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
-        if (isCloudActive()) {
-            const db = firebase.firestore();
-            db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
 
-        } else {
-            saveStateToLocalStorage();
-        }
-        
-        closeModalActuacion();
-        renderActuacionesList();
-        renderStatistics();
-        
-        state.currentDate = sessionKey;
-        document.getElementById("attendance-date").value = selectedDate;
-        
-        document.querySelectorAll(".nav-item").forEach(nav => {
-            if(nav.getAttribute("data-target") === "section-pasar-lista") {
-                nav.classList.add("active");
+        if (editingKey) {
+            // Modo Edición
+            let targetKey = editingKey;
+            if (editingKey !== selectedDate && editingKey !== `${selectedDate}_actuacion`) {
+                targetKey = selectedDate;
+                if (state.sessionTypes[targetKey]) {
+                    targetKey = `${selectedDate}_actuacion`;
+                    if (state.sessionTypes[targetKey]) {
+                        showToast("Ya existe una actuación registrada para esta fecha", "error");
+                        return;
+                    }
+                }
+                const oldSession = state.sessionTypes[editingKey] || {};
+                state.sessionTypes[targetKey] = {
+                    ...oldSession,
+                    type: "actuacion",
+                    name: actuacionName,
+                    isTrip: isTrip,
+                    location: locationVal
+                };
+                if (state.attendance[editingKey]) {
+                    state.attendance[targetKey] = state.attendance[editingKey];
+                    delete state.attendance[editingKey];
+                }
+                delete state.sessionTypes[editingKey];
+                dbDeleteSession(editingKey);
             } else {
-                nav.classList.remove("active");
+                state.sessionTypes[targetKey] = {
+                    ...state.sessionTypes[targetKey],
+                    type: "actuacion",
+                    name: actuacionName,
+                    isTrip: isTrip,
+                    location: locationVal
+                };
             }
-        });
-        
-        renderActiveSection("section-pasar-lista");
-        renderAttendance();
-        showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+
+            dbSaveSessionType(targetKey, state.sessionTypes[targetKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                if (state.attendance[targetKey]) {
+                    db.collection("attendance").doc(targetKey).set(state.attendance[targetKey]);
+                }
+            } else {
+                saveStateToLocalStorage();
+            }
+
+            closeModalActuacion();
+            renderActuacionesList();
+            renderStatistics();
+            renderCalendar();
+            showToast(`Actuación "${actuacionName}" actualizada con éxito`, "success");
+        } else {
+            // Modo Creación
+            let sessionKey = selectedDate;
+            if (state.sessionTypes[sessionKey]) {
+                sessionKey = `${selectedDate}_actuacion`;
+                if (state.sessionTypes[sessionKey]) {
+                    showToast("Ya existe una actuación registrada para esta fecha", "error");
+                    return;
+                }
+            }
+
+            initializeAttendanceForDate(sessionKey);
+            const createdAtIso = new Date().toISOString();
+            state.sessionTypes[sessionKey] = { 
+                type: "actuacion", 
+                name: actuacionName, 
+                isTrip: isTrip,
+                location: locationVal,
+                createdAt: createdAtIso
+            };
+            
+            dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
+            dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            } else {
+                saveStateToLocalStorage();
+            }
+            
+            closeModalActuacion();
+            renderActuacionesList();
+            renderStatistics();
+            renderCalendar();
+            
+            state.currentDate = sessionKey;
+            document.getElementById("attendance-date").value = selectedDate;
+            
+            document.querySelectorAll(".nav-item").forEach(nav => {
+                if(nav.getAttribute("data-target") === "section-pasar-lista") {
+                    nav.classList.add("active");
+                } else {
+                    nav.classList.remove("active");
+                }
+            });
+            
+            renderActiveSection("section-pasar-lista");
+            renderAttendance();
+            showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+        }
     });
 
 
@@ -3749,6 +3876,92 @@ function updateMusicianAttendance(id, status) {
     updateSectionHeaderRatio(id);
 }
 
+function goToPasarLista(dateKey) {
+    const rawDate = dateKey.split("_")[0];
+    state.currentDate = dateKey;
+    if (document.getElementById("attendance-date")) {
+        document.getElementById("attendance-date").value = rawDate;
+    }
+    initializeAttendanceForDate(dateKey);
+    document.querySelectorAll(".nav-item").forEach(nav => {
+        if (nav.getAttribute("data-target") === "section-pasar-lista") {
+            nav.classList.add("active");
+        } else {
+            nav.classList.remove("active");
+        }
+    });
+    renderActiveSection("section-pasar-lista");
+    renderAttendance();
+}
+
+function openEditRehearsalModal(dateKey) {
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+    if (!sessionInfo) return;
+
+    renderRehearsalLocationOptions();
+
+    const rawDate = dateKey.split("_")[0];
+    const keyInput = document.getElementById("rehearsal-editing-key");
+    const titleEl = document.getElementById("modal-rehearsal-title");
+    const submitBtn = document.getElementById("btn-submit-rehearsal-modal");
+    const shortcutBtn = document.getElementById("btn-shortcut-pasar-lista-rehearsal");
+
+    if (keyInput) keyInput.value = dateKey;
+    if (titleEl) titleEl.innerText = "Editar Ensayo";
+    if (submitBtn) submitBtn.innerText = "Guardar Cambios";
+
+    if (document.getElementById("rehearsal-date-input")) document.getElementById("rehearsal-date-input").value = rawDate;
+    if (document.getElementById("rehearsal-type-input")) document.getElementById("rehearsal-type-input").value = sessionInfo.subtype || "general";
+    if (document.getElementById("rehearsal-location-input")) document.getElementById("rehearsal-location-input").value = sessionInfo.location || "Parking";
+    if (document.getElementById("rehearsal-time-input")) document.getElementById("rehearsal-time-input").value = sessionInfo.time || "";
+
+    if (shortcutBtn) {
+        shortcutBtn.classList.remove("hidden");
+        shortcutBtn.onclick = () => {
+            const modal = document.getElementById("modal-rehearsal");
+            if (modal) modal.classList.remove("active");
+            goToPasarLista(dateKey);
+        };
+    }
+
+    const modal = document.getElementById("modal-rehearsal");
+    if (modal) modal.classList.add("active");
+}
+
+function openEditActuacionModal(dateKey) {
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+    if (!sessionInfo) return;
+
+    renderRehearsalLocationOptions();
+
+    const rawDate = dateKey.split("_")[0];
+    const keyInput = document.getElementById("actuacion-editing-key");
+    const titleEl = document.getElementById("modal-actuacion-title");
+    const submitBtn = document.getElementById("btn-submit-actuacion-modal");
+    const shortcutBtn = document.getElementById("btn-shortcut-pasar-lista-actuacion");
+
+    if (keyInput) keyInput.value = dateKey;
+    if (titleEl) titleEl.innerText = "Editar Actuación";
+    if (submitBtn) submitBtn.innerText = "Guardar Cambios";
+
+    if (document.getElementById("actuacion-name-input")) document.getElementById("actuacion-name-input").value = sessionInfo.name || "";
+    if (document.getElementById("actuacion-date-input")) document.getElementById("actuacion-date-input").value = rawDate;
+    if (document.getElementById("actuacion-location-input")) document.getElementById("actuacion-location-input").value = sessionInfo.location || "";
+    if (document.getElementById("actuacion-trip-input")) document.getElementById("actuacion-trip-input").checked = !!sessionInfo.isTrip;
+
+    if (shortcutBtn) {
+        shortcutBtn.classList.remove("hidden");
+        shortcutBtn.onclick = () => {
+            const modal = document.getElementById("modal-actuacion");
+            if (modal) modal.classList.remove("active");
+            goToPasarLista(dateKey);
+        };
+    }
+
+    const modal = document.getElementById("modal-actuacion");
+    if (modal) modal.classList.add("active");
+}
+
 function updateMusicianJustification(id, isJustified) {
     const date = state.currentDate;
     if (isPastLockBlocked(date)) {
@@ -4071,20 +4284,7 @@ function renderEnsayosList() {
 
         tr.querySelector(".edit-rehearsal-btn").addEventListener("click", (e) => {
             e.stopPropagation();
-            const rawDate = date.split("_")[0];
-            state.currentDate = date;
-            document.getElementById("attendance-date").value = rawDate;
-            
-            initializeAttendanceForDate(date);
-            
-            document.querySelectorAll(".nav-item").forEach(nav => {
-                if (nav.getAttribute("data-target") === "section-pasar-lista") {
-                    nav.classList.add("active");
-                } else {
-                    nav.classList.remove("active");
-                }
-            });
-            renderActiveSection("section-pasar-lista");
+            openEditRehearsalModal(date);
         });
 
         tr.querySelector(".delete-rehearsal-btn").addEventListener("click", (e) => {
@@ -4562,20 +4762,7 @@ function renderActuacionesList() {
 
         tr.querySelector(".edit-actuacion-btn").addEventListener("click", (e) => {
             e.stopPropagation();
-            const rawDate = date.split("_")[0];
-            state.currentDate = date;
-            document.getElementById("attendance-date").value = rawDate;
-            
-            initializeAttendanceForDate(date);
-            
-            document.querySelectorAll(".nav-item").forEach(nav => {
-                if (nav.getAttribute("data-target") === "section-pasar-lista") {
-                    nav.classList.add("active");
-                } else {
-                    nav.classList.remove("active");
-                }
-            });
-            renderActiveSection("section-pasar-lista");
+            openEditActuacionModal(date);
         });
 
         tr.querySelector(".delete-actuacion-btn").addEventListener("click", (e) => {
@@ -12758,24 +12945,37 @@ function openUpcomingEventDetailModal(date) {
 
     const locObj = (state.rehearsalLocations || []).find(l => l.name && locationName && l.name.trim().toLowerCase() === locationName.trim().toLowerCase());
 
+    let targetMapsUrl = "";
+    if (locationName && locationName !== "Por determinar") {
+        let mapsUrl = (locObj && locObj.mapsUrl) ? locObj.mapsUrl.trim() : locationName;
+        if (mapsUrl.startsWith("http://") || mapsUrl.startsWith("https://")) {
+            targetMapsUrl = mapsUrl;
+        } else {
+            targetMapsUrl = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsUrl);
+        }
+    }
+
     if (mapsBtn) {
-        if (!locationName || locationName === "Por determinar") {
+        if (!targetMapsUrl) {
             mapsBtn.classList.add("hidden");
         } else {
             mapsBtn.classList.remove("hidden");
-            let mapsUrl = (locObj && locObj.mapsUrl) ? locObj.mapsUrl.trim() : locationName;
-            if (mapsUrl.startsWith("http://") || mapsUrl.startsWith("https://")) {
-                mapsBtn.href = mapsUrl;
-            } else {
-                mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsUrl);
-            }
+            mapsBtn.href = targetMapsUrl;
         }
     }
 
     if (mapBox && mapContent) {
         if (locObj && locObj.image && locObj.image.trim()) {
             mapBox.classList.remove("hidden");
-            mapContent.innerHTML = `<img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px;" alt="${escapeHtml(locationName)}">`;
+            if (targetMapsUrl) {
+                mapContent.innerHTML = `
+                    <a href="${escapeHtml(targetMapsUrl)}" target="_blank" rel="noopener noreferrer" style="display: block; width: 100%; height: 100%; text-decoration: none; cursor: pointer;" title="Abrir ubicación en Google Maps">
+                        <img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease, filter 0.2s ease;" alt="${escapeHtml(locationName)}">
+                    </a>
+                `;
+            } else {
+                mapContent.innerHTML = `<img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px;" alt="${escapeHtml(locationName)}">`;
+            }
         } else {
             mapBox.classList.add("hidden");
             mapContent.innerHTML = "";
