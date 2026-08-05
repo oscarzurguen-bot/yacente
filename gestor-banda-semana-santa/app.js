@@ -2364,14 +2364,15 @@ function setupEventListeners() {
     const modalActuacion = document.getElementById("modal-actuacion");
     
     document.getElementById("btn-add-actuacion").addEventListener("click", () => {
-        renderRehearsalLocationOptions();
         if (document.getElementById("actuacion-editing-key")) document.getElementById("actuacion-editing-key").value = "";
         if (document.getElementById("modal-actuacion-title")) document.getElementById("modal-actuacion-title").innerText = "Nueva Actuación";
         if (document.getElementById("btn-submit-actuacion-modal")) document.getElementById("btn-submit-actuacion-modal").innerText = "Crear Actuación";
-        if (document.getElementById("btn-shortcut-pasar-lista-actuacion")) document.getElementById("btn-shortcut-pasar-lista-actuacion").classList.add("hidden");
 
         document.getElementById("actuacion-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("actuacion-name-input").value = "";
+        if (document.getElementById("actuacion-location-input")) {
+            document.getElementById("actuacion-location-input").value = "";
+        }
         if (document.getElementById("actuacion-trip-input")) {
             document.getElementById("actuacion-trip-input").checked = false;
         }
@@ -2390,7 +2391,7 @@ function setupEventListeners() {
         if (!selectedDate || !actuacionName) return;
 
         const isTrip = document.getElementById("actuacion-trip-input") ? document.getElementById("actuacion-trip-input").checked : false;
-        const locationVal = document.getElementById("actuacion-location-input") ? document.getElementById("actuacion-location-input").value : "";
+        const locationVal = document.getElementById("actuacion-location-input") ? document.getElementById("actuacion-location-input").value.trim() : "";
 
         if (editingKey) {
             // Modo Edición
@@ -3904,7 +3905,6 @@ function openEditRehearsalModal(dateKey) {
     const keyInput = document.getElementById("rehearsal-editing-key");
     const titleEl = document.getElementById("modal-rehearsal-title");
     const submitBtn = document.getElementById("btn-submit-rehearsal-modal");
-    const shortcutBtn = document.getElementById("btn-shortcut-pasar-lista-rehearsal");
 
     if (keyInput) keyInput.value = dateKey;
     if (titleEl) titleEl.innerText = "Editar Ensayo";
@@ -3915,15 +3915,6 @@ function openEditRehearsalModal(dateKey) {
     if (document.getElementById("rehearsal-location-input")) document.getElementById("rehearsal-location-input").value = sessionInfo.location || "Parking";
     if (document.getElementById("rehearsal-time-input")) document.getElementById("rehearsal-time-input").value = sessionInfo.time || "";
 
-    if (shortcutBtn) {
-        shortcutBtn.classList.remove("hidden");
-        shortcutBtn.onclick = () => {
-            const modal = document.getElementById("modal-rehearsal");
-            if (modal) modal.classList.remove("active");
-            goToPasarLista(dateKey);
-        };
-    }
-
     const modal = document.getElementById("modal-rehearsal");
     if (modal) modal.classList.add("active");
 }
@@ -3932,13 +3923,10 @@ function openEditActuacionModal(dateKey) {
     const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
     if (!sessionInfo) return;
 
-    renderRehearsalLocationOptions();
-
     const rawDate = dateKey.split("_")[0];
     const keyInput = document.getElementById("actuacion-editing-key");
     const titleEl = document.getElementById("modal-actuacion-title");
     const submitBtn = document.getElementById("btn-submit-actuacion-modal");
-    const shortcutBtn = document.getElementById("btn-shortcut-pasar-lista-actuacion");
 
     if (keyInput) keyInput.value = dateKey;
     if (titleEl) titleEl.innerText = "Editar Actuación";
@@ -3948,15 +3936,6 @@ function openEditActuacionModal(dateKey) {
     if (document.getElementById("actuacion-date-input")) document.getElementById("actuacion-date-input").value = rawDate;
     if (document.getElementById("actuacion-location-input")) document.getElementById("actuacion-location-input").value = sessionInfo.location || "";
     if (document.getElementById("actuacion-trip-input")) document.getElementById("actuacion-trip-input").checked = !!sessionInfo.isTrip;
-
-    if (shortcutBtn) {
-        shortcutBtn.classList.remove("hidden");
-        shortcutBtn.onclick = () => {
-            const modal = document.getElementById("modal-actuacion");
-            if (modal) modal.classList.remove("active");
-            goToPasarLista(dateKey);
-        };
-    }
 
     const modal = document.getElementById("modal-actuacion");
     if (modal) modal.classList.add("active");
@@ -14461,7 +14440,6 @@ function dbSaveRehearsalLocations() {
 
 function renderRehearsalLocationOptions() {
     const rehearsalSelect = document.getElementById("rehearsal-location-input");
-    const actuacionSelect = document.getElementById("actuacion-location-input");
 
     const locations = (state.rehearsalLocations && state.rehearsalLocations.length > 0)
         ? state.rehearsalLocations
@@ -14475,9 +14453,6 @@ function renderRehearsalLocationOptions() {
 
     if (rehearsalSelect) {
         rehearsalSelect.innerHTML = optionsHtml;
-    }
-    if (actuacionSelect) {
-        actuacionSelect.innerHTML = optionsHtml;
     }
 }
 

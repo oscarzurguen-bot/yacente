@@ -2290,7 +2290,6 @@
                     <input type="text" id="rehearsal-time-input" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
                 </div>
                 <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
-                    <button type="button" class="btn btn-secondary hidden" id="btn-shortcut-pasar-lista-rehearsal" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--color-gold); color: var(--color-gold); font-weight: 600;">📋 Pase de Lista</button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-rehearsal-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary" id="btn-submit-rehearsal-modal">Crear Ensayo</button>
                 </div>
@@ -2429,7 +2428,7 @@
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
-                    Pasar Lista / Editar
+                    Pasar Lista
                 </button>
                 <button class="btn btn-secondary" id="btn-close-rehearsal-detail-footer">Cerrar</button>
             </div>
@@ -2460,14 +2459,13 @@
                 </div>
                 <div class="form-group">
                     <label for="actuacion-location-input">Lugar / Ubicación de la Actuación</label>
-                    <select id="actuacion-location-input" style="width: 100%;"></select>
+                    <input type="text" id="actuacion-location-input" placeholder="Ej: Cabra (Córdoba), Iglesia de San Juan..." style="width: 100%;">
                 </div>
                 <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                     <input type="checkbox" id="actuacion-trip-input" style="width: auto; margin: 0;">
                     <label for="actuacion-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
                 </div>
                 <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
-                    <button type="button" class="btn btn-secondary hidden" id="btn-shortcut-pasar-lista-actuacion" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--color-gold); color: var(--color-gold); font-weight: 600;">📋 Pase de Lista</button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-actuacion-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary" id="btn-submit-actuacion-modal">Crear Actuación</button>
                 </div>
@@ -2822,7 +2820,7 @@
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
-                    Pasar Lista / Editar
+                    Pasar Lista
                 </button>
                 <button class="btn btn-secondary" id="btn-close-actuacion-detail-footer">Cerrar</button>
             </div>
@@ -3639,13 +3637,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=419"></script>
+    <script src="app.js?v=421"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=419
+        // Purga de caché antigua y registro del Service Worker v=421
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v419") {
+                    if (key !== "yacente-v421") {
                         caches.delete(key);
                     }
                 });
@@ -3658,9 +3656,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=419")
+                navigator.serviceWorker.register("sw.js?v=421")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v419 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v421 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
