@@ -4361,7 +4361,7 @@ function openRehearsalDetailModal(date) {
     document.getElementById("rehearsal-detail-title").innerText = `Ensayo del ${formatDateSpanish(date)}`;
     let subtypeText = "Ensayo General";
     if (isSpecialRehearsal) {
-        subtypeText = `Ensayo por Voces (Convocadas: ${convocated.join(", ")})`;
+        subtypeText = "Ensayo por Voces";
     }
     const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
     const timeVal = sessionInfo && sessionInfo.time ? ` | Hora: ${sessionInfo.time}` : "";
