@@ -3401,7 +3401,7 @@
 
     <!-- Modal: Detalle de Próximo Evento para Músicos -->
     <div id="modal-comp-upcoming-event-detail" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px; width: 92%; padding: 24px; position: relative;">
+        <div class="modal-card" style="max-width: 460px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 20px; position: relative;">
             <button class="modal-close" id="btn-close-upcoming-event-detail" style="position: absolute; top: 16px; right: 16px;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -3410,32 +3410,32 @@
             </button>
             
             <!-- 1. Título del Ensayo / Evento -->
-            <h3 id="upcoming-event-detail-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
+            <h3 id="upcoming-event-detail-title" style="margin: 0 0 14px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.25rem; line-height: 1.25;">Ensayo de Banda</h3>
             
             <!-- 2. Especificaciones del Evento (Fecha, Hora, Lugar, Convocados) -->
-            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px;">
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📅</div>
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">📅</div>
                     <div>
-                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Fecha</div>
-                        <div id="upcoming-event-detail-date" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Viernes, 14 de Marzo de 2026</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Fecha</div>
+                        <div id="upcoming-event-detail-date" style="font-size: 0.92rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Viernes, 14 de Marzo de 2026</div>
                     </div>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">⏰</div>
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">⏰</div>
                     <div>
-                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Hora</div>
-                        <div id="upcoming-event-detail-time" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">21:00 h</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Hora</div>
+                        <div id="upcoming-event-detail-time" style="font-size: 0.92rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">21:00 h</div>
                     </div>
                 </div>
 
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📍</div>
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">📍</div>
                         <div>
-                            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Lugar</div>
-                            <div id="upcoming-event-detail-location" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Parking de la Sede</div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Lugar</div>
+                            <div id="upcoming-event-detail-location" style="font-size: 0.92rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Parking de la Sede</div>
                         </div>
                     </div>
                     <a id="upcoming-event-detail-maps-btn" href="#" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-secondary); font-size: 0.76rem; font-weight: 600; text-decoration: none; transition: all 0.2s ease;" title="Abrir ubicación en Google Maps">
@@ -3444,9 +3444,9 @@
                     </a>
                 </div>
 
-                <!-- Previsualización de Mapa / Imagen de Google Maps (Cuadrado) -->
-                <div id="upcoming-event-detail-map-box" class="hidden" style="width: 100%; aspect-ratio: 1 / 1; max-height: 280px; margin: 4px 0 0 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.3); position: relative;">
-                    <div id="upcoming-event-detail-map-content" style="width: 100%; height: 100%;"></div>
+                <!-- Previsualización de Imagen del Lugar de Ensayo (Centrada y Compacta) -->
+                <div id="upcoming-event-detail-map-box" class="hidden" style="width: 100%; display: flex; justify-content: center; margin: 4px 0 2px 0;">
+                    <div id="upcoming-event-detail-map-content" style="width: 140px; height: 140px; border-radius: 14px; overflow: hidden; border: 2px solid var(--color-gold); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); background: rgba(0, 0, 0, 0.4); flex-shrink: 0;"></div>
                 </div>
 
                 <div id="upcoming-event-detail-convocated-box" class="hidden" style="display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
@@ -3632,13 +3632,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=416"></script>
+    <script src="app.js?v=417"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=416
+        // Purga de caché antigua y registro del Service Worker v=417
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v416") {
+                    if (key !== "yacente-v417") {
                         caches.delete(key);
                     }
                 });
@@ -3651,9 +3651,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=416")
+                navigator.serviceWorker.register("sw.js?v=417")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v416 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v417 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

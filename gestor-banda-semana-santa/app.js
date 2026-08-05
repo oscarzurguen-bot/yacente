@@ -12499,17 +12499,14 @@ function renderComponentHistorial() {
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
-        const rawTimeText = session.time ? `${session.time} h` : "";
-        let convocatedText = "";
-        if (session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
-            convocatedText = session.convocatedVoices.join(", ");
-        }
+        const timeText = session.time ? ` • ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
         row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
-        row.style.gap = "12px";
+        row.style.gap = "10px";
         row.style.width = "100%";
         row.style.cursor = "pointer";
         row.title = "Ver asistencia general y marchas tocadas";
@@ -12522,20 +12519,20 @@ function renderComponentHistorial() {
         const moAbbr = monthsAbbr[moNum - 1] || "";
         
         row.innerHTML = `
-            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.22); border-radius: 10px; width: 62px; min-width: 62px; padding: 8px 4px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold); flex-shrink: 0;">
-                <div style="font-size: 1.4rem; font-weight: 800; color: var(--color-gold); line-height: 1; font-family: 'Outfit', sans-serif;">${dy}</div>
-                <div style="font-size: 0.68rem; text-transform: uppercase; color: var(--text-color); font-weight: 700; margin-top: 3px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
+                <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--color-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
                 <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
-            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 2px 0;">
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
-                    <h4 class="comp-session-title" style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); line-height: 1.25; font-family: 'Outfit', sans-serif;">${escapeHtml(sessionTitle)}</h4>
-                    <span class="comp-attendance-badge ${badgeClass}" style="flex-shrink: 0;">${badgeText}</span>
+            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                <div class="comp-session-meta">
+                    <h4 class="comp-session-title">${sessionTitle}</h4>
+                    <div class="comp-session-details">
+                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
+                    </div>
                 </div>
-                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
-                    ${rawTimeText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text-secondary);">⏰ ${escapeHtml(rawTimeText)}</span>` : ''}
-                    ${locationText ? `<span style="display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted);">📍 ${escapeHtml(locationText)}</span>` : ''}
-                    ${convocatedText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); padding: 1px 7px; border-radius: 4px; font-weight: 600;">🎺 ${escapeHtml(convocatedText)}</span>` : ''}
+                <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
+                    <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
                 </div>
             </div>
         `;
@@ -12922,17 +12919,14 @@ function renderComponentEventos() {
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
-        const rawTimeText = session.time ? `${session.time} h` : "";
-        let convocatedText = "";
-        if (session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
-            convocatedText = session.convocatedVoices.join(", ");
-        }
+        const timeText = session.time ? ` • ${session.time}` : "";
+        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
         
         const row = document.createElement("div");
         row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
-        row.style.gap = "12px";
+        row.style.gap = "10px";
         row.style.width = "100%";
         row.style.cursor = "pointer";
         row.title = "Ver detalle del evento y responder asistencia";
@@ -12945,20 +12939,20 @@ function renderComponentEventos() {
         const moAbbr = monthsAbbr[moNum - 1] || "";
         
         row.innerHTML = `
-            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.22); border-radius: 10px; width: 62px; min-width: 62px; padding: 8px 4px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold); flex-shrink: 0;">
-                <div style="font-size: 1.4rem; font-weight: 800; color: var(--color-gold); line-height: 1; font-family: 'Outfit', sans-serif;">${dy}</div>
-                <div style="font-size: 0.68rem; text-transform: uppercase; color: var(--text-color); font-weight: 700; margin-top: 3px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
+                <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
                 <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
-            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 2px 0;">
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
-                    <h4 class="comp-session-title" style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); line-height: 1.25; font-family: 'Outfit', sans-serif;">${escapeHtml(sessionTitle)}</h4>
-                    <span class="comp-attendance-badge ${badgeClass}" style="flex-shrink: 0;">${badgeText}</span>
+            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                <div class="comp-session-meta">
+                    <h4 class="comp-session-title">${sessionTitle}</h4>
+                    <div class="comp-session-details">
+                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
+                    </div>
                 </div>
-                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
-                    ${rawTimeText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text-secondary);">⏰ ${escapeHtml(rawTimeText)}</span>` : ''}
-                    ${locationText ? `<span style="display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted);">📍 ${escapeHtml(locationText)}</span>` : ''}
-                    ${convocatedText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); padding: 1px 7px; border-radius: 4px; font-weight: 600;">🎺 ${escapeHtml(convocatedText)}</span>` : ''}
+                <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
+                    <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
                 </div>
             </div>
         `;
