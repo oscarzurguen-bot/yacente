@@ -972,6 +972,32 @@ input:checked + .slider:before {
     padding-right: 16px !important;
 }
 
+/* Plantilla Musician Row Highlight & Hover Effects */
+.plantilla-musician-row {
+    cursor: pointer;
+    transition: background-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.plantilla-musician-row:hover {
+    background-color: rgba(212, 175, 55, 0.08) !important;
+    box-shadow: inset 0 0 12px rgba(212, 175, 55, 0.12), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.plantilla-musician-row.is-baja-row:hover {
+    background-color: rgba(160, 160, 160, 0.18) !important;
+    filter: grayscale(0.4) !important;
+}
+
+.plantilla-musician-row .musician-name-clickable {
+    transition: transform 0.2s ease, color 0.2s ease;
+    transform-origin: left center;
+}
+
+.plantilla-musician-row:hover .musician-name-clickable {
+    color: var(--color-gold) !important;
+    transform: scale(1.035);
+}
+
 /* Quick Navigation Links for Statistics */
 .stats-quick-nav-card {
     position: relative;

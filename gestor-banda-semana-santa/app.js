@@ -4860,8 +4860,9 @@ function renderPlantillaTable() {
                 : `<div style="width: 30px; height: 30px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
 
             const tr = document.createElement("tr");
+            tr.classList.add("plantilla-musician-row");
             if (musician.isBaja) {
-                tr.className = "is-baja-row";
+                tr.classList.add("is-baja-row");
                 tr.style.cssText = "background: rgba(128, 128, 128, 0.08); opacity: 0.65; filter: grayscale(0.85);";
             }
 
@@ -4918,26 +4919,34 @@ function renderPlantillaTable() {
                 </td>
             `;
 
+            tr.addEventListener("click", () => {
+                openMusicianDetailStats(musician.id);
+            });
+
             tr.querySelector(".musician-avatar-clickable").addEventListener("click", (e) => {
                 e.stopPropagation();
                 openPhotoPreviewModal(musician.id);
             });
 
-            tr.querySelector(".musician-name-clickable").addEventListener("click", () => {
+            tr.querySelector(".musician-name-clickable").addEventListener("click", (e) => {
+                e.stopPropagation();
                 openMusicianDetailStats(musician.id);
             });
 
-            tr.querySelector(".edit-musician-btn").addEventListener("click", () => {
+            tr.querySelector(".edit-musician-btn").addEventListener("click", (e) => {
+                e.stopPropagation();
                 openEditMusicianModal(musician.id);
             });
 
-            tr.querySelector(".delete-musician-btn").addEventListener("click", () => {
+            tr.querySelector(".delete-musician-btn").addEventListener("click", (e) => {
+                e.stopPropagation();
                 deleteMusician(musician.id);
             });
 
             const resetPinBtn = tr.querySelector(".btn-reset-pin-row-padlock");
             if (resetPinBtn) {
-                resetPinBtn.addEventListener("click", () => {
+                resetPinBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
                     if (confirm(`¿Estás seguro de que quieres restablecer el PIN de ${musician.name}? Volverá a registrarse con el siguiente PIN que introduzca.`)) {
                         musician.pin = "";
                         saveStateToLocalStorage();
