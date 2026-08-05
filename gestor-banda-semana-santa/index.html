@@ -2482,14 +2482,32 @@
                     <input type="text" id="lugar-ensayo-nombre-input" required placeholder="Ej. Local de Ensayo Principal, Pabellón Municipal..." style="width: 100%;">
                 </div>
                 <div class="form-group">
-                    <label for="lugar-ensayo-direccion-input">Dirección o Enlace de Google Maps</label>
-                    <input type="text" id="lugar-ensayo-direccion-input" placeholder="Ej. Calle Mayor 12, Murcia o pega un enlace de Maps" style="width: 100%;">
-                    <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">Escribe la dirección física o pega una ubicación de Google Maps para que la app dirija a los músicos.</p>
+                    <label for="lugar-ensayo-direccion-input">Dirección Física</label>
+                    <input type="text" id="lugar-ensayo-direccion-input" placeholder="Ej. Calle Mayor 12, Murcia" style="width: 100%;">
                 </div>
                 <div class="form-group">
-                    <label for="lugar-ensayo-html-input">Código HTML / Embed de Google Maps (o Imagen)</label>
-                    <textarea id="lugar-ensayo-html-input" rows="3" placeholder="Pega aquí el código <iframe>...</iframe> de Google Maps o la imagen de la ubicación..." style="width: 100%; font-family: monospace; font-size: 0.8rem; resize: vertical; padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary);"></textarea>
-                    <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">En Google Maps ➔ Compartir ➔ Insertar un mapa ➔ Copiar HTML (o url/etiqueta img).</p>
+                    <label for="lugar-ensayo-maps-url-input">Enlace de Google Maps</label>
+                    <input type="url" id="lugar-ensayo-maps-url-input" placeholder="Ej. https://maps.app.goo.gl/... o https://google.com/maps/..." style="width: 100%;">
+                    <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">Pega aquí el enlace de Google Maps para que la opción "Cómo llegar" lleve directamente a los músicos.</p>
+                </div>
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600;">Imagen del Lugar de Ensayo (Opcional)</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div id="lugar-ensayo-image-preview" style="width: 80px; height: 80px; border-radius: 10px; border: 1px dashed var(--border-color); background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative;">
+                            <span id="lugar-ensayo-image-placeholder" style="font-size: 1.8rem; opacity: 0.5;">🖼️</span>
+                            <img id="lugar-ensayo-image-img" class="hidden" style="width: 100%; height: 100%; object-fit: cover;" alt="Vista previa">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <input type="file" id="lugar-ensayo-image-file" accept="image/*" style="display: none;">
+                            <button type="button" id="btn-upload-lugar-ensayo-image" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>📷</span> Subir Imagen
+                            </button>
+                            <button type="button" id="btn-remove-lugar-ensayo-image" class="btn btn-secondary btn-sm hidden" style="color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>🗑️</span> Quitar Imagen
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size: 0.74rem; margin-top: 6px; line-height: 1.35;">Sube una imagen o mapa del local para mostrar a los músicos.</p>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-lugar-ensayo-modal">Cancelar</button>
@@ -3618,13 +3636,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=413"></script>
+    <script src="app.js?v=414"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=413
+        // Purga de caché antigua y registro del Service Worker v=414
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v413") {
+                    if (key !== "yacente-v414") {
                         caches.delete(key);
                     }
                 });
@@ -3637,9 +3655,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=413")
+                navigator.serviceWorker.register("sw.js?v=414")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v413 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v414 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

@@ -12745,22 +12745,28 @@ function openUpcomingEventDetailModal(date) {
     const locObj = (state.rehearsalLocations || []).find(l => l.name.toLowerCase() === locationName.toLowerCase());
 
     if (mapsBtn) {
-        const targetAddress = (locObj && locObj.address) ? locObj.address : locationName;
-        if (targetAddress.startsWith("http://") || targetAddress.startsWith("https://")) {
-            mapsBtn.href = targetAddress;
+        let mapsUrl = (locObj && locObj.mapsUrl) ? locObj.mapsUrl.trim() : "";
+        if (!mapsUrl && locObj && locObj.address) {
+            mapsUrl = locObj.address.trim();
+        }
+        if (!mapsUrl) {
+            mapsUrl = locationName;
+        }
+
+        if (mapsUrl.startsWith("http://") || mapsUrl.startsWith("https://")) {
+            mapsBtn.href = mapsUrl;
         } else {
-            mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(targetAddress);
+            mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsUrl);
         }
     }
 
     if (mapBox && mapContent) {
-        if (locObj) {
+        if (locObj && locObj.image) {
             mapBox.classList.remove("hidden");
-            mapContent.innerHTML = renderLocationMapContent(locObj, false);
+            mapContent.innerHTML = `<img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${escapeHtml(locationName)}">`;
         } else {
-            const fallbackLoc = { name: locationName, address: locationName };
-            mapBox.classList.remove("hidden");
-            mapContent.innerHTML = renderLocationMapContent(fallbackLoc, false);
+            mapBox.classList.add("hidden");
+            mapContent.innerHTML = "";
         }
     }
 
@@ -14263,50 +14269,42 @@ function renderRehearsalLocationOptions() {
     }
 }
 
-function renderLocationMapContent(loc, isCardPreview = true) {
+function compressImageFile(file, maxWidth, maxHeight, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth || height > maxHeight) {
+                if (width / height > maxWidth / maxHeight) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                } else {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+            callback(dataUrl);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderLocationMapContent(loc) {
     if (!loc) return "";
-    const htmlCode = loc.mapHtml || loc.html || "";
 
-    if (htmlCode && htmlCode.trim()) {
-        const str = htmlCode.trim();
-
-        // Si es un snippet <iframe> de Google Maps
-        if (str.toLowerCase().includes("<iframe")) {
-            let sanitized = str
-                .replace(/width="[^"]*"/gi, 'width="100%"')
-                .replace(/height="[^"]*"/gi, 'height="100%"');
-
-            if (sanitized.includes('style="')) {
-                sanitized = sanitized.replace('style="', 'style="width:100%; height:100%; border:0; ');
-            } else {
-                sanitized = sanitized.replace('<iframe', '<iframe style="width:100%; height:100%; border:0;"');
-            }
-
-            const pointerStyle = isCardPreview ? 'pointer-events: none;' : '';
-            return `<div style="width:100%; height:100%; position:relative; overflow:hidden; ${pointerStyle}">${sanitized}</div>`;
-        }
-
-        // Si es una etiqueta <img>
-        if (str.toLowerCase().includes("<img")) {
-            let sanitized = str;
-            if (sanitized.includes('style="')) {
-                sanitized = sanitized.replace('style="', 'style="width:100%; height:100%; object-fit:cover; display:block; ');
-            } else {
-                sanitized = sanitized.replace('<img', '<img style="width:100%; height:100%; object-fit:cover; display:block;"');
-            }
-            return `<div style="width:100%; height:100%; overflow:hidden;">${sanitized}</div>`;
-        }
-
-        // Si es una URL directa de imagen o web
-        if (str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:image")) {
-            return `<img src="${escapeHtml(str)}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Ubicación ${escapeHtml(loc.name)}">`;
-        }
-
-        // Código HTML personalizado
-        return `<div style="width:100%; height:100%; overflow:hidden;">${str}</div>`;
+    if (loc.image) {
+        return `<img src="${loc.image}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="${escapeHtml(loc.name)}">`;
     }
 
-    // Gráfico de Mapa Cuadrado por Defecto
     return `
         <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(212,175,55,0.18) 0%, rgba(15,15,15,0.92) 85%); color: var(--text-muted); text-align: center; padding: 20px; box-sizing: border-box;">
             <span style="font-size: 3rem; margin-bottom: 8px; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.6));">📍</span>
@@ -14333,9 +14331,9 @@ function renderAdminLugaresEnsayoList() {
 
     container.innerHTML = locations.map(loc => `
         <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--border-color); background: var(--bg-card);">
-            <!-- Marco Cuadrado para Mapa o Imagen HTML -->
+            <!-- Marco Cuadrado para Foto o Mapa -->
             <div style="width: 100%; aspect-ratio: 1 / 1; background: #000; border-bottom: 1px solid var(--border-color); position: relative; overflow: hidden;">
-                ${renderLocationMapContent(loc, true)}
+                ${renderLocationMapContent(loc)}
             </div>
             
             <!-- Detalles y Acciones -->
@@ -14347,6 +14345,11 @@ function renderAdminLugaresEnsayoList() {
                     <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; line-height: 1.35;">
                         ${loc.address ? escapeHtml(loc.address) : '<span style="font-style: italic;">Sin dirección especificada</span>'}
                     </div>
+                    ${loc.mapsUrl ? `
+                        <a href="${escapeHtml(loc.mapsUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem; color: var(--color-gold); text-decoration: none; margin-top: 4px; font-weight: 600;">
+                            <span>🗺️</span> Enlace Google Maps
+                        </a>
+                    ` : ''}
                 </div>
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
                     <button class="btn btn-secondary btn-sm edit-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
@@ -14385,13 +14388,37 @@ function renderAdminLugaresEnsayoList() {
     });
 }
 
+let currentLugarEnsayoImageDataUrl = "";
+
+function updateLugarEnsayoImagePreview() {
+    const placeholder = document.getElementById("lugar-ensayo-image-placeholder");
+    const img = document.getElementById("lugar-ensayo-image-img");
+    const btnRemove = document.getElementById("btn-remove-lugar-ensayo-image");
+
+    if (currentLugarEnsayoImageDataUrl) {
+        if (img) {
+            img.src = currentLugarEnsayoImageDataUrl;
+            img.classList.remove("hidden");
+        }
+        if (placeholder) placeholder.classList.add("hidden");
+        if (btnRemove) btnRemove.classList.remove("hidden");
+    } else {
+        if (img) {
+            img.src = "";
+            img.classList.add("hidden");
+        }
+        if (placeholder) placeholder.classList.remove("hidden");
+        if (btnRemove) btnRemove.classList.add("hidden");
+    }
+}
+
 function openLugarEnsayoModal(id = null) {
     const modal = document.getElementById("modal-lugar-ensayo");
     const titleEl = document.getElementById("modal-lugar-ensayo-title");
     const idInput = document.getElementById("lugar-ensayo-id");
     const nameInput = document.getElementById("lugar-ensayo-nombre-input");
     const addressInput = document.getElementById("lugar-ensayo-direccion-input");
-    const htmlInput = document.getElementById("lugar-ensayo-html-input");
+    const mapsUrlInput = document.getElementById("lugar-ensayo-maps-url-input");
 
     if (!modal) return;
 
@@ -14402,16 +14429,19 @@ function openLugarEnsayoModal(id = null) {
             if (idInput) idInput.value = loc.id;
             if (nameInput) nameInput.value = loc.name || "";
             if (addressInput) addressInput.value = loc.address || "";
-            if (htmlInput) htmlInput.value = loc.mapHtml || loc.html || "";
+            if (mapsUrlInput) mapsUrlInput.value = loc.mapsUrl || "";
+            currentLugarEnsayoImageDataUrl = loc.image || "";
         }
     } else {
         if (titleEl) titleEl.innerText = "Añadir Lugar de Ensayo";
         if (idInput) idInput.value = "";
         if (nameInput) nameInput.value = "";
         if (addressInput) addressInput.value = "";
-        if (htmlInput) htmlInput.value = "";
+        if (mapsUrlInput) mapsUrlInput.value = "";
+        currentLugarEnsayoImageDataUrl = "";
     }
 
+    updateLugarEnsayoImagePreview();
     modal.classList.add("active");
 }
 
@@ -14426,6 +14456,33 @@ function setupLugaresEnsayoEvents() {
     const btnCancel = document.getElementById("btn-cancel-lugar-ensayo-modal");
     const form = document.getElementById("form-lugar-ensayo");
 
+    const btnUploadImg = document.getElementById("btn-upload-lugar-ensayo-image");
+    const fileInputImg = document.getElementById("lugar-ensayo-image-file");
+    const btnRemoveImg = document.getElementById("btn-remove-lugar-ensayo-image");
+
+    if (btnUploadImg && fileInputImg) {
+        btnUploadImg.addEventListener("click", () => fileInputImg.click());
+    }
+
+    if (fileInputImg) {
+        fileInputImg.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            compressImageFile(file, 800, 800, (dataUrl) => {
+                currentLugarEnsayoImageDataUrl = dataUrl;
+                updateLugarEnsayoImagePreview();
+            });
+        });
+    }
+
+    if (btnRemoveImg) {
+        btnRemoveImg.addEventListener("click", () => {
+            currentLugarEnsayoImageDataUrl = "";
+            if (fileInputImg) fileInputImg.value = "";
+            updateLugarEnsayoImagePreview();
+        });
+    }
+
     const closeModal = () => {
         if (modal) modal.classList.remove("active");
     };
@@ -14439,7 +14496,8 @@ function setupLugaresEnsayoEvents() {
             const id = document.getElementById("lugar-ensayo-id").value;
             const name = document.getElementById("lugar-ensayo-nombre-input").value.trim();
             const address = document.getElementById("lugar-ensayo-direccion-input").value.trim();
-            const mapHtml = document.getElementById("lugar-ensayo-html-input").value.trim();
+            const mapsUrlInput = document.getElementById("lugar-ensayo-maps-url-input");
+            const mapsUrl = mapsUrlInput ? mapsUrlInput.value.trim() : "";
 
             if (!name) {
                 showToast("Por favor introduce el nombre del lugar", "error");
@@ -14453,14 +14511,16 @@ function setupLugaresEnsayoEvents() {
                 if (idx !== -1) {
                     state.rehearsalLocations[idx].name = name;
                     state.rehearsalLocations[idx].address = address;
-                    state.rehearsalLocations[idx].mapHtml = mapHtml;
+                    state.rehearsalLocations[idx].mapsUrl = mapsUrl;
+                    state.rehearsalLocations[idx].image = currentLugarEnsayoImageDataUrl;
                 }
             } else {
                 const newLoc = {
                     id: "loc_" + Date.now(),
                     name: name,
                     address: address,
-                    mapHtml: mapHtml
+                    mapsUrl: mapsUrl,
+                    image: currentLugarEnsayoImageDataUrl
                 };
                 state.rehearsalLocations.push(newLoc);
             }
