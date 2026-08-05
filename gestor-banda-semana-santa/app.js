@@ -2194,9 +2194,33 @@ function setupEventListeners() {
         renderStatistics();
     });
 
-    // ==========================================
-    // MODAL DE CREAR ENSAYO
-    // ==========================================
+    // Helper to format start and end time inputs into a string "19:30 - 21:00" or single time
+    function getFormattedTimeFromInputs(startInputId, endInputId) {
+        const startEl = document.getElementById(startInputId);
+        const endEl = document.getElementById(endInputId);
+        const startVal = startEl ? startEl.value.trim() : "";
+        const endVal = endEl ? endEl.value.trim() : "";
+        if (startVal && endVal) return `${startVal} - ${endVal}`;
+        if (startVal) return startVal;
+        if (endVal) return endVal;
+        return "";
+    }
+
+    function setTimeInputsFromValue(startInputId, endInputId, timeVal) {
+        const startEl = document.getElementById(startInputId);
+        const endEl = document.getElementById(endInputId);
+        if (!startEl || !endEl) return;
+        const str = timeVal || "";
+        if (str.includes(" - ")) {
+            const parts = str.split(" - ");
+            startEl.value = parts[0].trim();
+            endEl.value = parts[1].trim();
+        } else {
+            startEl.value = str;
+            endEl.value = "";
+        }
+    }
+
     // ==========================================
     // MODAL DE CREAR / EDITAR ENSAYO
     // ==========================================
@@ -2211,9 +2235,8 @@ function setupEventListeners() {
         
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
-        if (document.getElementById("rehearsal-time-input")) {
-            document.getElementById("rehearsal-time-input").value = "";
-        }
+        if (document.getElementById("rehearsal-start-time-input")) document.getElementById("rehearsal-start-time-input").value = "";
+        if (document.getElementById("rehearsal-end-time-input")) document.getElementById("rehearsal-end-time-input").value = "";
         modalRehearsal.classList.add("active");
     });
 
@@ -2244,7 +2267,7 @@ function setupEventListeners() {
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
-        const timeVal = document.getElementById("rehearsal-time-input") ? document.getElementById("rehearsal-time-input").value.trim() : "";
+        const timeVal = getFormattedTimeFromInputs("rehearsal-start-time-input", "rehearsal-end-time-input");
 
         let targetKey = selectedDate;
         if (subtype !== "general") {
@@ -2845,9 +2868,7 @@ function setupEventListeners() {
         
         // Reset defaults
         document.getElementById("quick-session-actuacion-name").value = "";
-        if (document.getElementById("quick-session-time")) {
-            document.getElementById("quick-session-time").value = "";
-        }
+        setTimeInputsFromValue("quick-session-start-time", "quick-session-end-time", "");
         
         const sessionInfo = state.sessionTypes[date];
         if (sessionInfo) {
@@ -2874,9 +2895,7 @@ function setupEventListeners() {
                 if (document.getElementById("quick-session-location")) {
                     document.getElementById("quick-session-location").value = sessionInfo.location || "Parking";
                 }
-                if (document.getElementById("quick-session-time")) {
-                    document.getElementById("quick-session-time").value = sessionInfo.time || "";
-                }
+                setTimeInputsFromValue("quick-session-start-time", "quick-session-end-time", sessionInfo.time || "");
             }
         } else {
             // Default when not created
@@ -2884,6 +2903,7 @@ function setupEventListeners() {
             if (document.getElementById("quick-session-location")) {
                 document.getElementById("quick-session-location").value = "Parking";
             }
+            setTimeInputsFromValue("quick-session-start-time", "quick-session-end-time", "");
         }
         
         // Trigger visibility update
@@ -2928,7 +2948,7 @@ function setupEventListeners() {
         
         if (type.startsWith("ensayo-")) {
             const locationVal = document.getElementById("quick-session-location") ? document.getElementById("quick-session-location").value : "Parking";
-            const timeVal = document.getElementById("quick-session-time") ? document.getElementById("quick-session-time").value.trim() : "";
+            const timeVal = getFormattedTimeFromInputs("quick-session-start-time", "quick-session-end-time");
             
             if (type === "ensayo-general") {
                 newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal, time: timeVal };
@@ -3913,7 +3933,7 @@ function openEditRehearsalModal(dateKey) {
     if (document.getElementById("rehearsal-date-input")) document.getElementById("rehearsal-date-input").value = rawDate;
     if (document.getElementById("rehearsal-type-input")) document.getElementById("rehearsal-type-input").value = sessionInfo.subtype || "general";
     if (document.getElementById("rehearsal-location-input")) document.getElementById("rehearsal-location-input").value = sessionInfo.location || "Parking";
-    if (document.getElementById("rehearsal-time-input")) document.getElementById("rehearsal-time-input").value = sessionInfo.time || "";
+    setTimeInputsFromValue("rehearsal-start-time-input", "rehearsal-end-time-input", sessionInfo.time || "");
 
     const modal = document.getElementById("modal-rehearsal");
     if (modal) modal.classList.add("active");
@@ -8591,9 +8611,7 @@ function renderCalendar() {
             if (document.getElementById("quick-session-location")) {
                 document.getElementById("quick-session-location").value = "Parking";
             }
-            if (document.getElementById("quick-session-time")) {
-                document.getElementById("quick-session-time").value = "";
-            }
+            setTimeInputsFromValue("quick-session-start-time", "quick-session-end-time", "");
             
             // Hide actuation name field by default
             const actuacionGroup = document.getElementById("quick-session-actuacion-group");

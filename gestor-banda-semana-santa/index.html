@@ -2285,9 +2285,15 @@
                         <option value="San Blas">San Blas</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="rehearsal-time-input">Hora del Ensayo</label>
-                    <input type="text" id="rehearsal-time-input" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="rehearsal-start-time-input">Hora Inicio</label>
+                        <input type="time" id="rehearsal-start-time-input" style="width: 100%;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="rehearsal-end-time-input">Hora Fin</label>
+                        <input type="time" id="rehearsal-end-time-input" style="width: 100%;">
+                    </div>
                 </div>
                 <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-rehearsal-modal">Cancelar</button>
@@ -2679,8 +2685,16 @@
                 
                 <!-- Group: Rehearsal Time -->
                 <div class="form-group" id="quick-session-time-group" style="margin-top: 15px;">
-                    <label for="quick-session-time">Hora del Ensayo</label>
-                    <input type="text" id="quick-session-time" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label for="quick-session-start-time" style="font-size: 0.85rem; font-weight: 600;">Hora Inicio</label>
+                            <input type="time" id="quick-session-start-time" style="width: 100%;">
+                        </div>
+                        <div>
+                            <label for="quick-session-end-time" style="font-size: 0.85rem; font-weight: 600;">Hora Fin</label>
+                            <input type="time" id="quick-session-end-time" style="width: 100%;">
+                        </div>
+                    </div>
                 </div>
                  
                 <!-- Group: Performance Name (hidden by default) -->
