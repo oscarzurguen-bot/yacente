@@ -1912,12 +1912,6 @@
                             </label>
                             <input type="url" id="marcha-audio-spotify-input" placeholder="https://open.spotify.com/track/..." style="width: 100%; font-size: 0.82rem;">
                         </div>
-                        <div>
-                            <label for="marcha-audio-custom-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
-                                <span>🎵</span> Otro Enlace de Audio / Directo
-                            </label>
-                            <input type="url" id="marcha-audio-custom-input" placeholder="https://..." style="width: 100%; font-size: 0.82rem;">
-                        </div>
                     </div>
                 </div>
                 <div class="modal-actions">
@@ -3536,13 +3530,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=408"></script>
+    <script src="app.js?v=409"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=408
+        // Purga de caché antigua y registro del Service Worker v=409
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v408") {
+                    if (key !== "yacente-v409") {
                         caches.delete(key);
                     }
                 });
@@ -3555,9 +3549,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=408")
+                navigator.serviceWorker.register("sw.js?v=409")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v408 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v409 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

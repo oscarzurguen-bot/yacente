@@ -13371,7 +13371,6 @@ function openAddMarchaModal() {
     document.getElementById("marcha-difficulty-input").value = "1";
     if (document.getElementById("marcha-audio-youtube-input")) document.getElementById("marcha-audio-youtube-input").value = "";
     if (document.getElementById("marcha-audio-spotify-input")) document.getElementById("marcha-audio-spotify-input").value = "";
-    if (document.getElementById("marcha-audio-custom-input")) document.getElementById("marcha-audio-custom-input").value = "";
     
     const titleEl = document.getElementById("modal-marcha-title");
     if (titleEl) titleEl.innerText = "Añadir Nueva Marcha";
@@ -13394,9 +13393,6 @@ function openEditMarchaModal(id) {
     }
     if (document.getElementById("marcha-audio-spotify-input")) {
         document.getElementById("marcha-audio-spotify-input").value = m.spotifyUrl || "";
-    }
-    if (document.getElementById("marcha-audio-custom-input")) {
-        document.getElementById("marcha-audio-custom-input").value = m.audioUrl || "";
     }
     
     const titleEl = document.getElementById("modal-marcha-title");
@@ -13441,7 +13437,6 @@ function setupMarchaModalEvents() {
             const difficulty = document.getElementById("marcha-difficulty-input").value;
             const youtubeUrl = document.getElementById("marcha-audio-youtube-input") ? document.getElementById("marcha-audio-youtube-input").value.trim() : "";
             const spotifyUrl = document.getElementById("marcha-audio-spotify-input") ? document.getElementById("marcha-audio-spotify-input").value.trim() : "";
-            const audioUrl = document.getElementById("marcha-audio-custom-input") ? document.getElementById("marcha-audio-custom-input").value.trim() : "";
 
             if (!title) return;
 
@@ -13454,8 +13449,7 @@ function setupMarchaModalEvents() {
                         status,
                         difficulty,
                         youtubeUrl,
-                        spotifyUrl,
-                        audioUrl
+                        spotifyUrl
                     };
                     dbSaveMarcha(state.marchas[index]);
                     showToast("Marcha actualizada", "success");
@@ -13469,7 +13463,6 @@ function setupMarchaModalEvents() {
                     difficulty,
                     youtubeUrl,
                     spotifyUrl,
-                    audioUrl,
                     notes: ""
                 };
                 if (!state.marchas) state.marchas = [];
@@ -13506,9 +13499,8 @@ function openMarchaAudioLinksModal(marchaId) {
         container.innerHTML = "";
         const youtubeUrl = (marcha.youtubeUrl || "").trim();
         const spotifyUrl = (marcha.spotifyUrl || "").trim();
-        const audioUrl = (marcha.audioUrl || "").trim();
 
-        const hasLinks = youtubeUrl || spotifyUrl || audioUrl;
+        const hasLinks = youtubeUrl || spotifyUrl;
 
         if (!hasLinks) {
             container.innerHTML = `
@@ -13546,22 +13538,6 @@ function openMarchaAudioLinksModal(marchaId) {
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.25rem;">🟢</span>
                         <span style="font-size: 0.92rem;">Escuchar en Spotify</span>
-                    </div>
-                    <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
-                `;
-                container.appendChild(linkBtn);
-            }
-
-            if (audioUrl) {
-                const linkBtn = document.createElement("a");
-                linkBtn.href = audioUrl;
-                linkBtn.target = "_blank";
-                linkBtn.rel = "noopener noreferrer";
-                linkBtn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.35); border-radius: 10px; color: var(--color-gold); font-weight: 700; text-decoration: none; box-sizing: border-box; transition: transform 0.2s ease, background 0.2s ease;";
-                linkBtn.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.25rem;">🎵</span>
-                        <span style="font-size: 0.92rem;">Enlace de Audio / Directo</span>
                     </div>
                     <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
                 `;
