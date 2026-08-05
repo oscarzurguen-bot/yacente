@@ -1206,10 +1206,55 @@ function dbDeleteSession(date) {
     }
 }
 
-function dbDeleteSuggestion(suggestion) {
+function dbDeleteSuggestionByAdmin(suggestion) {
+    if (suggestion.deletedByMusician) {
+        return dbHardDeleteSuggestion(suggestion);
+    }
+    if (isCloudActive() && suggestion.docId) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").doc(suggestion.docId).update({ deletedByAdmin: true })
+            .then(() => {
+                suggestion.deletedByAdmin = true;
+            })
+            .catch(err => {
+                console.error("Error al marcar sugerencia como eliminada por admin en nube:", err);
+                throw err;
+            });
+    } else {
+        suggestion.deletedByAdmin = true;
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function dbDeleteSuggestionByMusician(suggestion) {
+    if (suggestion.deletedByDirector || suggestion.deletedByAdmin) {
+        return dbHardDeleteSuggestion(suggestion);
+    }
+    if (isCloudActive() && suggestion.docId) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").doc(suggestion.docId).update({ deletedByMusician: true })
+            .then(() => {
+                suggestion.deletedByMusician = true;
+            })
+            .catch(err => {
+                console.error("Error al marcar sugerencia como eliminada por músico en nube:", err);
+                throw err;
+            });
+    } else {
+        suggestion.deletedByMusician = true;
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function dbHardDeleteSuggestion(suggestion) {
     if (isCloudActive() && suggestion.docId) {
         const db = firebase.firestore();
         return db.collection("suggestions").doc(suggestion.docId).delete()
+            .then(() => {
+                state.suggestions = (state.suggestions || []).filter(s => s.id !== suggestion.id && s.docId !== suggestion.docId);
+            })
             .catch(err => {
                 console.error("Error al eliminar sugerencia en nube:", err);
                 throw err;
@@ -1221,8 +1266,15 @@ function dbDeleteSuggestion(suggestion) {
     }
 }
 
+function dbDeleteSuggestion(suggestion, role = "admin") {
+    if (role === "musician") {
+        return dbDeleteSuggestionByMusician(suggestion);
+    }
+    return dbDeleteSuggestionByAdmin(suggestion);
+}
+
 function dbMarkAllSuggestionsRead() {
-    const unread = (state.suggestions || []).filter(s => !s.read);
+    const unread = (state.suggestions || []).filter(s => !s.read && !s.deletedByAdmin);
     if (unread.length === 0) return Promise.resolve();
 
     if (isCloudActive()) {
@@ -1240,7 +1292,7 @@ function dbMarkAllSuggestionsRead() {
 }
 
 function updateSuggestionsBadge() {
-    const unreadCount = (state.suggestions || []).filter(s => !s.read).length;
+    const unreadCount = (state.suggestions || []).filter(s => !s.read && !s.deletedByAdmin).length;
     document.querySelectorAll(".suggestions-unread-badge").forEach(badge => {
         if (unreadCount > 0) {
             badge.innerText = unreadCount > 99 ? "99+" : String(unreadCount);
@@ -1252,6 +1304,9 @@ function updateSuggestionsBadge() {
 }
 
 function dbSaveSuggestion(suggestion) {
+    if (suggestion && suggestion.authorId && suggestion.date) {
+        localStorage.setItem("yacente_last_suggestion_date_" + suggestion.authorId, suggestion.date);
+    }
     if (isCloudActive()) {
         const db = firebase.firestore();
         return db.collection("suggestions").add(suggestion)
@@ -13751,12 +13806,22 @@ function escapeHtml(str) {
 const SUGGESTION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getSuggestionCooldownEnd(musicianId) {
+    if (!musicianId) return null;
     const mySuggestions = (state.suggestions || []).filter(s => String(s.authorId) === String(musicianId));
-    if (mySuggestions.length === 0) return null;
-    const lastDate = mySuggestions.reduce((latest, s) => {
+    let lastDate = mySuggestions.reduce((latest, s) => {
         const t = new Date(s.date).getTime();
-        return t > latest ? t : latest;
+        return (t && !isNaN(t) && t > latest) ? t : latest;
     }, 0);
+
+    const storedLastDateStr = localStorage.getItem("yacente_last_suggestion_date_" + musicianId);
+    if (storedLastDateStr) {
+        const tStored = new Date(storedLastDateStr).getTime();
+        if (tStored && !isNaN(tStored) && tStored > lastDate) {
+            lastDate = tStored;
+        }
+    }
+
+    if (!lastDate) return null;
     const cooldownEnd = lastDate + SUGGESTION_COOLDOWN_MS;
     return cooldownEnd > Date.now() ? new Date(cooldownEnd) : null;
 }
@@ -13788,7 +13853,7 @@ function renderMySuggestionHistory() {
     if (!container || !musicianId) return;
 
     const mine = (state.suggestions || [])
-        .filter(s => String(s.authorId) === String(musicianId))
+        .filter(s => String(s.authorId) === String(musicianId) && !s.deletedByMusician)
         .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     container.innerHTML = "";
@@ -13828,9 +13893,9 @@ function renderMySuggestionHistory() {
         const deleteBtn = itemDiv.querySelector(".btn-delete-my-suggestion");
         deleteBtn.addEventListener("click", () => {
             if (!confirm("¿Estás seguro de que quieres eliminar esta sugerencia de tu historial? Esta acción no se puede deshacer.")) return;
-            dbDeleteSuggestion(sug)
+            dbDeleteSuggestionByMusician(sug)
                 .then(() => {
-                    showToast("Sugerencia eliminada", "success");
+                    showToast("Sugerencia eliminada de tu historial", "success");
                     renderMySuggestionHistory();
                     renderComponentSugerenciasPage();
                     updateSuggestionsBadge();
@@ -13926,16 +13991,16 @@ function renderAdminSuggestionsList() {
     const emptyState = document.getElementById("admin-suggestions-empty");
     if (!container) return;
 
-    const suggestions = state.suggestions || [];
+    const visibleSuggestions = (state.suggestions || []).filter(s => !s.deletedByAdmin);
     container.innerHTML = "";
 
-    if (suggestions.length === 0) {
+    if (visibleSuggestions.length === 0) {
         if (emptyState) emptyState.classList.remove("hidden");
         return;
     }
     if (emptyState) emptyState.classList.add("hidden");
 
-    const sorted = [...suggestions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sorted = [...visibleSuggestions].sort((a, b) => new Date(b.date) - new Date(a.date));
 
     sorted.forEach(sug => {
         const itemDiv = document.createElement("div");
@@ -13968,10 +14033,11 @@ function renderAdminSuggestionsList() {
         const deleteBtn = itemDiv.querySelector(".btn-delete-suggestion");
         deleteBtn.addEventListener("click", () => {
             if (!confirm("¿Estás seguro de que quieres eliminar esta sugerencia? Esta acción no se puede deshacer.")) return;
-            dbDeleteSuggestion(sug)
+            dbDeleteSuggestionByAdmin(sug)
                 .then(() => {
                     showToast("Sugerencia eliminada", "success");
                     renderAdminSuggestionsList();
+                    updateSuggestionsBadge();
                 })
                 .catch(() => {
                     showToast("No se ha podido eliminar la sugerencia.", "error");

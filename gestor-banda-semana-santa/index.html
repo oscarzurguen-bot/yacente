@@ -3488,13 +3488,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=399"></script>
+    <script src="app.js?v=400"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=399
+        // Purga de caché antigua y registro del Service Worker v=400
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v399") {
+                    if (key !== "yacente-v400") {
                         caches.delete(key);
                     }
                 });
@@ -3507,9 +3507,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=399")
+                navigator.serviceWorker.register("sw.js?v=400")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v399 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v400 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
