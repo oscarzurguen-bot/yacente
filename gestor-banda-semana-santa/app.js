@@ -12734,19 +12734,33 @@ function openUpcomingEventDetailModal(date) {
     // Location & Maps Link
     const locEl = document.getElementById("upcoming-event-detail-location");
     const mapsBtn = document.getElementById("upcoming-event-detail-maps-btn");
+    const mapBox = document.getElementById("upcoming-event-detail-map-box");
+    const mapContent = document.getElementById("upcoming-event-detail-map-content");
     const locationName = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking" : "Por determinar");
-    
+
     if (locEl) {
         locEl.innerText = locationName;
     }
 
+    const locObj = (state.rehearsalLocations || []).find(l => l.name.toLowerCase() === locationName.toLowerCase());
+
     if (mapsBtn) {
-        const locObj = (state.rehearsalLocations || []).find(l => l.name.toLowerCase() === locationName.toLowerCase());
         const targetAddress = (locObj && locObj.address) ? locObj.address : locationName;
         if (targetAddress.startsWith("http://") || targetAddress.startsWith("https://")) {
             mapsBtn.href = targetAddress;
         } else {
             mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(targetAddress);
+        }
+    }
+
+    if (mapBox && mapContent) {
+        if (locObj) {
+            mapBox.classList.remove("hidden");
+            mapContent.innerHTML = renderLocationMapContent(locObj, false);
+        } else {
+            const fallbackLoc = { name: locationName, address: locationName };
+            mapBox.classList.remove("hidden");
+            mapContent.innerHTML = renderLocationMapContent(fallbackLoc, false);
         }
     }
 
@@ -14249,6 +14263,59 @@ function renderRehearsalLocationOptions() {
     }
 }
 
+function renderLocationMapContent(loc, isCardPreview = true) {
+    if (!loc) return "";
+    const htmlCode = loc.mapHtml || loc.html || "";
+
+    if (htmlCode && htmlCode.trim()) {
+        const str = htmlCode.trim();
+
+        // Si es un snippet <iframe> de Google Maps
+        if (str.toLowerCase().includes("<iframe")) {
+            let sanitized = str
+                .replace(/width="[^"]*"/gi, 'width="100%"')
+                .replace(/height="[^"]*"/gi, 'height="100%"');
+
+            if (sanitized.includes('style="')) {
+                sanitized = sanitized.replace('style="', 'style="width:100%; height:100%; border:0; ');
+            } else {
+                sanitized = sanitized.replace('<iframe', '<iframe style="width:100%; height:100%; border:0;"');
+            }
+
+            const pointerStyle = isCardPreview ? 'pointer-events: none;' : '';
+            return `<div style="width:100%; height:100%; position:relative; overflow:hidden; ${pointerStyle}">${sanitized}</div>`;
+        }
+
+        // Si es una etiqueta <img>
+        if (str.toLowerCase().includes("<img")) {
+            let sanitized = str;
+            if (sanitized.includes('style="')) {
+                sanitized = sanitized.replace('style="', 'style="width:100%; height:100%; object-fit:cover; display:block; ');
+            } else {
+                sanitized = sanitized.replace('<img', '<img style="width:100%; height:100%; object-fit:cover; display:block;"');
+            }
+            return `<div style="width:100%; height:100%; overflow:hidden;">${sanitized}</div>`;
+        }
+
+        // Si es una URL directa de imagen o web
+        if (str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:image")) {
+            return `<img src="${escapeHtml(str)}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="Ubicación ${escapeHtml(loc.name)}">`;
+        }
+
+        // Código HTML personalizado
+        return `<div style="width:100%; height:100%; overflow:hidden;">${str}</div>`;
+    }
+
+    // Gráfico de Mapa Cuadrado por Defecto
+    return `
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(212,175,55,0.18) 0%, rgba(15,15,15,0.92) 85%); color: var(--text-muted); text-align: center; padding: 20px; box-sizing: border-box;">
+            <span style="font-size: 3rem; margin-bottom: 8px; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.6));">📍</span>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${escapeHtml(loc.name || "Lugar de Ensayo")}</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; line-height: 1.3;">${escapeHtml(loc.address || "Ubicación en Google Maps")}</div>
+        </div>
+    `;
+}
+
 function renderAdminLugaresEnsayoList() {
     const container = document.getElementById("admin-lugares-ensayo-list");
     const emptyEl = document.getElementById("admin-lugares-ensayo-empty");
@@ -14265,22 +14332,30 @@ function renderAdminLugaresEnsayoList() {
     if (emptyEl) emptyEl.classList.add("hidden");
 
     container.innerHTML = locations.map(loc => `
-        <div class="card" style="padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 3px solid var(--color-gold);">
-            <div>
-                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-                    <span>📍</span> ${escapeHtml(loc.name)}
-                </div>
-                <div style="font-size: 0.83rem; color: var(--text-muted); margin-top: 2px;">
-                    ${loc.address ? escapeHtml(loc.address) : '<span style="font-style: italic;">Sin dirección especificada</span>'}
-                </div>
+        <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--border-color); background: var(--bg-card);">
+            <!-- Marco Cuadrado para Mapa o Imagen HTML -->
+            <div style="width: 100%; aspect-ratio: 1 / 1; background: #000; border-bottom: 1px solid var(--border-color); position: relative; overflow: hidden;">
+                ${renderLocationMapContent(loc, true)}
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <button class="btn btn-secondary btn-sm edit-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 10px; font-size: 0.8rem;">
-                    ✏️ Editar
-                </button>
-                <button class="btn btn-secondary btn-sm delete-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 10px; font-size: 0.8rem; color: var(--color-absent);">
-                    🗑️
-                </button>
+            
+            <!-- Detalles y Acciones -->
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: space-between;">
+                <div>
+                    <div style="font-weight: 700; font-size: 0.98rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span>📍</span> ${escapeHtml(loc.name)}
+                    </div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; line-height: 1.35;">
+                        ${loc.address ? escapeHtml(loc.address) : '<span style="font-style: italic;">Sin dirección especificada</span>'}
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+                    <button class="btn btn-secondary btn-sm edit-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn btn-secondary btn-sm delete-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 10px; font-size: 0.8rem; color: var(--color-absent);">
+                        🗑️
+                    </button>
+                </div>
             </div>
         </div>
     `).join("");
@@ -14316,6 +14391,7 @@ function openLugarEnsayoModal(id = null) {
     const idInput = document.getElementById("lugar-ensayo-id");
     const nameInput = document.getElementById("lugar-ensayo-nombre-input");
     const addressInput = document.getElementById("lugar-ensayo-direccion-input");
+    const htmlInput = document.getElementById("lugar-ensayo-html-input");
 
     if (!modal) return;
 
@@ -14326,12 +14402,14 @@ function openLugarEnsayoModal(id = null) {
             if (idInput) idInput.value = loc.id;
             if (nameInput) nameInput.value = loc.name || "";
             if (addressInput) addressInput.value = loc.address || "";
+            if (htmlInput) htmlInput.value = loc.mapHtml || loc.html || "";
         }
     } else {
         if (titleEl) titleEl.innerText = "Añadir Lugar de Ensayo";
         if (idInput) idInput.value = "";
         if (nameInput) nameInput.value = "";
         if (addressInput) addressInput.value = "";
+        if (htmlInput) htmlInput.value = "";
     }
 
     modal.classList.add("active");
@@ -14361,6 +14439,7 @@ function setupLugaresEnsayoEvents() {
             const id = document.getElementById("lugar-ensayo-id").value;
             const name = document.getElementById("lugar-ensayo-nombre-input").value.trim();
             const address = document.getElementById("lugar-ensayo-direccion-input").value.trim();
+            const mapHtml = document.getElementById("lugar-ensayo-html-input").value.trim();
 
             if (!name) {
                 showToast("Por favor introduce el nombre del lugar", "error");
@@ -14374,12 +14453,14 @@ function setupLugaresEnsayoEvents() {
                 if (idx !== -1) {
                     state.rehearsalLocations[idx].name = name;
                     state.rehearsalLocations[idx].address = address;
+                    state.rehearsalLocations[idx].mapHtml = mapHtml;
                 }
             } else {
                 const newLoc = {
                     id: "loc_" + Date.now(),
                     name: name,
-                    address: address
+                    address: address,
+                    mapHtml: mapHtml
                 };
                 state.rehearsalLocations.push(newLoc);
             }

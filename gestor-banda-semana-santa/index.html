@@ -1293,7 +1293,7 @@
                         </button>
                     </div>
 
-                    <div id="admin-lugares-ensayo-list" class="vertical-cards-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+                    <div id="admin-lugares-ensayo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;"></div>
                     <div id="admin-lugares-ensayo-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
                         <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📍</span>
                         No hay lugares de ensayo configurados todavía.
@@ -2486,6 +2486,11 @@
                     <input type="text" id="lugar-ensayo-direccion-input" placeholder="Ej. Calle Mayor 12, Murcia o pega un enlace de Maps" style="width: 100%;">
                     <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">Escribe la dirección física o pega una ubicación de Google Maps para que la app dirija a los músicos.</p>
                 </div>
+                <div class="form-group">
+                    <label for="lugar-ensayo-html-input">Código HTML / Embed de Google Maps (o Imagen)</label>
+                    <textarea id="lugar-ensayo-html-input" rows="3" placeholder="Pega aquí el código <iframe>...</iframe> de Google Maps o la imagen de la ubicación..." style="width: 100%; font-family: monospace; font-size: 0.8rem; resize: vertical; padding: 8px 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary);"></textarea>
+                    <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">En Google Maps ➔ Compartir ➔ Insertar un mapa ➔ Copiar HTML (o url/etiqueta img).</p>
+                </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-lugar-ensayo-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar Lugar</button>
@@ -3425,6 +3430,11 @@
                     </a>
                 </div>
 
+                <!-- Previsualización de Mapa / Imagen de Google Maps (Cuadrado) -->
+                <div id="upcoming-event-detail-map-box" class="hidden" style="width: 100%; aspect-ratio: 1 / 1; max-height: 280px; margin: 4px 0 0 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.3); position: relative;">
+                    <div id="upcoming-event-detail-map-content" style="width: 100%; height: 100%;"></div>
+                </div>
+
                 <div id="upcoming-event-detail-convocated-box" class="hidden" style="display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
                     <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">🎺</div>
                     <div>
@@ -3608,13 +3618,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=412"></script>
+    <script src="app.js?v=413"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=412
+        // Purga de caché antigua y registro del Service Worker v=413
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v410") {
+                    if (key !== "yacente-v413") {
                         caches.delete(key);
                     }
                 });
@@ -3627,9 +3637,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=412")
+                navigator.serviceWorker.register("sw.js?v=413")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v412 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v413 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
