@@ -1310,22 +1310,20 @@ function dbSaveSuggestion(suggestion) {
 }
 
 function dbSaveMarcha(marcha) {
+    saveStateToLocalStorage();
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("marchas").doc(marcha.id).set(marcha)
             .catch(err => console.error("Error al guardar marcha en nube:", err));
-    } else {
-        saveStateToLocalStorage();
     }
 }
 
 function dbDeleteMarcha(id) {
+    saveStateToLocalStorage();
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("marchas").doc(id).delete()
             .catch(err => console.error("Error al borrar marcha en nube:", err));
-    } else {
-        saveStateToLocalStorage();
     }
 }
 
