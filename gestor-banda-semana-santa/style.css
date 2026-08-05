@@ -212,12 +212,27 @@ h1, h2, h3, h4, .logo-text h1 {
 }
 
 .nav-item svg {
-    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast), color var(--transition-fast);
+}
+
+.nav-item span {
+    display: inline-block;
+    transition: transform var(--transition-fast), color var(--transition-fast);
+    transform-origin: left center;
 }
 
 .nav-item:hover {
     color: var(--text-primary);
     background-color: rgba(212, 175, 55, 0.04);
+}
+
+.nav-item:hover svg {
+    transform: scale(1.12);
+}
+
+.nav-item:hover span {
+    transform: scale(1.04);
+    color: var(--text-primary);
 }
 
 .nav-item.active {
@@ -230,6 +245,15 @@ h1, h2, h3, h4, .logo-text h1 {
 .nav-item.active svg {
     color: var(--color-gold);
     transform: scale(1.05);
+}
+
+.nav-item.active:hover svg {
+    transform: scale(1.14);
+}
+
+.nav-item.active:hover span {
+    color: var(--color-gold);
+    transform: scale(1.04);
 }
 
 #btn-logout-nav-admin {
