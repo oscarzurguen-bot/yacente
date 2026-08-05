@@ -3446,15 +3446,17 @@ function renderAttendance() {
         sectionDiv.className = "instrument-section";
         sectionDiv.id = `section-instrument-${sectionName.replace(/\s+/g, '-')}`;
 
+        const activeMusiciansInSection = musiciansInSection.filter(m => !isMusicianOnLeaveOnDate(m, date));
+
         let presents = 0;
-        musiciansInSection.forEach(m => {
+        activeMusiciansInSection.forEach(m => {
             if (state.attendance[date] && state.attendance[date][m.id] && state.attendance[date][m.id].status === "present") {
                 presents++;
             }
         });
-        const sectionRatio = Math.round((presents / musiciansInSection.length) * 100) || 0;
+        const sectionRatio = activeMusiciansInSection.length > 0 ? Math.round((presents / activeMusiciansInSection.length) * 100) : 0;
 
-        const allPresent = presents === musiciansInSection.length && musiciansInSection.length > 0;
+        const allPresent = activeMusiciansInSection.length > 0 && presents === activeMusiciansInSection.length;
 
         const headerDiv = document.createElement("div");
         headerDiv.className = "instrument-header";
@@ -3501,13 +3503,17 @@ function renderAttendance() {
         listDiv.className = "musicians-list";
 
         musiciansInSection.forEach(musician => {
+            const isOnLeave = isMusicianOnLeaveOnDate(musician, date);
             const dateAtt = state.attendance[date] || {};
             const attState = dateAtt[musician.id] || { status: "absent", justified: false, reason: "" };
             const cardDiv = document.createElement("div");
             cardDiv.className = `musician-card`;
             cardDiv.id = `card-${musician.id}`;
             
-            if (attState.status === "present") {
+            if (isOnLeave) {
+                cardDiv.classList.add("is-baja");
+                cardDiv.style.cssText = "background: rgba(128, 128, 128, 0.08); border: 1px solid rgba(160, 160, 160, 0.3); opacity: 0.75; filter: grayscale(0.85);";
+            } else if (attState.status === "present") {
                 cardDiv.classList.add("is-present");
             } else {
                 cardDiv.classList.add("is-absent");
@@ -3520,32 +3526,44 @@ function renderAttendance() {
             const avatarMarkup = musician.photo
                 ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
                 : initials;
+
+            const bajaBadgeMarkup = isOnLeave ? `<span style="font-size: 0.68rem; background: rgba(128, 128, 128, 0.25); color: #a0a0a0; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(160, 160, 160, 0.4); font-weight: 700; text-transform: uppercase; margin-left: 6px; vertical-align: middle;">Baja</span>` : '';
+
+            const actionsMarkup = isOnLeave ? `
+                <div class="attendance-actions" style="pointer-events: none;">
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #a0a0a0; background: rgba(128, 128, 128, 0.15); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(160, 160, 160, 0.3); display: inline-flex; align-items: center; gap: 4px;">
+                        🚫 Baja Temporal
+                    </span>
+                </div>
+            ` : `
+                <div class="attendance-actions">
+                    <button class="toggle-btn btn-present" data-id="${musician.id}">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Presente
+                    </button>
+                    <button class="toggle-btn btn-absent" data-id="${musician.id}">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        Ausente
+                    </button>
+                </div>
+            `;
             
             cardDiv.innerHTML = `
                 <div class="musician-card-top">
                     <div class="musician-avatar">${avatarMarkup}</div>
                     <div class="musician-details">
-                        <span class="musician-name">${musician.name}</span>
+                        <span class="musician-name">${musician.name} ${bajaBadgeMarkup}</span>
                         <span class="musician-role">${musician.role || 'Músico de fila'}</span>
                     </div>
-                    <div class="attendance-actions">
-                        <button class="toggle-btn btn-present" data-id="${musician.id}">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            Presente
-                        </button>
-                        <button class="toggle-btn btn-absent" data-id="${musician.id}">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                            Ausente
-                        </button>
-                    </div>
+                    ${actionsMarkup}
                 </div>
                 
-                <div class="absence-details-container ${attState.status === 'present' ? 'hidden' : ''} ${attState.status === 'absent' && attState.justified && attState.reason && attState.reason.trim() !== '' ? 'show-summary' : 'show-form'}">
+                <div class="absence-details-container ${isOnLeave || attState.status === 'present' ? 'hidden' : ''} ${attState.status === 'absent' && attState.justified && attState.reason && attState.reason.trim() !== '' ? 'show-summary' : 'show-form'}">
                     <!-- Vista Formulario -->
                     <div class="absence-form-view">
                         <label class="justified-checkbox-row">
@@ -3580,59 +3598,61 @@ function renderAttendance() {
                 </div>
             `;
 
-            cardDiv.querySelector(".btn-present").addEventListener("click", () => {
-                updateMusicianAttendance(musician.id, "present");
-            });
+            if (!isOnLeave) {
+                cardDiv.querySelector(".btn-present").addEventListener("click", () => {
+                    updateMusicianAttendance(musician.id, "present");
+                });
 
-            cardDiv.querySelector(".btn-absent").addEventListener("click", () => {
-                updateMusicianAttendance(musician.id, "absent");
-            });
+                cardDiv.querySelector(".btn-absent").addEventListener("click", () => {
+                    updateMusicianAttendance(musician.id, "absent");
+                });
 
-            cardDiv.querySelector(".chk-justified").addEventListener("change", (e) => {
-                updateMusicianJustification(musician.id, e.target.checked);
-            });
+                cardDiv.querySelector(".chk-justified").addEventListener("change", (e) => {
+                    updateMusicianJustification(musician.id, e.target.checked);
+                });
 
-            const inputReason = cardDiv.querySelector(".input-reason");
-            inputReason.addEventListener("input", (e) => {
-                updateMusicianReason(musician.id, e.target.value);
-            });
+                const inputReason = cardDiv.querySelector(".input-reason");
+                inputReason.addEventListener("input", (e) => {
+                    updateMusicianReason(musician.id, e.target.value);
+                });
 
-            inputReason.addEventListener("blur", (e) => {
-                const val = e.target.value.trim();
-                updateMusicianReason(musician.id, val);
-                if (val !== "") {
-                    showAbsenceSummary(cardDiv, val);
-                }
-            });
-
-            inputReason.addEventListener("keyup", (e) => {
-                if (e.key === "Enter") {
+                inputReason.addEventListener("blur", (e) => {
                     const val = e.target.value.trim();
                     updateMusicianReason(musician.id, val);
                     if (val !== "") {
                         showAbsenceSummary(cardDiv, val);
-                        inputReason.blur();
                     }
-                }
-            });
-
-            cardDiv.querySelectorAll(".quick-reason-pill").forEach(pill => {
-                pill.addEventListener("click", () => {
-                    const value = pill.getAttribute("data-value");
-                    inputReason.value = value;
-                    cardDiv.querySelectorAll(".quick-reason-pill").forEach(p => p.classList.remove("active"));
-                    pill.classList.add("active");
-                    updateMusicianReason(musician.id, value);
-                    showAbsenceSummary(cardDiv, value);
                 });
-            });
 
-            cardDiv.querySelector(".btn-edit-reason").addEventListener("click", () => {
-                const container = cardDiv.querySelector(".absence-details-container");
-                container.classList.remove("show-summary");
-                container.classList.add("show-form");
-                inputReason.focus();
-            });
+                inputReason.addEventListener("keyup", (e) => {
+                    if (e.key === "Enter") {
+                        const val = e.target.value.trim();
+                        updateMusicianReason(musician.id, val);
+                        if (val !== "") {
+                            showAbsenceSummary(cardDiv, val);
+                            inputReason.blur();
+                        }
+                    }
+                });
+
+                cardDiv.querySelectorAll(".quick-reason-pill").forEach(pill => {
+                    pill.addEventListener("click", () => {
+                        const value = pill.getAttribute("data-value");
+                        inputReason.value = value;
+                        cardDiv.querySelectorAll(".quick-reason-pill").forEach(p => p.classList.remove("active"));
+                        pill.classList.add("active");
+                        updateMusicianReason(musician.id, value);
+                        showAbsenceSummary(cardDiv, value);
+                    });
+                });
+
+                cardDiv.querySelector(".btn-edit-reason").addEventListener("click", () => {
+                    const container = cardDiv.querySelector(".absence-details-container");
+                    container.classList.remove("show-summary");
+                    container.classList.add("show-form");
+                    inputReason.focus();
+                });
+            }
 
             listDiv.appendChild(cardDiv);
         });
@@ -3678,6 +3698,7 @@ function toggleVoiceAttendance(musiciansInSection, sectionName, shouldMarkPresen
     const newStatus = shouldMarkPresent ? "present" : "absent";
 
     musiciansInSection.forEach(m => {
+        if (isMusicianOnLeaveOnDate(m, date)) return; // Excluir de marcar masivo
         state.attendance[date][m.id] = {
             status: newStatus,
             justified: false,
@@ -3828,15 +3849,16 @@ function updateSectionHeaderRatio(musicianId) {
     
     const date = state.currentDate;
     const musiciansInSection = state.musicians.filter(m => m.instrument === sectionName);
+    const activeMusicians = musiciansInSection.filter(m => !isMusicianOnLeaveOnDate(m, date));
     
     let presents = 0;
-    musiciansInSection.forEach(m => {
+    activeMusicians.forEach(m => {
         if (state.attendance[date] && state.attendance[date][m.id] && state.attendance[date][m.id].status === "present") {
             presents++;
         }
     });
     
-    const sectionRatio = Math.round((presents / musiciansInSection.length) * 100) || 0;
+    const sectionRatio = activeMusicians.length > 0 ? Math.round((presents / activeMusicians.length) * 100) : 0;
     sectionDiv.querySelector(".section-attendance-ratio").innerText = `${sectionRatio}% Asistencia`;
 }
 
@@ -3856,6 +3878,10 @@ function updateAttendanceStatsRibbon() {
     state.musicians.forEach(m => {
         // Si el ensayo es por voces y el músico no está convocado, omitimos
         if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+            return;
+        }
+        // Excluir músicos en baja temporal en esta fecha de las estadísticas del día
+        if (isMusicianOnLeaveOnDate(m, date)) {
             return;
         }
         total++;
@@ -4753,6 +4779,19 @@ function openActuacionDetailModal(date) {
 
     // Open modal
     modal.classList.add("active");
+}
+
+function isMusicianOnLeaveOnDate(musician, dateStr) {
+    if (!musician) return false;
+    if (musician.isBaja) return true;
+    if (musician.bajaPeriods && Array.isArray(musician.bajaPeriods)) {
+        return musician.bajaPeriods.some(p => {
+            const start = p.startDate || "";
+            const end = p.endDate || "9999-12-31";
+            return dateStr >= start && dateStr <= end;
+        });
+    }
+    return false;
 }
 
 function formatRoleShort(role) {
