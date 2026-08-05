@@ -119,6 +119,7 @@ let state = {
     formacionDesfile: [],
     directorConcierto: null,
     suggestions: [],
+    rehearsalLocations: [],
     currentPreavisoDate: "",
     compCalendarYear: undefined,
     compCalendarMonth: undefined,
@@ -226,6 +227,22 @@ function initApp() {
 
     const storedSuggestions = localStorage.getItem("harmonia_suggestions");
     state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
+
+    const storedRehearsalLocations = localStorage.getItem("harmonia_rehearsal_locations");
+    if (storedRehearsalLocations) {
+        try {
+            state.rehearsalLocations = JSON.parse(storedRehearsalLocations);
+        } catch(e) {
+            state.rehearsalLocations = null;
+        }
+    }
+    if (!state.rehearsalLocations || !Array.isArray(state.rehearsalLocations) || state.rehearsalLocations.length === 0) {
+        state.rehearsalLocations = [
+            { id: "loc_parking", name: "Parking", address: "Parking de la Sede" },
+            { id: "loc_arrabal", name: "Arrabal", address: "Arrabal" },
+            { id: "loc_sanblas", name: "San Blas", address: "San Blas" }
+        ];
+    }
 
     // Cargar formaciones del simulador
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
@@ -419,6 +436,7 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
+    localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
 
     if (state.firebaseConfig) {
         localStorage.setItem("yacente_firebase_config", JSON.stringify(state.firebaseConfig));
@@ -2170,11 +2188,9 @@ function setupEventListeners() {
     const modalRehearsal = document.getElementById("modal-rehearsal");
     
     document.getElementById("btn-add-rehearsal").addEventListener("click", () => {
+        renderRehearsalLocationOptions();
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
-        if (document.getElementById("rehearsal-location-input")) {
-            document.getElementById("rehearsal-location-input").value = "Parking";
-        }
         if (document.getElementById("rehearsal-time-input")) {
             document.getElementById("rehearsal-time-input").value = "";
         }
@@ -2555,20 +2571,6 @@ function setupEventListeners() {
     // ==========================================
     // REPERTORIO Y MARCHAS
     // ==========================================
-    const modalMarcha = document.getElementById("modal-marcha");
-    document.getElementById("btn-add-marcha").addEventListener("click", () => {
-        document.getElementById("modal-marcha-title").innerText = "Añadir Nueva Marcha";
-        document.getElementById("marcha-id").value = "";
-        document.getElementById("marcha-title-input").value = "";
-        document.getElementById("marcha-status-input").value = "green";
-        document.getElementById("marcha-difficulty-input").value = "1";
-        modalMarcha.classList.add("active");
-    });
-
-    const closeModalMarcha = () => modalMarcha.classList.remove("active");
-    document.getElementById("btn-close-marcha-modal").addEventListener("click", closeModalMarcha);
-    document.getElementById("btn-cancel-marcha-modal").addEventListener("click", closeModalMarcha);
-
     document.getElementById("btn-close-marcha-history-modal").addEventListener("click", () => {
         document.getElementById("modal-marcha-history").classList.remove("active");
     });
@@ -2576,43 +2578,6 @@ function setupEventListeners() {
         if (e.target === e.currentTarget) {
             document.getElementById("modal-marcha-history").classList.remove("active");
         }
-    });
-
-    document.getElementById("form-marcha").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const id = document.getElementById("marcha-id").value;
-        const title = document.getElementById("marcha-title-input").value.trim();
-        const status = document.getElementById("marcha-status-input").value;
-        const difficulty = parseInt(document.getElementById("marcha-difficulty-input").value) || 1;
-
-        if (!title) return;
-
-        if (id) {
-            // Edit existing marcha
-            const index = state.marchas.findIndex(m => m.id === id);
-            if (index !== -1) {
-                state.marchas[index].title = title;
-                state.marchas[index].status = status;
-                state.marchas[index].difficulty = difficulty;
-                dbSaveMarcha(state.marchas[index]);
-                showToast("Marcha actualizada", "success");
-            }
-        } else {
-            // Create new marcha
-            const newMarcha = {
-                id: "mar-" + Date.now(),
-                title,
-                status,
-                difficulty
-            };
-            state.marchas.push(newMarcha);
-            dbSaveMarcha(newMarcha);
-            showToast("Marcha añadida al repertorio", "success");
-        }
-
-        closeModalMarcha();
-        renderMarchasList();
-        renderRehearsalMarchasWidget();
     });
 
     document.getElementById("search-marcha").addEventListener("input", () => {
@@ -8034,13 +7999,7 @@ function renderMarchasList() {
         });
 
         card.querySelector(".edit-marcha-btn").addEventListener("click", () => {
-            const modal = document.getElementById("modal-marcha");
-            document.getElementById("modal-marcha-title").innerText = "Editar Marcha";
-            document.getElementById("marcha-id").value = m.id;
-            document.getElementById("marcha-title-input").value = m.title;
-            document.getElementById("marcha-status-input").value = m.status || "green";
-            document.getElementById("marcha-difficulty-input").value = m.difficulty || "1";
-            modal.classList.add("active");
+            openEditMarchaModal(m.id);
         });
 
         card.querySelector(".delete-marcha-btn").addEventListener("click", () => {
@@ -12764,10 +12723,23 @@ function openUpcomingEventDetailModal(date) {
         timeEl.innerText = sessionInfo && sessionInfo.time ? `${sessionInfo.time} h` : "Por determinar";
     }
 
-    // Location
+    // Location & Maps Link
     const locEl = document.getElementById("upcoming-event-detail-location");
+    const mapsBtn = document.getElementById("upcoming-event-detail-maps-btn");
+    const locationName = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking" : "Por determinar");
+    
     if (locEl) {
-        locEl.innerText = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking de la Sede" : "Por determinar");
+        locEl.innerText = locationName;
+    }
+
+    if (mapsBtn) {
+        const locObj = (state.rehearsalLocations || []).find(l => l.name.toLowerCase() === locationName.toLowerCase());
+        const targetAddress = (locObj && locObj.address) ? locObj.address : locationName;
+        if (targetAddress.startsWith("http://") || targetAddress.startsWith("https://")) {
+            mapsBtn.href = targetAddress;
+        } else {
+            mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(targetAddress);
+        }
     }
 
     // Convocated Voices Box
@@ -13417,6 +13389,7 @@ function setupMarchaModalEvents() {
 
     const closeModal = () => {
         if (modal) modal.classList.remove("active");
+        if (form) form.reset();
     };
 
     if (btnClose) btnClose.addEventListener("click", closeModal);
