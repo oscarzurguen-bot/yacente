@@ -707,49 +707,14 @@ function startCloudSync() {
         localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
         
         // Dispatch notifications if this is not the initial load and role is component
-        if (!isInitialSessionTypesLoad && getAuthRole() === "component") {
-            const musicianId = getAuthMusicianId();
-            if (musicianId) {
-                changes.forEach(change => {
-                    if (change.type === "added") {
-                        const sessionData = change.doc.data();
-                        const sessionDate = change.doc.id;
-                        
-                        if (isMusicianConvocated(musicianId, sessionData)) {
-                            const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
-                            const formattedDate = formatDateShortSpanish(sessionDate);
-                            let body = "";
-                            if (sessionData.type === "ensayo") {
-                                const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
-                                const locationVal = sessionData.location || "Parking";
-                                const timeStr = sessionData.time ? ` ${sessionData.time}` : "";
-                                body = `${subtypeText}${timeStr} - ${formattedDate} (${locationVal})`;
-                            } else {
-                                body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
-                            }
-                            
-                            // Save to local storage notifications list
-                            const notifId = `${sessionDate}-${sessionData.type}`;
-                            const deletedIds = getDeletedNotificationIds(musicianId);
-                            if (!deletedIds.includes(notifId)) {
-                                const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-                                if (!notifs.some(n => n.id === notifId)) {
-                                    notifs.unshift({
-                                        id: notifId,
-                                        title: title,
-                                        body: body,
-                                        date: new Date().toISOString(),
-                                        seen: false
-                                    });
-                                    localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
-                                    updateNotificationsBadge();
-                                    sendBrowserNotification(title, body);
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+        if (!isInitialSessionTypesLoad) {
+            changes.forEach(change => {
+                if (change.type === "added" || change.type === "modified") {
+                    const sessionData = change.doc.data();
+                    const sessionKey = change.doc.id;
+                    dispatchSessionNotification(sessionKey, sessionData);
+                }
+            });
         }
         
         isInitialSessionTypesLoad = false;
@@ -2257,17 +2222,20 @@ function setupEventListeners() {
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
         const timeVal = document.getElementById("rehearsal-time-input") ? document.getElementById("rehearsal-time-input").value.trim() : "";
+        const createdAtIso = new Date().toISOString();
         state.sessionTypes[sessionKey] = { 
             type: "ensayo", 
             subtype: subtype, 
             name: "", 
             convocatedVoices: convocatedVoices,
             location: locationVal,
-            time: timeVal
+            time: timeVal,
+            createdAt: createdAtIso
         };
         initializeAttendanceForDate(sessionKey, convocatedVoices);
         
         dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
+        dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
@@ -2331,9 +2299,16 @@ function setupEventListeners() {
 
         initializeAttendanceForDate(sessionKey);
         const isTrip = document.getElementById("actuacion-trip-input") ? document.getElementById("actuacion-trip-input").checked : false;
-        state.sessionTypes[sessionKey] = { type: "actuacion", name: actuacionName, isTrip: isTrip };
+        const createdAtIso = new Date().toISOString();
+        state.sessionTypes[sessionKey] = { 
+            type: "actuacion", 
+            name: actuacionName, 
+            isTrip: isTrip,
+            createdAt: createdAtIso
+        };
         
         dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
+        dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
         if (isCloudActive()) {
             const db = firebase.firestore();
             db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
@@ -14967,6 +14942,94 @@ function updateNotificationsBadge() {
     }
 }
 
+function formatNotificationTimestamp(dateInput) {
+    if (!dateInput) return "";
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+    const timeStr = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+
+    if (d >= todayStart) {
+        return `Hoy, ${timeStr}`;
+    } else if (d >= yesterdayStart) {
+        return `Ayer, ${timeStr}`;
+    } else {
+        const day = d.getDate();
+        const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        const month = months[d.getMonth()];
+        return `${day} ${month}, ${timeStr}`;
+    }
+}
+
+function dispatchSessionNotification(sessionKey, sessionData) {
+    if (!sessionData) return;
+
+    const rawDate = sessionKey.split("_")[0];
+    const formattedDate = formatDateShortSpanish(rawDate);
+    const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
+    let body = "";
+    if (sessionData.type === "ensayo") {
+        const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
+        const locationVal = sessionData.location || "Parking";
+        const timeStr = sessionData.time ? ` ${sessionData.time}` : "";
+        body = `${subtypeText}${timeStr} - ${formattedDate} (${locationVal})`;
+    } else {
+        body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
+    }
+
+    const notifId = `session_${sessionKey}_${sessionData.type}`;
+    const creationDate = sessionData.createdAt || sessionData.date || new Date().toISOString();
+
+    const musicians = state.musicians || [];
+    musicians.forEach(m => {
+        if (!m || !m.id) return;
+        if (isMusicianConvocated(m.id, sessionData)) {
+            const key = "yacente_notifications_" + m.id;
+            const deletedIds = getDeletedNotificationIds(m.id);
+            if (deletedIds.includes(notifId)) return;
+
+            let notifs = JSON.parse(localStorage.getItem(key) || "[]");
+            notifs = purgeExpiredNotifications(notifs);
+
+            const existingIdx = notifs.findIndex(n => n.id === notifId);
+            const notifObj = {
+                id: notifId,
+                title: title,
+                body: body,
+                date: creationDate,
+                seen: false,
+                type: sessionData.type
+            };
+
+            if (existingIdx !== -1) {
+                notifs[existingIdx] = notifObj;
+            } else {
+                notifs.unshift(notifObj);
+            }
+
+            // Ordenamiento cronológico inverso por fecha de creación
+            notifs.sort((a, b) => {
+                const tA = a.date ? new Date(a.date).getTime() : 0;
+                const tB = b.date ? new Date(b.date).getTime() : 0;
+                return tB - tA;
+            });
+
+            localStorage.setItem(key, JSON.stringify(notifs));
+        }
+    });
+
+    updateNotificationsBadge();
+    if (document.body.classList.contains("component-portal")) {
+        sendBrowserNotification(title, body);
+        renderComponentNotificationsList();
+    }
+}
+
 function renderComponentNotificationsList() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
@@ -14978,10 +15041,18 @@ function renderComponentNotificationsList() {
     const validNotifs = purgeExpiredNotifications(notifs).filter(n => !deletedIds.includes(n.id));
     if (validNotifs.length !== notifs.length) {
         notifs = validNotifs;
-        localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
     } else {
         notifs = validNotifs;
     }
+
+    // Ordenamiento cronológico inverso estricto por fecha de emisión
+    notifs.sort((a, b) => {
+        const tA = a.date ? new Date(a.date).getTime() : 0;
+        const tB = b.date ? new Date(b.date).getTime() : 0;
+        return tB - tA;
+    });
+
+    localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
 
     const container = document.getElementById("comp-notif-list-container");
     const countLabel = document.getElementById("comp-notif-count-label");
@@ -15032,7 +15103,7 @@ function renderComponentNotificationsList() {
             ${announcementBadge}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none;">
                 <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: ${notif.seen ? 'var(--text-primary)' : 'var(--color-gold)'};">${notif.title}</h4>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(notif.date).toLocaleDateString('es-ES', {hour: '2-digit', minute:'2-digit'})}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${formatNotificationTimestamp(notif.date)}</span>
             </div>
             <p style="margin: 0; font-size: 0.8rem; color: var(--text-color); pointer-events: none;">${notif.body}</p>
         `;
