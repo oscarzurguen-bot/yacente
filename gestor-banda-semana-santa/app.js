@@ -487,6 +487,7 @@ let unsubFormacionDesfile = null;
 let unsubAnnouncements = null;
 let unsubDeletedNotifs = null;
 let unsubSuggestions = null;
+let unsubRehearsalLocations = null;
 
 function getDeletedNotificationIds(musicianId) {
     if (!musicianId) return [];
@@ -995,6 +996,18 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync sugerencias:", err);
     });
+
+    // Escucha de lugares de ensayo (sincronización en tiempo real para directores y músicos)
+    unsubRehearsalLocations = db.collection("settings").doc("rehearsalLocations").onSnapshot(doc => {
+        if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
+            state.rehearsalLocations = doc.data().list;
+            saveStateToLocalStorage();
+            renderRehearsalLocationOptions();
+            renderAdminLugaresEnsayoList();
+        }
+    }, err => {
+        console.error("Error sync lugares de ensayo:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -1011,6 +1024,7 @@ function stopCloudSync() {
     if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
     if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
     if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
+    if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -12485,14 +12499,17 @@ function renderComponentHistorial() {
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
-        const timeText = session.time ? ` • ${session.time}` : "";
-        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
+        const rawTimeText = session.time ? `${session.time} h` : "";
+        let convocatedText = "";
+        if (session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
+            convocatedText = session.convocatedVoices.join(", ");
+        }
         
         const row = document.createElement("div");
         row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
-        row.style.gap = "10px";
+        row.style.gap = "12px";
         row.style.width = "100%";
         row.style.cursor = "pointer";
         row.title = "Ver asistencia general y marchas tocadas";
@@ -12505,20 +12522,20 @@ function renderComponentHistorial() {
         const moAbbr = monthsAbbr[moNum - 1] || "";
         
         row.innerHTML = `
-            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
-                <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
-                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--color-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.22); border-radius: 10px; width: 62px; min-width: 62px; padding: 8px 4px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold); flex-shrink: 0;">
+                <div style="font-size: 1.4rem; font-weight: 800; color: var(--color-gold); line-height: 1; font-family: 'Outfit', sans-serif;">${dy}</div>
+                <div style="font-size: 0.68rem; text-transform: uppercase; color: var(--text-color); font-weight: 700; margin-top: 3px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
                 <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
-            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
-                <div class="comp-session-meta">
-                    <h4 class="comp-session-title">${sessionTitle}</h4>
-                    <div class="comp-session-details">
-                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
-                    </div>
+            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 2px 0;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                    <h4 class="comp-session-title" style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); line-height: 1.25; font-family: 'Outfit', sans-serif;">${escapeHtml(sessionTitle)}</h4>
+                    <span class="comp-attendance-badge ${badgeClass}" style="flex-shrink: 0;">${badgeText}</span>
                 </div>
-                <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
-                    <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                    ${rawTimeText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text-secondary);">⏰ ${escapeHtml(rawTimeText)}</span>` : ''}
+                    ${locationText ? `<span style="display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted);">📍 ${escapeHtml(locationText)}</span>` : ''}
+                    ${convocatedText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); padding: 1px 7px; border-radius: 4px; font-weight: 600;">🎺 ${escapeHtml(convocatedText)}</span>` : ''}
                 </div>
             </div>
         `;
@@ -12742,28 +12759,26 @@ function openUpcomingEventDetailModal(date) {
         locEl.innerText = locationName;
     }
 
-    const locObj = (state.rehearsalLocations || []).find(l => l.name.toLowerCase() === locationName.toLowerCase());
+    const locObj = (state.rehearsalLocations || []).find(l => l.name && locationName && l.name.trim().toLowerCase() === locationName.trim().toLowerCase());
 
     if (mapsBtn) {
-        let mapsUrl = (locObj && locObj.mapsUrl) ? locObj.mapsUrl.trim() : "";
-        if (!mapsUrl && locObj && locObj.address) {
-            mapsUrl = locObj.address.trim();
-        }
-        if (!mapsUrl) {
-            mapsUrl = locationName;
-        }
-
-        if (mapsUrl.startsWith("http://") || mapsUrl.startsWith("https://")) {
-            mapsBtn.href = mapsUrl;
+        if (!locationName || locationName === "Por determinar") {
+            mapsBtn.classList.add("hidden");
         } else {
-            mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsUrl);
+            mapsBtn.classList.remove("hidden");
+            let mapsUrl = (locObj && locObj.mapsUrl) ? locObj.mapsUrl.trim() : locationName;
+            if (mapsUrl.startsWith("http://") || mapsUrl.startsWith("https://")) {
+                mapsBtn.href = mapsUrl;
+            } else {
+                mapsBtn.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsUrl);
+            }
         }
     }
 
     if (mapBox && mapContent) {
-        if (locObj && locObj.image) {
+        if (locObj && locObj.image && locObj.image.trim()) {
             mapBox.classList.remove("hidden");
-            mapContent.innerHTML = `<img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="${escapeHtml(locationName)}">`;
+            mapContent.innerHTML = `<img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px;" alt="${escapeHtml(locationName)}">`;
         } else {
             mapBox.classList.add("hidden");
             mapContent.innerHTML = "";
@@ -12907,14 +12922,17 @@ function renderComponentEventos() {
         
         let sessionTitle = session.name || (session.type === "ensayo" ? typeLabel : "Actuación Oficial");
         const locationText = session.location || (session.type === "ensayo" ? "Parking" : "");
-        const timeText = session.time ? ` • ${session.time}` : "";
-        const subtitleText = locationText ? `${locationText}${timeText}` : (session.time ? `${session.time}` : typeLabel);
+        const rawTimeText = session.time ? `${session.time} h` : "";
+        let convocatedText = "";
+        if (session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
+            convocatedText = session.convocatedVoices.join(", ");
+        }
         
         const row = document.createElement("div");
         row.className = "comp-session-row comp-session-row-clickable";
         row.style.display = "flex";
         row.style.alignItems = "stretch";
-        row.style.gap = "10px";
+        row.style.gap = "12px";
         row.style.width = "100%";
         row.style.cursor = "pointer";
         row.title = "Ver detalle del evento y responder asistencia";
@@ -12927,20 +12945,20 @@ function renderComponentEventos() {
         const moAbbr = monthsAbbr[moNum - 1] || "";
         
         row.innerHTML = `
-            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
-                <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
-                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--color-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+            <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.22); border-radius: 10px; width: 62px; min-width: 62px; padding: 8px 4px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold); flex-shrink: 0;">
+                <div style="font-size: 1.4rem; font-weight: 800; color: var(--color-gold); line-height: 1; font-family: 'Outfit', sans-serif;">${dy}</div>
+                <div style="font-size: 0.68rem; text-transform: uppercase; color: var(--text-color); font-weight: 700; margin-top: 3px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
                 <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
-            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
-                <div class="comp-session-meta">
-                    <h4 class="comp-session-title">${sessionTitle}</h4>
-                    <div class="comp-session-details">
-                        <span class="comp-session-location" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; display: block; margin-top: 2px;">${subtitleText}</span>
-                    </div>
+            <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 2px 0;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;">
+                    <h4 class="comp-session-title" style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); line-height: 1.25; font-family: 'Outfit', sans-serif;">${escapeHtml(sessionTitle)}</h4>
+                    <span class="comp-attendance-badge ${badgeClass}" style="flex-shrink: 0;">${badgeText}</span>
                 </div>
-                <div class="comp-session-status-row" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
-                    <span class="comp-attendance-badge ${badgeClass}">${badgeText}</span>
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                    ${rawTimeText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text-secondary);">⏰ ${escapeHtml(rawTimeText)}</span>` : ''}
+                    ${locationText ? `<span style="display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted);">📍 ${escapeHtml(locationText)}</span>` : ''}
+                    ${convocatedText ? `<span style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); padding: 1px 7px; border-radius: 4px; font-weight: 600;">🎺 ${escapeHtml(convocatedText)}</span>` : ''}
                 </div>
             </div>
         `;
@@ -14309,7 +14327,6 @@ function renderLocationMapContent(loc) {
         <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(212,175,55,0.18) 0%, rgba(15,15,15,0.92) 85%); color: var(--text-muted); text-align: center; padding: 20px; box-sizing: border-box;">
             <span style="font-size: 3rem; margin-bottom: 8px; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.6));">📍</span>
             <div style="font-size: 0.95rem; font-weight: 700; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${escapeHtml(loc.name || "Lugar de Ensayo")}</div>
-            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; line-height: 1.3;">${escapeHtml(loc.address || "Ubicación en Google Maps")}</div>
         </div>
     `;
 }
@@ -14342,11 +14359,8 @@ function renderAdminLugaresEnsayoList() {
                     <div style="font-weight: 700; font-size: 0.98rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
                         <span>📍</span> ${escapeHtml(loc.name)}
                     </div>
-                    <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 3px; line-height: 1.35;">
-                        ${loc.address ? escapeHtml(loc.address) : '<span style="font-style: italic;">Sin dirección especificada</span>'}
-                    </div>
                     ${loc.mapsUrl ? `
-                        <a href="${escapeHtml(loc.mapsUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.76rem; color: var(--color-gold); text-decoration: none; margin-top: 4px; font-weight: 600;">
+                        <a href="${escapeHtml(loc.mapsUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--color-gold); text-decoration: none; margin-top: 6px; font-weight: 600;">
                             <span>🗺️</span> Enlace Google Maps
                         </a>
                     ` : ''}
@@ -14417,7 +14431,6 @@ function openLugarEnsayoModal(id = null) {
     const titleEl = document.getElementById("modal-lugar-ensayo-title");
     const idInput = document.getElementById("lugar-ensayo-id");
     const nameInput = document.getElementById("lugar-ensayo-nombre-input");
-    const addressInput = document.getElementById("lugar-ensayo-direccion-input");
     const mapsUrlInput = document.getElementById("lugar-ensayo-maps-url-input");
 
     if (!modal) return;
@@ -14428,7 +14441,6 @@ function openLugarEnsayoModal(id = null) {
             if (titleEl) titleEl.innerText = "Editar Lugar de Ensayo";
             if (idInput) idInput.value = loc.id;
             if (nameInput) nameInput.value = loc.name || "";
-            if (addressInput) addressInput.value = loc.address || "";
             if (mapsUrlInput) mapsUrlInput.value = loc.mapsUrl || "";
             currentLugarEnsayoImageDataUrl = loc.image || "";
         }
@@ -14436,7 +14448,6 @@ function openLugarEnsayoModal(id = null) {
         if (titleEl) titleEl.innerText = "Añadir Lugar de Ensayo";
         if (idInput) idInput.value = "";
         if (nameInput) nameInput.value = "";
-        if (addressInput) addressInput.value = "";
         if (mapsUrlInput) mapsUrlInput.value = "";
         currentLugarEnsayoImageDataUrl = "";
     }
@@ -14495,7 +14506,6 @@ function setupLugaresEnsayoEvents() {
             e.preventDefault();
             const id = document.getElementById("lugar-ensayo-id").value;
             const name = document.getElementById("lugar-ensayo-nombre-input").value.trim();
-            const address = document.getElementById("lugar-ensayo-direccion-input").value.trim();
             const mapsUrlInput = document.getElementById("lugar-ensayo-maps-url-input");
             const mapsUrl = mapsUrlInput ? mapsUrlInput.value.trim() : "";
 
@@ -14510,7 +14520,6 @@ function setupLugaresEnsayoEvents() {
                 const idx = state.rehearsalLocations.findIndex(l => l.id === id);
                 if (idx !== -1) {
                     state.rehearsalLocations[idx].name = name;
-                    state.rehearsalLocations[idx].address = address;
                     state.rehearsalLocations[idx].mapsUrl = mapsUrl;
                     state.rehearsalLocations[idx].image = currentLugarEnsayoImageDataUrl;
                 }
@@ -14518,7 +14527,6 @@ function setupLugaresEnsayoEvents() {
                 const newLoc = {
                     id: "loc_" + Date.now(),
                     name: name,
-                    address: address,
                     mapsUrl: mapsUrl,
                     image: currentLugarEnsayoImageDataUrl
                 };

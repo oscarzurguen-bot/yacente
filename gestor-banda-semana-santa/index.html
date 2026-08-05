@@ -2482,10 +2482,6 @@
                     <input type="text" id="lugar-ensayo-nombre-input" required placeholder="Ej. Local de Ensayo Principal, Pabellón Municipal..." style="width: 100%;">
                 </div>
                 <div class="form-group">
-                    <label for="lugar-ensayo-direccion-input">Dirección Física</label>
-                    <input type="text" id="lugar-ensayo-direccion-input" placeholder="Ej. Calle Mayor 12, Murcia" style="width: 100%;">
-                </div>
-                <div class="form-group">
                     <label for="lugar-ensayo-maps-url-input">Enlace de Google Maps</label>
                     <input type="url" id="lugar-ensayo-maps-url-input" placeholder="Ej. https://maps.app.goo.gl/... o https://google.com/maps/..." style="width: 100%;">
                     <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">Pega aquí el enlace de Google Maps para que la opción "Cómo llegar" lleve directamente a los músicos.</p>
@@ -3636,13 +3632,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=414"></script>
+    <script src="app.js?v=416"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=414
+        // Purga de caché antigua y registro del Service Worker v=416
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v414") {
+                    if (key !== "yacente-v416") {
                         caches.delete(key);
                     }
                 });
@@ -3655,9 +3651,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=414")
+                navigator.serviceWorker.register("sw.js?v=416")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v414 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v416 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
