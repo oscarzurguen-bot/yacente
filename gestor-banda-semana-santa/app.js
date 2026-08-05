@@ -2284,6 +2284,7 @@ function setupEventListeners() {
     const modalActuacion = document.getElementById("modal-actuacion");
     
     document.getElementById("btn-add-actuacion").addEventListener("click", () => {
+        renderRehearsalLocationOptions();
         document.getElementById("actuacion-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("actuacion-name-input").value = "";
         if (document.getElementById("actuacion-trip-input")) {
@@ -2313,11 +2314,13 @@ function setupEventListeners() {
 
         initializeAttendanceForDate(sessionKey);
         const isTrip = document.getElementById("actuacion-trip-input") ? document.getElementById("actuacion-trip-input").checked : false;
+        const locationVal = document.getElementById("actuacion-location-input") ? document.getElementById("actuacion-location-input").value : "";
         const createdAtIso = new Date().toISOString();
         state.sessionTypes[sessionKey] = { 
             type: "actuacion", 
             name: actuacionName, 
             isTrip: isTrip,
+            location: locationVal,
             createdAt: createdAtIso
         };
         
@@ -3007,6 +3010,7 @@ function setupMarchasDragAndDrop() {
     setupAnnouncementEvents();
     setupMusicianDrawerAndSettingsEvents();
     setupSuggestionsMailboxEvents();
+    setupLugaresEnsayoEvents();
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
 
@@ -3310,6 +3314,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             dateContainer.classList.add("hidden");
             renderAdminSuggestionsList();
             dbMarkAllSuggestionsRead().then(() => updateSuggestionsBadge());
+            break;
+        case "section-otros-lugares-ensayo":
+            pageTitle.innerText = "Lugares de Ensayo";
+            pageSubtitle.innerText = "Gestión de ubicaciones y enlace a Google Maps";
+            dateContainer.classList.add("hidden");
+            renderAdminLugaresEnsayoList();
             break;
         case "section-componente-notificaciones":
             pageTitle.innerText = "Centro de Notificaciones";
@@ -14202,6 +14212,185 @@ function setupSuggestionsMailboxEvents() {
             if (targetId) renderActiveSection(targetId);
         });
     });
+}
+
+// ==========================================================================
+// GESTIÓN DE LUGARES DE ENSAYO (DIRECTOR Y DESPLEGABLES)
+// ==========================================================================
+
+function dbSaveRehearsalLocations() {
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("settings").doc("rehearsalLocations").set({ list: state.rehearsalLocations || [] })
+            .catch(err => console.error("Error al guardar lugares de ensayo en la nube:", err));
+    }
+}
+
+function renderRehearsalLocationOptions() {
+    const rehearsalSelect = document.getElementById("rehearsal-location-input");
+    const actuacionSelect = document.getElementById("actuacion-location-input");
+
+    const locations = (state.rehearsalLocations && state.rehearsalLocations.length > 0)
+        ? state.rehearsalLocations
+        : [
+            { id: "loc_parking", name: "Parking", address: "Parking de la Sede" },
+            { id: "loc_arrabal", name: "Arrabal", address: "Arrabal" },
+            { id: "loc_sanblas", name: "San Blas", address: "San Blas" }
+        ];
+
+    let optionsHtml = locations.map(l => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join("");
+
+    if (rehearsalSelect) {
+        rehearsalSelect.innerHTML = optionsHtml;
+    }
+    if (actuacionSelect) {
+        actuacionSelect.innerHTML = optionsHtml;
+    }
+}
+
+function renderAdminLugaresEnsayoList() {
+    const container = document.getElementById("admin-lugares-ensayo-list");
+    const emptyEl = document.getElementById("admin-lugares-ensayo-empty");
+    if (!container) return;
+
+    const locations = state.rehearsalLocations || [];
+
+    if (locations.length === 0) {
+        container.innerHTML = "";
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    container.innerHTML = locations.map(loc => `
+        <div class="card" style="padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 3px solid var(--color-gold);">
+            <div>
+                <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <span>📍</span> ${escapeHtml(loc.name)}
+                </div>
+                <div style="font-size: 0.83rem; color: var(--text-muted); margin-top: 2px;">
+                    ${loc.address ? escapeHtml(loc.address) : '<span style="font-style: italic;">Sin dirección especificada</span>'}
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn btn-secondary btn-sm edit-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 10px; font-size: 0.8rem;">
+                    ✏️ Editar
+                </button>
+                <button class="btn btn-secondary btn-sm delete-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 10px; font-size: 0.8rem; color: var(--color-absent);">
+                    🗑️
+                </button>
+            </div>
+        </div>
+    `).join("");
+
+    // Bind Edit
+    container.querySelectorAll(".edit-lugar-ensayo-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const locId = btn.dataset.id;
+            openLugarEnsayoModal(locId);
+        });
+    });
+
+    // Bind Delete
+    container.querySelectorAll(".delete-lugar-ensayo-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const locId = btn.dataset.id;
+            const loc = state.rehearsalLocations.find(l => l.id === locId);
+            if (!loc) return;
+            if (confirm(`¿Estás seguro de eliminar el lugar de ensayo "${loc.name}"?`)) {
+                state.rehearsalLocations = state.rehearsalLocations.filter(l => l.id !== locId);
+                dbSaveRehearsalLocations();
+                renderAdminLugaresEnsayoList();
+                renderRehearsalLocationOptions();
+                showToast("Lugar de ensayo eliminado", "info");
+            }
+        });
+    });
+}
+
+function openLugarEnsayoModal(id = null) {
+    const modal = document.getElementById("modal-lugar-ensayo");
+    const titleEl = document.getElementById("modal-lugar-ensayo-title");
+    const idInput = document.getElementById("lugar-ensayo-id");
+    const nameInput = document.getElementById("lugar-ensayo-nombre-input");
+    const addressInput = document.getElementById("lugar-ensayo-direccion-input");
+
+    if (!modal) return;
+
+    if (id) {
+        const loc = (state.rehearsalLocations || []).find(l => l.id === id);
+        if (loc) {
+            if (titleEl) titleEl.innerText = "Editar Lugar de Ensayo";
+            if (idInput) idInput.value = loc.id;
+            if (nameInput) nameInput.value = loc.name || "";
+            if (addressInput) addressInput.value = loc.address || "";
+        }
+    } else {
+        if (titleEl) titleEl.innerText = "Añadir Lugar de Ensayo";
+        if (idInput) idInput.value = "";
+        if (nameInput) nameInput.value = "";
+        if (addressInput) addressInput.value = "";
+    }
+
+    modal.classList.add("active");
+}
+
+function setupLugaresEnsayoEvents() {
+    const btnAdd = document.getElementById("btn-add-lugar-ensayo");
+    if (btnAdd) {
+        btnAdd.addEventListener("click", () => openLugarEnsayoModal());
+    }
+
+    const modal = document.getElementById("modal-lugar-ensayo");
+    const btnClose = document.getElementById("btn-close-lugar-ensayo-modal");
+    const btnCancel = document.getElementById("btn-cancel-lugar-ensayo-modal");
+    const form = document.getElementById("form-lugar-ensayo");
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const id = document.getElementById("lugar-ensayo-id").value;
+            const name = document.getElementById("lugar-ensayo-nombre-input").value.trim();
+            const address = document.getElementById("lugar-ensayo-direccion-input").value.trim();
+
+            if (!name) {
+                showToast("Por favor introduce el nombre del lugar", "error");
+                return;
+            }
+
+            if (!state.rehearsalLocations) state.rehearsalLocations = [];
+
+            if (id) {
+                const idx = state.rehearsalLocations.findIndex(l => l.id === id);
+                if (idx !== -1) {
+                    state.rehearsalLocations[idx].name = name;
+                    state.rehearsalLocations[idx].address = address;
+                }
+            } else {
+                const newLoc = {
+                    id: "loc_" + Date.now(),
+                    name: name,
+                    address: address
+                };
+                state.rehearsalLocations.push(newLoc);
+            }
+
+            dbSaveRehearsalLocations();
+            renderAdminLugaresEnsayoList();
+            renderRehearsalLocationOptions();
+            closeModal();
+            showToast("Lugar de ensayo guardado correctamente", "success");
+        });
+    }
 }
 
 function renderAdminSuggestionsList() {

@@ -2452,6 +2452,10 @@
                     <label for="actuacion-date-input">Fecha de la Actuación</label>
                     <input type="date" id="actuacion-date-input" required style="width: 100%;">
                 </div>
+                <div class="form-group">
+                    <label for="actuacion-location-input">Lugar / Ubicación de la Actuación</label>
+                    <select id="actuacion-location-input" style="width: 100%;"></select>
+                </div>
                 <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                     <input type="checkbox" id="actuacion-trip-input" style="width: auto; margin: 0;">
                     <label for="actuacion-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
@@ -3623,9 +3627,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=410")
+                navigator.serviceWorker.register("sw.js?v=412")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v410 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v412 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
