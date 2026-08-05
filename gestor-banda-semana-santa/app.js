@@ -2227,7 +2227,8 @@ function setupEventListeners() {
             if (!s) return { h: "", m: "00" };
             const parts = s.trim().split(":");
             if (parts.length < 2) return { h: "", m: "00" };
-            const h = parts[0].padStart(2, "0");
+            let h = parts[0].padStart(2, "0");
+            if (h === "00") h = "24";
             const mNum = parseInt(parts[1], 10) || 0;
             const m = (mNum >= 15 && mNum < 45) ? "30" : "00";
             return { h, m };

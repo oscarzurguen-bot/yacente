@@ -2346,14 +2346,6 @@
                         <div style="display: flex; gap: 4px; align-items: center;">
                             <select id="rehearsal-start-hour-input" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
                                 <option value="">--</option>
-                                <option value="00">00</option>
-                                <option value="01">01</option>
-                                <option value="02">02</option>
-                                <option value="03">03</option>
-                                <option value="04">04</option>
-                                <option value="05">05</option>
-                                <option value="06">06</option>
-                                <option value="07">07</option>
                                 <option value="08">08</option>
                                 <option value="09">09</option>
                                 <option value="10">10</option>
@@ -2370,6 +2362,7 @@
                                 <option value="21">21</option>
                                 <option value="22">22</option>
                                 <option value="23">23</option>
+                                <option value="24">24</option>
                             </select>
                             <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                             <select id="rehearsal-start-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
@@ -2383,14 +2376,6 @@
                         <div style="display: flex; gap: 4px; align-items: center;">
                             <select id="rehearsal-end-hour-input" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
                                 <option value="">--</option>
-                                <option value="00">00</option>
-                                <option value="01">01</option>
-                                <option value="02">02</option>
-                                <option value="03">03</option>
-                                <option value="04">04</option>
-                                <option value="05">05</option>
-                                <option value="06">06</option>
-                                <option value="07">07</option>
                                 <option value="08">08</option>
                                 <option value="09">09</option>
                                 <option value="10">10</option>
@@ -2407,6 +2392,7 @@
                                 <option value="21">21</option>
                                 <option value="22">22</option>
                                 <option value="23">23</option>
+                                <option value="24">24</option>
                             </select>
                             <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                             <select id="rehearsal-end-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
@@ -2812,14 +2798,6 @@
                             <div style="display: flex; gap: 4px; align-items: center;">
                                 <select id="quick-session-start-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
                                     <option value="">--</option>
-                                    <option value="00">00</option>
-                                    <option value="01">01</option>
-                                    <option value="02">02</option>
-                                    <option value="03">03</option>
-                                    <option value="04">04</option>
-                                    <option value="05">05</option>
-                                    <option value="06">06</option>
-                                    <option value="07">07</option>
                                     <option value="08">08</option>
                                     <option value="09">09</option>
                                     <option value="10">10</option>
@@ -2836,6 +2814,7 @@
                                     <option value="21">21</option>
                                     <option value="22">22</option>
                                     <option value="23">23</option>
+                                    <option value="24">24</option>
                                 </select>
                                 <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                                 <select id="quick-session-start-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
@@ -2849,14 +2828,6 @@
                             <div style="display: flex; gap: 4px; align-items: center;">
                                 <select id="quick-session-end-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
                                     <option value="">--</option>
-                                    <option value="00">00</option>
-                                    <option value="01">01</option>
-                                    <option value="02">02</option>
-                                    <option value="03">03</option>
-                                    <option value="04">04</option>
-                                    <option value="05">05</option>
-                                    <option value="06">06</option>
-                                    <option value="07">07</option>
                                     <option value="08">08</option>
                                     <option value="09">09</option>
                                     <option value="10">10</option>
@@ -2873,6 +2844,7 @@
                                     <option value="21">21</option>
                                     <option value="22">22</option>
                                     <option value="23">23</option>
+                                    <option value="24">24</option>
                                 </select>
                                 <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                                 <select id="quick-session-end-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
@@ -3838,13 +3810,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=426"></script>
+    <script src="app.js?v=427"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=426
+        // Purga de caché antigua y registro del Service Worker v=427
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v426") {
+                    if (key !== "yacente-v427") {
                         caches.delete(key);
                     }
                 });
@@ -3857,9 +3829,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=426")
+                navigator.serviceWorker.register("sw.js?v=427")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v426 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v427 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
