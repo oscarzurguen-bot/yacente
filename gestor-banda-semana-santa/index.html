@@ -2287,12 +2287,78 @@
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label for="rehearsal-start-time-input">Hora Inicio</label>
-                        <input type="time" id="rehearsal-start-time-input" style="width: 100%;">
+                        <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Inicio</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <select id="rehearsal-start-hour-input" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                <option value="">--</option>
+                                <option value="00">00</option>
+                                <option value="01">01</option>
+                                <option value="02">02</option>
+                                <option value="03">03</option>
+                                <option value="04">04</option>
+                                <option value="05">05</option>
+                                <option value="06">06</option>
+                                <option value="07">07</option>
+                                <option value="08">08</option>
+                                <option value="09">09</option>
+                                <option value="10">10</option>
+                                <option value="11">11</option>
+                                <option value="12">12</option>
+                                <option value="13">13</option>
+                                <option value="14">14</option>
+                                <option value="15">15</option>
+                                <option value="16">16</option>
+                                <option value="17">17</option>
+                                <option value="18">18</option>
+                                <option value="19">19</option>
+                                <option value="20">20</option>
+                                <option value="21">21</option>
+                                <option value="22">22</option>
+                                <option value="23">23</option>
+                            </select>
+                            <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                            <select id="rehearsal-start-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                <option value="00" selected>00</option>
+                                <option value="30">30</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label for="rehearsal-end-time-input">Hora Fin</label>
-                        <input type="time" id="rehearsal-end-time-input" style="width: 100%;">
+                        <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Fin</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <select id="rehearsal-end-hour-input" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                <option value="">--</option>
+                                <option value="00">00</option>
+                                <option value="01">01</option>
+                                <option value="02">02</option>
+                                <option value="03">03</option>
+                                <option value="04">04</option>
+                                <option value="05">05</option>
+                                <option value="06">06</option>
+                                <option value="07">07</option>
+                                <option value="08">08</option>
+                                <option value="09">09</option>
+                                <option value="10">10</option>
+                                <option value="11">11</option>
+                                <option value="12">12</option>
+                                <option value="13">13</option>
+                                <option value="14">14</option>
+                                <option value="15">15</option>
+                                <option value="16">16</option>
+                                <option value="17">17</option>
+                                <option value="18">18</option>
+                                <option value="19">19</option>
+                                <option value="20">20</option>
+                                <option value="21">21</option>
+                                <option value="22">22</option>
+                                <option value="23">23</option>
+                            </select>
+                            <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                            <select id="rehearsal-end-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                <option value="00" selected>00</option>
+                                <option value="30">30</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
@@ -2687,12 +2753,78 @@
                 <div class="form-group" id="quick-session-time-group" style="margin-top: 15px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                         <div>
-                            <label for="quick-session-start-time" style="font-size: 0.85rem; font-weight: 600;">Hora Inicio</label>
-                            <input type="time" id="quick-session-start-time" style="width: 100%;">
+                            <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Inicio</label>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <select id="quick-session-start-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                    <option value="">--</option>
+                                    <option value="00">00</option>
+                                    <option value="01">01</option>
+                                    <option value="02">02</option>
+                                    <option value="03">03</option>
+                                    <option value="04">04</option>
+                                    <option value="05">05</option>
+                                    <option value="06">06</option>
+                                    <option value="07">07</option>
+                                    <option value="08">08</option>
+                                    <option value="09">09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                    <option value="21">21</option>
+                                    <option value="22">22</option>
+                                    <option value="23">23</option>
+                                </select>
+                                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                                <select id="quick-session-start-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                    <option value="00" selected>00</option>
+                                    <option value="30">30</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
-                            <label for="quick-session-end-time" style="font-size: 0.85rem; font-weight: 600;">Hora Fin</label>
-                            <input type="time" id="quick-session-end-time" style="width: 100%;">
+                            <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Fin</label>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <select id="quick-session-end-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                    <option value="">--</option>
+                                    <option value="00">00</option>
+                                    <option value="01">01</option>
+                                    <option value="02">02</option>
+                                    <option value="03">03</option>
+                                    <option value="04">04</option>
+                                    <option value="05">05</option>
+                                    <option value="06">06</option>
+                                    <option value="07">07</option>
+                                    <option value="08">08</option>
+                                    <option value="09">09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                    <option value="21">21</option>
+                                    <option value="22">22</option>
+                                    <option value="23">23</option>
+                                </select>
+                                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                                <select id="quick-session-end-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                    <option value="00" selected>00</option>
+                                    <option value="30">30</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3651,13 +3783,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=422"></script>
+    <script src="app.js?v=423"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=422
+        // Purga de caché antigua y registro del Service Worker v=423
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v422") {
+                    if (key !== "yacente-v423") {
                         caches.delete(key);
                     }
                 });
@@ -3670,9 +3802,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=422")
+                navigator.serviceWorker.register("sw.js?v=423")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v422 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v423 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
