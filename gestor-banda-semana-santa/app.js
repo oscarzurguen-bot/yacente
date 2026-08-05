@@ -5328,6 +5328,7 @@ function renderStatistics() {
         renderStatsMarchasOlvidadas();
         renderGeneralOverviewChart();
         renderDayHeatmap([]);
+        renderStatsEnsayos([]);
         return;
     }
 
@@ -5493,6 +5494,7 @@ function renderStatistics() {
     renderGeneralOverviewChart();
     renderSectionAttendanceComparisonChart();
     renderDayHeatmap(filteredDates);
+    renderStatsEnsayos(filteredDates);
 }
 
 let showAllMarchasEnsayadas = false;
@@ -5909,6 +5911,183 @@ function renderStatsRanking(filteredDates) {
 
         container.appendChild(card);
     });
+}
+
+// ==========================================================================
+// ESTADÍSTICA DE ENSAYOS (DURACIÓN, GENERALES Y POR VOZ)
+// ==========================================================================
+function parseRehearsalDurationMinutes(timeStr) {
+    if (!timeStr || typeof timeStr !== "string") return 0;
+    const parts = timeStr.split(/[-–—]|(?:\sa\s)|(?:\shasta\s)/i);
+    if (parts.length >= 2) {
+        const parseTime = (s) => {
+            if (!s) return null;
+            const m = s.match(/(\d{1,2})[\:\s hH]*(\d{2})?/);
+            if (!m) return null;
+            const h = parseInt(m[1], 10);
+            const min = m[2] ? parseInt(m[2], 10) : 0;
+            if (isNaN(h) || h > 23 || isNaN(min) || min > 59) return null;
+            return h * 60 + min;
+        };
+
+        const startMin = parseTime(parts[0]);
+        const endMin = parseTime(parts[1]);
+
+        if (startMin !== null && endMin !== null) {
+            let diff = endMin - startMin;
+            if (diff <= 0) {
+                diff += 24 * 60; // Cruzó medianoche
+            }
+            if (diff > 0 && diff < 12 * 60) {
+                return diff;
+            }
+        }
+    }
+    return 0;
+}
+
+function formatMinutesToHoursStr(totalMinutes) {
+    if (!totalMinutes || totalMinutes <= 0) return "0 h";
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (mins === 0) {
+        return `${hours} h`;
+    }
+    if (hours === 0) {
+        return `${mins} min`;
+    }
+    return `${hours} h ${mins} min`;
+}
+
+function getSubtypeLabel(subtype, sessionInfo) {
+    const sub = (subtype || "").trim().toLowerCase();
+    if (!sub || sub === "general" || sub === "ensayo-general" || sub === "ensayo general") {
+        return "Ensayo General";
+    }
+    if (sub === "trompetas1" || sub === "ensayo-trompetas1") return "Ensayo Trompetas 1ª";
+    if (sub === "bajos" || sub === "ensayo-bajos") return "Ensayo Bajos";
+    if (sub === "trompetas2y3" || sub === "ensayo-trompetas2y3") return "Ensayo Trompetas 2ª y 3ª";
+    if (sub === "cornetas" || sub === "ensayo-cornetas") return "Ensayo Cornetas";
+    if (sub === "percusion" || sub === "ensayo-percusion") return "Ensayo Percusión";
+    if (sub === "primeras" || sub === "ensayo-primeras") return "Ensayo Primeras";
+
+    if (sessionInfo && Array.isArray(sessionInfo.convocatedVoices) && sessionInfo.convocatedVoices.length > 0) {
+        return "Ensayo " + sessionInfo.convocatedVoices.join(", ");
+    }
+
+    const cleanSub = sub.replace(/^ensayo-?/, "");
+    return "Ensayo " + cleanSub.charAt(0).toUpperCase() + cleanSub.slice(1);
+}
+
+function calculateRehearsalsStats(datesArray) {
+    let totalCount = 0;
+    let generalCount = 0;
+    let voiceCount = 0;
+    let totalMinutes = 0;
+    
+    const breakdownMap = {};
+
+    (datesArray || []).forEach(dateKey => {
+        const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+        const type = sessionInfo ? sessionInfo.type : "ensayo";
+        if (type !== "ensayo") return;
+
+        totalCount++;
+        const duration = parseRehearsalDurationMinutes(sessionInfo ? sessionInfo.time : "");
+        totalMinutes += duration;
+
+        const sub = sessionInfo ? sessionInfo.subtype : "general";
+        const label = getSubtypeLabel(sub, sessionInfo);
+
+        const isGen = (label === "Ensayo General");
+        if (isGen) {
+            generalCount++;
+        } else {
+            voiceCount++;
+        }
+
+        if (!breakdownMap[label]) {
+            breakdownMap[label] = {
+                label: label,
+                count: 0,
+                totalMinutes: 0,
+                isGeneral: isGen
+            };
+        }
+        breakdownMap[label].count++;
+        breakdownMap[label].totalMinutes += duration;
+    });
+
+    const breakdownList = Object.values(breakdownMap).sort((a, b) => {
+        if (a.isGeneral && !b.isGeneral) return -1;
+        if (!a.isGeneral && b.isGeneral) return 1;
+        return b.count - a.count || b.totalMinutes - a.totalMinutes;
+    }).map(item => {
+        const pctOfTotal = totalCount > 0 ? Math.round((item.count / totalCount) * 100) : 0;
+        return {
+            ...item,
+            pctOfTotal,
+            formattedHours: formatMinutesToHoursStr(item.totalMinutes)
+        };
+    });
+
+    return {
+        totalCount,
+        generalCount,
+        voiceCount,
+        totalMinutes,
+        formattedTotalHours: formatMinutesToHoursStr(totalMinutes),
+        breakdownList
+    };
+}
+
+function renderStatsEnsayos(filteredDates) {
+    const stats = calculateRehearsalsStats(filteredDates);
+
+    const totalEl = document.getElementById("stats-rehearsals-total-count");
+    const generalEl = document.getElementById("stats-rehearsals-general-count");
+    const voiceEl = document.getElementById("stats-rehearsals-voice-count");
+    const hoursEl = document.getElementById("stats-rehearsals-total-hours");
+    const bodyEl = document.getElementById("stats-rehearsals-breakdown-body");
+
+    if (totalEl) totalEl.innerText = stats.totalCount;
+    if (generalEl) generalEl.innerText = stats.generalCount;
+    if (voiceEl) voiceEl.innerText = stats.voiceCount;
+    if (hoursEl) hoursEl.innerText = stats.formattedTotalHours;
+
+    if (bodyEl) {
+        if (stats.breakdownList.length === 0) {
+            bodyEl.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted" style="padding: 20px;">
+                        No hay ensayos registrados en este período.
+                    </td>
+                </tr>
+            `;
+        } else {
+            let html = "";
+            stats.breakdownList.forEach(item => {
+                const badgeColor = item.isGeneral ? "var(--color-gold)" : "#3b82f6";
+                html += `
+                    <tr>
+                        <td>
+                            <strong style="color: var(--text-primary);">${item.label}</strong>
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;">${item.count}</span>
+                        </td>
+                        <td style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">
+                            ${item.pctOfTotal}%
+                        </td>
+                        <td style="text-align: right; padding-right: 15px; font-weight: 700; color: ${badgeColor}; font-size: 0.9rem;">
+                            ${item.formattedHours}
+                        </td>
+                    </tr>
+                `;
+            });
+            bodyEl.innerHTML = html;
+        }
+    }
 }
 
 // Renderiza la cuadrícula de componentes con sus anillos SVG circulares de progreso

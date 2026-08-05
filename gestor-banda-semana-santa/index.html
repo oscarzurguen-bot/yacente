@@ -783,6 +783,7 @@
                         <button type="button" class="btn-stats-quick-link" data-target="card-stats-alertas">⚠️ Alertas</button>
                         <button type="button" class="btn-stats-quick-link" data-target="card-stats-marchas">🎺 Más Ensayadas</button>
                         <button type="button" class="btn-stats-quick-link" data-target="card-stats-marchas-olvidadas">🎼 Más Olvidadas</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-ensayos">🎶 Ensayos</button>
                     </div>
                 </div>
 
@@ -1070,6 +1071,60 @@
                                 </thead>
                                 <tbody id="stats-marchas-olvidadas-table-body">
                                     <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                </div>
+
+                <!-- Estadística de Ensayos -->
+                <div class="card-collapsible" id="card-stats-ensayos" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <h3>🎶 Estadística de ensayos</h3>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <!-- Summary KPI Grid -->
+                        <div class="stats-overview-grid" style="margin-bottom: 20px;">
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos Realizados</h3>
+                                <div class="huge-number" id="stats-rehearsals-total-count" style="font-size: 2rem;">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Generales y por Voz</p>
+                            </div>
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos Generales</h3>
+                                <div class="huge-number" id="stats-rehearsals-general-count" style="font-size: 2rem; color: var(--color-gold);">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Toda la plantilla convocada</p>
+                            </div>
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos por Voz</h3>
+                                <div class="huge-number" id="stats-rehearsals-voice-count" style="font-size: 2rem; color: #3b82f6;">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Secciones específicas</p>
+                            </div>
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Horas Ensayadas</h3>
+                                <div class="huge-number" id="stats-rehearsals-total-hours" style="font-size: 2rem; color: var(--color-present);">0 h</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Basado en hora inicio y fin</p>
+                            </div>
+                        </div>
+
+                        <!-- Breakdown Table -->
+                        <h4 style="font-size: 0.92rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                            Desglose por Tipo de Ensayo y Secciones Convocadas
+                        </h4>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo / Sección de Ensayo</th>
+                                        <th style="text-align: center;">Nº Ensayos</th>
+                                        <th style="text-align: center;">% del Total</th>
+                                        <th style="text-align: right; padding-right: 15px;">Horas Ensayadas</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stats-rehearsals-breakdown-body">
+                                    <!-- Dynamic rows rendered in JS -->
                                 </tbody>
                             </table>
                         </div>
@@ -3783,13 +3838,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=423"></script>
+    <script src="app.js?v=424"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=423
+        // Purga de caché antigua y registro del Service Worker v=424
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v423") {
+                    if (key !== "yacente-v424") {
                         caches.delete(key);
                     }
                 });
@@ -3802,9 +3857,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=423")
+                navigator.serviceWorker.register("sw.js?v=424")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v423 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v424 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
