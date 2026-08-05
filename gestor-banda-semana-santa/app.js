@@ -1333,6 +1333,10 @@ function dbSaveMarcha(marcha) {
 }
 
 function dbDeleteMarcha(id) {
+    if (state.pastLockEnabled) {
+        showToast("Bloqueo de pasado activado, no se pueden eliminar marchas del repertorio.", "warning");
+        return;
+    }
     saveStateToLocalStorage();
     if (isCloudActive()) {
         const db = firebase.firestore();
@@ -5261,6 +5265,10 @@ function openEditMusicianModal(id) {
 }
 
 function deleteMusician(id) {
+    if (state.pastLockEnabled) {
+        showToast("Bloqueo de pasado activado, no se pueden eliminar músicos de la plantilla.", "warning");
+        return;
+    }
     const m = state.musicians.find(mus => mus.id === id);
     if (!m) return;
 
@@ -15019,6 +15027,10 @@ function renderAdminLugaresEnsayoList() {
     // Bind Delete
     container.querySelectorAll(".delete-lugar-ensayo-btn").forEach(btn => {
         btn.addEventListener("click", () => {
+            if (state.pastLockEnabled) {
+                showToast("Bloqueo de pasado activado, no se pueden eliminar lugares de ensayo.", "warning");
+                return;
+            }
             const locId = btn.dataset.id;
             const loc = state.rehearsalLocations.find(l => l.id === locId);
             if (!loc) return;
