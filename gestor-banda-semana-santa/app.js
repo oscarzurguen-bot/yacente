@@ -7265,14 +7265,76 @@ function downloadSeasonPDFReport(selectedSeason) {
         });
     });
 
-    const totalFaltasTotalesGral = totalFaltasUnjustifiedGral + totalFaltasJustifiedGral;
     const avgAttendancePct = totalEvaluationsGral > 0 ? Math.round((totalAsistenciasGral / totalEvaluationsGral) * 100) : 0;
     const avgUnjustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100) : 0;
-    const avgJustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasJustifiedGral / totalEvaluationsGral) * 100) : 0;
     const presentsPctOfTotal = totalEvaluationsGral > 0 ? ((totalAsistenciasGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
     const absentUnjustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
     const absentJustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasJustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
 
+    // 1. ESTADÍSTICA DE ENSAYOS Y HORAS
+    const rehearsalsStats = calculateRehearsalsStats(seasonDates);
+    let rehearsalsBreakdownHTML = "";
+    if (rehearsalsStats.breakdownList.length === 0) {
+        rehearsalsBreakdownHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin ensayos registrados en este período.</td></tr>`;
+    } else {
+        rehearsalsStats.breakdownList.forEach(item => {
+            const color = item.isGeneral ? "#d4af37" : "#3b82f6";
+            rehearsalsBreakdownHTML += `
+                <tr>
+                    <td><strong>${item.label}</strong></td>
+                    <td style="text-align: center;">${item.count}</td>
+                    <td style="text-align: center;">${item.pctOfTotal}%</td>
+                    <td style="text-align: right; padding-right: 15px; font-weight: bold; color: ${color};">${item.formattedHours}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // 2. DISTRIBUCIÓN POR DÍAS DE LA SEMANA
+    const dayNamesSpanish = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    const dayIndexMap = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
+    const dayStats = dayNamesSpanish.map(name => ({ name, sessions: 0, presents: 0, totalChecks: 0 }));
+
+    seasonDates.forEach(date => {
+        const parts = date.split("-");
+        const dObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const dayIdx = dayIndexMap[dObj.getDay()];
+        if (dayStats[dayIdx] !== undefined) {
+            dayStats[dayIdx].sessions++;
+            const dayRecord = state.attendance[date] || {};
+            state.musicians.forEach(m => {
+                const r = dayRecord[m.id];
+                if (r) {
+                    dayStats[dayIdx].totalChecks++;
+                    if (r.status === "present") dayStats[dayIdx].presents++;
+                }
+            });
+        }
+    });
+
+    let dayStatsHTML = "";
+    dayStats.forEach(ds => {
+        if (ds.sessions > 0) {
+            const pct = ds.totalChecks > 0 ? Math.round((ds.presents / ds.totalChecks) * 100) : 0;
+            let color = "#2ecc71";
+            if (pct < 50) color = "#e74c3c";
+            else if (pct < 80) color = "#d4af37";
+
+            dayStatsHTML += `
+                <tr>
+                    <td><strong>${ds.name}</strong></td>
+                    <td style="text-align: center;">${ds.sessions} ${ds.sessions === 1 ? 'convocatoria' : 'convocatorias'}</td>
+                    <td style="text-align: center;">${ds.presents} / ${ds.totalChecks}</td>
+                    <td style="text-align: right; padding-right: 15px; color: ${color}; font-weight: bold;">${pct}%</td>
+                </tr>
+            `;
+        }
+    });
+    if (!dayStatsHTML) {
+        dayStatsHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin datos en este período.</td></tr>`;
+    }
+
+    // 3. ASISTENCIA POR SECCIONES
     const sections = {};
     state.musicians.forEach(m => {
         const sec = m.instrument || "Otros";
@@ -7298,9 +7360,9 @@ function downloadSeasonPDFReport(selectedSeason) {
     sortedSections.forEach(secName => {
         const s = sections[secName];
         const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 0;
-        let color = "var(--color-absent)";
-        if (pct >= 80) color = "var(--color-present)";
-        else if (pct >= 50) color = "var(--color-gold)";
+        let color = "#e74c3c";
+        if (pct >= 80) color = "#2ecc71";
+        else if (pct >= 50) color = "#d4af37";
 
         sectionsHTML += `
             <tr>
@@ -7313,6 +7375,7 @@ function downloadSeasonPDFReport(selectedSeason) {
         `;
     });
 
+    // 4. RACHAS Y TOP 5 ASISTENCIA
     const musiciansList = Object.values(musicianStats);
 
     const top3Streaks = [...musiciansList]
@@ -7342,32 +7405,85 @@ function downloadSeasonPDFReport(selectedSeason) {
         }
     }
 
-    const top5Attendance = [...musiciansList]
-        .filter(m => m.total > 0)
-        .sort((a, b) => {
-            const pctA = a.presents / a.total;
-            const pctB = b.presents / b.total;
-            return pctB - pctA || b.presents - a.presents;
-        })
-        .slice(0, 5);
+    // 5. RANKING COMPLETO DE COMPONENTES
+    const fullRankingData = state.musicians.map(m => {
+        const musicianId = m.id;
+        let totalConvocated = 0;
+        let presentsCount = 0;
 
-    let top5HTML = "";
-    top5Attendance.forEach((m, idx) => {
-        const pct = Math.round((m.presents / m.total) * 100);
-        top5HTML += `
+        seasonDates.forEach(date => {
+            const dayRecord = state.attendance[date];
+            const record = dayRecord ? dayRecord[musicianId] : null;
+            if (record) {
+                totalConvocated++;
+                if (record.status === "present") presentsCount++;
+            }
+        });
+
+        const attendancePct = totalConvocated > 0 ? (presentsCount / totalConvocated) * 100 : 0;
+
+        const rehearsalDates = seasonDates.filter(date => {
+            const session = state.sessionTypes[date];
+            return !session || session.type === "ensayo";
+        }).sort((a, b) => b.localeCompare(a));
+
+        let streak = 0;
+        for (let i = 0; i < rehearsalDates.length; i++) {
+            const date = rehearsalDates[i];
+            const dayRecord = state.attendance[date];
+            const record = dayRecord ? dayRecord[musicianId] : null;
+            if (record && record.status === "present") {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        const medals = getMusicianMedalsData(musicianId);
+        const badgesCount = medals.filter(med => med.unlocked && !med.isNegative).reduce((acc, med) => acc + (med.stars || 1), 0);
+
+        return {
+            id: m.id,
+            name: m.name,
+            instrument: m.instrument,
+            role: m.role,
+            attendancePct,
+            presentsCount,
+            totalConvocated,
+            streak,
+            badgesCount
+        };
+    }).sort((a, b) => {
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) return roundDiff;
+        if (b.streak !== a.streak) return b.streak - a.streak;
+        if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+
+    let fullRankingHTML = "";
+    fullRankingData.forEach((item, idx) => {
+        const pct = Math.round(item.attendancePct);
+        let color = "#2ecc71";
+        if (pct < 50) color = "#e74c3c";
+        else if (pct < 80) color = "#d4af37";
+
+        fullRankingHTML += `
             <tr>
-                <td><strong>${idx + 1}º ${m.name}</strong></td>
-                <td>${m.instrument}</td>
-                <td style="text-align: center;">${m.presents} / ${m.total}</td>
-                <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">${pct}%</td>
+                <td style="text-align: center; font-weight: bold;">#${idx + 1}</td>
+                <td><strong>${item.name}</strong></td>
+                <td>${item.instrument} ${item.role ? `(${item.role})` : ''}</td>
+                <td style="text-align: center;">${item.presentsCount} / ${item.totalConvocated}</td>
+                <td style="text-align: center; font-weight: bold; color: #ff6a00;">${item.streak} 🔥</td>
+                <td style="text-align: center; font-weight: bold; color: #d4af37;">${item.badgesCount} 🏅</td>
+                <td style="text-align: right; padding-right: 15px; font-weight: bold; color: ${color};">${pct}%</td>
             </tr>
         `;
     });
 
-    if (top5HTML === "") {
-        top5HTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin datos en este periodo.</td></tr>`;
-    }
-
+    // 6. ALERTAS DE ASISTENCIA (<50%)
     const alertMusicians = musiciansList
         .filter(m => m.total > 0 && (m.presents / m.total) < 0.5)
         .sort((a, b) => (a.presents / a.total) - (b.presents / b.total));
@@ -7380,15 +7496,17 @@ function downloadSeasonPDFReport(selectedSeason) {
                 <td><strong>${m.name}</strong></td>
                 <td>${m.instrument}</td>
                 <td style="text-align: center;">${m.presents} / ${m.total}</td>
-                <td style="text-align: right; padding-right: 15px; font-weight: bold;">${pct}%</td>
+                <td style="text-align: center; color: #e74c3c; font-weight: bold;">${m.absentUnjustified}</td>
+                <td style="text-align: right; padding-right: 15px; font-weight: bold; color: #e74c3c;">${pct}%</td>
             </tr>
         `;
     });
 
     if (alertsHTML === "") {
-        alertsHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b; font-style: italic;">No hay componentes por debajo del 50% de asistencia en esta temporada. ¡Buen compromiso general!</td></tr>`;
+        alertsHTML = `<tr><td colspan="5" style="text-align: center; color: #64748b; font-style: italic;">No hay componentes por debajo del 50% de asistencia en esta temporada. ¡Buen compromiso general!</td></tr>`;
     }
 
+    // 7. REPERTORIO DE LA TEMPORADA
     const totalMarchas = state.marchas ? state.marchas.length : 0;
     let greenCount = 0;
     let yellowCount = 0;
@@ -7455,18 +7573,64 @@ function downloadSeasonPDFReport(selectedSeason) {
         `;
     });
 
-    const top5LeastEnsayadas = [...sortedMarchas]
-        .sort((a, b) => a.count - b.count || a.title.localeCompare(b.title))
-        .slice(0, 5);
+    // Marchas más olvidadas con días sin ensayar
+    const lastRehearsalDatesSeason = {};
+    if (state.playedMarchas) {
+        Object.keys(state.playedMarchas).forEach(sessionKey => {
+            const sessionInfo = state.sessionTypes[sessionKey];
+            const isRehearsal = !sessionInfo || sessionInfo.type === "ensayo";
+            if (!isRehearsal) return;
+            
+            const rawDate = sessionKey.split("_")[0];
+            const list = state.playedMarchas[sessionKey] || [];
+            
+            list.forEach(mId => {
+                if (!lastRehearsalDatesSeason[mId] || rawDate > lastRehearsalDatesSeason[mId]) {
+                    lastRehearsalDatesSeason[mId] = rawDate;
+                }
+            });
+        });
+    }
 
-    let top5LeastEnsayadasHTML = "";
-    top5LeastEnsayadas.forEach((m, idx) => {
-        const countText = m.count === 0 ? "0 Ensayos" : `${m.count} ${m.count === 1 ? 'ensayo' : 'ensayos'}`;
-        const style = m.count === 0 ? `style="color: var(--color-absent); font-weight: 500;"` : "";
-        top5LeastEnsayadasHTML += `
+    const todayDate = new Date();
+    const todayStartObj = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+
+    const marchasOlvidadasData = (state.marchas || []).map(m => {
+        const lastDateStr = lastRehearsalDatesSeason[m.id];
+        let days = Infinity;
+        let daysLabel = "Nunca";
+        
+        if (lastDateStr) {
+            const parts = lastDateStr.split("-");
+            const lastDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            const diffTime = todayStartObj - lastDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            days = Math.max(0, diffDays);
+            daysLabel = `${days} ${days === 1 ? 'día' : 'días'}`;
+        }
+        
+        return {
+            ...m,
+            days: days,
+            daysLabel: daysLabel
+        };
+    }).sort((a, b) => {
+        if (a.days === Infinity && b.days !== Infinity) return -1;
+        if (a.days !== Infinity && b.days === Infinity) return 1;
+        if (a.days === Infinity && b.days === Infinity) {
+            return a.title.localeCompare(b.title, 'es');
+        }
+        return b.days - a.days || a.title.localeCompare(b.title, 'es');
+    });
+
+    const top5Olvidadas = marchasOlvidadasData.slice(0, 5);
+    let top5OlvidadasHTML = "";
+    top5Olvidadas.forEach((m, idx) => {
+        const daysColor = m.days === Infinity ? "#e74c3c" : (m.days > 30 ? "#d4af37" : "#475569");
+        top5OlvidadasHTML += `
             <div class="print-repertoire-item-row">
                 <span>${idx + 1}. <strong>${m.title}</strong></span>
-                <span ${style}>${countText}</span>
+                <span style="color: ${daysColor}; font-weight: 600;">${m.daysLabel} sin ensayar</span>
             </div>
         `;
     });
@@ -7478,7 +7642,7 @@ function downloadSeasonPDFReport(selectedSeason) {
         <div class="print-header">
             <div class="print-brand">
                 <h1 class="print-title">YACENTE</h1>
-                <div class="print-subtitle">Asociación Musical Yacente • Informe de Temporada</div>
+                <div class="print-subtitle">Asociación Musical Yacente • Informe Global de Temporada</div>
             </div>
             <div class="print-meta">
                 <strong>Temporada:</strong> ${selectedSeason}<br>
@@ -7487,127 +7651,202 @@ function downloadSeasonPDFReport(selectedSeason) {
             </div>
         </div>
 
-        <div class="print-section-title">1. Resumen General de la Temporada</div>
-        <div class="print-grid">
-            <div class="print-stat-box">
-                <div class="print-stat-title">Asistencia Media</div>
-                <div class="print-stat-value" style="color: ${avgAttendancePct >= 80 ? 'var(--color-present)' : (avgAttendancePct >= 50 ? 'var(--color-gold)' : 'var(--color-absent)')};">${avgAttendancePct}%</div>
-                <div class="print-stat-desc">${avgAttendancePct >= 80 ? 'Excelente (>=80%)' : (avgAttendancePct >= 50 ? 'Aceptable (50%-80%)' : 'Crítico (<50%)')}</div>
+        <div class="print-page-block">
+            <div class="print-section-title">1. Resumen General de la Temporada</div>
+            <div class="print-grid">
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Asistencia Media</div>
+                    <div class="print-stat-value" style="color: ${avgAttendancePct >= 80 ? '#2ecc71' : (avgAttendancePct >= 50 ? '#d4af37' : '#e74c3c')};">${avgAttendancePct}%</div>
+                    <div class="print-stat-desc">${avgAttendancePct >= 80 ? 'Excelente (>=80%)' : (avgAttendancePct >= 50 ? 'Aceptable (50%-80%)' : 'Crítico (<50%)')}</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Total Convocatorias</div>
+                    <div class="print-stat-value">${totalConvocatorias}</div>
+                    <div class="print-stat-desc">${totalEnsayosCount} Ensayos | ${totalActuacionesCount} Actuaciones</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Incidencia de Faltas</div>
+                    <div class="print-stat-value" style="color: #e74c3c;">${avgUnjustifiedPct}%</div>
+                    <div class="print-stat-desc">${totalFaltasUnjustifiedGral} Faltas sin justificar</div>
+                </div>
             </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Total Convocatorias</div>
-                <div class="print-stat-value">${totalConvocatorias}</div>
-                <div class="print-stat-desc">${totalEnsayosCount} Ensayos | ${totalActuacionesCount} Actuaciones</div>
-            </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Incidencia de Faltas</div>
-                <div class="print-stat-value" style="color: var(--color-absent);">${avgUnjustifiedPct}%</div>
-                <div class="print-stat-desc">${totalFaltasUnjustifiedGral} Faltas sin justificar</div>
-            </div>
-        </div>
-        <div class="print-grid" style="margin-top: -5px;">
-            <div class="print-stat-box">
-                <div class="print-stat-title">Asistencias Totales</div>
-                <div class="print-stat-value" style="color: var(--color-present); font-size: 13pt;">${totalAsistenciasGral.toLocaleString()} presencias</div>
-                <div class="print-stat-desc">${presentsPctOfTotal}% del total general</div>
-            </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Faltas Justificadas</div>
-                <div class="print-stat-value" style="color: var(--color-justified); font-size: 13pt;">${totalFaltasJustifiedGral.toLocaleString()} justificadas</div>
-                <div class="print-stat-desc">${absentJustifiedPctOfTotal}% del total general</div>
-            </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Faltas Sin Justificar</div>
-                <div class="print-stat-value" style="color: var(--color-absent); font-size: 13pt;">${totalFaltasUnjustifiedGral.toLocaleString()} injustificadas</div>
-                <div class="print-stat-desc">${absentUnjustifiedPctOfTotal}% del total general</div>
-            </div>
-        </div>
-
-        <div class="print-section-title">2. Asistencia por Secciones / Voces</div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Sección / Instrumento</th>
-                    <th style="text-align: center;">Presencias</th>
-                    <th style="text-align: center;">Faltas S.J.</th>
-                    <th style="text-align: center;">Faltas Just.</th>
-                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${sectionsHTML}
-            </tbody>
-        </table>
-
-        <div class="print-section-title">3. Compromiso y Rendimiento de Componentes</div>
-        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
-            Top 3 Rachas de Asistencia de la Temporada
-        </div>
-        <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
-            ${streaksHTML}
-        </div>
-
-        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
-            Top 5 Componentes con Mayor Asistencia
-        </div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Músico</th>
-                    <th>Sección</th>
-                    <th style="text-align: center;">Asistidas / Convocadas</th>
-                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${top5HTML}
-            </tbody>
-        </table>
-
-        <div class="print-section-title">4. Componentes con Alerta de Asistencia (&lt;50%)</div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Músico</th>
-                    <th>Sección</th>
-                    <th style="text-align: center;">Asistidas / Convocadas</th>
-                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${alertsHTML}
-            </tbody>
-        </table>
-
-        <div class="print-section-title">5. Trabajo de Repertorio de la Temporada</div>
-        <div class="print-grid">
-            <div class="print-stat-box" style="padding: 8px;">
-                <div class="print-stat-title">Marchas en Catálogo</div>
-                <div class="print-stat-value" style="font-size: 13pt;">${totalMarchas} marchas</div>
-            </div>
-            <div class="print-stat-box" style="padding: 8px;">
-                <div class="print-stat-title">Bien Trabajadas (🟢)</div>
-                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-present);">${greenCount} (${greenPct}%)</div>
-            </div>
-            <div class="print-stat-box" style="padding: 8px;">
-                <div class="print-stat-title">Por Trabajar (🔴)</div>
-                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-absent);">${redCount} (${redPct}%)</div>
+            <div class="print-grid" style="margin-top: -5px;">
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Asistencias Totales</div>
+                    <div class="print-stat-value" style="color: #2ecc71; font-size: 13pt;">${totalAsistenciasGral.toLocaleString()} presencias</div>
+                    <div class="print-stat-desc">${presentsPctOfTotal}% del total general</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Faltas Justificadas</div>
+                    <div class="print-stat-value" style="color: #d4af37; font-size: 13pt;">${totalFaltasJustifiedGral.toLocaleString()} justificadas</div>
+                    <div class="print-stat-desc">${absentJustifiedPctOfTotal}% del total general</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Faltas Sin Justificar</div>
+                    <div class="print-stat-value" style="color: #e74c3c; font-size: 13pt;">${totalFaltasUnjustifiedGral.toLocaleString()} injustificadas</div>
+                    <div class="print-stat-desc">${absentUnjustifiedPctOfTotal}% del total general</div>
+                </div>
             </div>
         </div>
 
-        <div class="print-repertoire-flex">
-            <div class="print-repertoire-col">
-                <div class="print-repertoire-col-title">Top 5 Marchas más Ensayadas</div>
-                ${top5MostEnsayadasHTML}
+        <div class="print-page-block">
+            <div class="print-section-title">2. Estadística de Ensayos y Horas Ensayadas</div>
+            <div class="print-grid">
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Ensayos Totales</div>
+                    <div class="print-stat-value">${rehearsalsStats.totalCount}</div>
+                    <div class="print-stat-desc">Generales y por voz</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Ensayos Generales</div>
+                    <div class="print-stat-value" style="color: #d4af37;">${rehearsalsStats.generalCount}</div>
+                    <div class="print-stat-desc">Toda la plantilla</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Ensayos por Voz</div>
+                    <div class="print-stat-value" style="color: #3b82f6;">${rehearsalsStats.voiceCount}</div>
+                    <div class="print-stat-desc">Secciones específicas</div>
+                </div>
             </div>
-            <div class="print-repertoire-col">
-                <div class="print-repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
-                ${top5LeastEnsayadasHTML}
+            <div class="print-grid" style="margin-top: -5px; grid-template-columns: 1fr;">
+                <div class="print-stat-box" style="padding: 10px;">
+                    <div class="print-stat-title">Horas Totales Invertidas en Ensayos</div>
+                    <div class="print-stat-value" style="color: #2ecc71; font-size: 15pt;">${rehearsalsStats.formattedTotalHours}</div>
+                    <div class="print-stat-desc">Tiempo acumulado en ensayos según horario fijado</div>
+                </div>
+            </div>
+            <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 10px; margin-bottom: 6px;">
+                Desglose por Modalidad / Sección de Ensayo
+            </div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Tipo / Sección Convocada</th>
+                        <th style="text-align: center;">Nº Ensayos</th>
+                        <th style="text-align: center;">% del Total</th>
+                        <th style="text-align: right; padding-right: 15px;">Horas Ensayadas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rehearsalsBreakdownHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">3. Distribución y Asistencia por Día de la Semana</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Día de la Semana</th>
+                        <th style="text-align: center;">Convocatorias</th>
+                        <th style="text-align: center;">Asistencias vs Convocados</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asistencia Media</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dayStatsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">4. Asistencia por Secciones / Voces</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Sección / Instrumento</th>
+                        <th style="text-align: center;">Presencias</th>
+                        <th style="text-align: center;">Faltas S.J.</th>
+                        <th style="text-align: center;">Faltas Just.</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sectionsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">5. Compromiso y Rachas Destacadas</div>
+            <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+                Top 3 Rachas de Asistencia de la Temporada
+            </div>
+            <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
+                ${streaksHTML}
             </div>
         </div>
 
-        <div class="print-footer">
-            Asociación Musical Yacente • Salamanca • Sistema de Asistencia e Informes Interno
+        <div class="print-page-block">
+            <div class="print-section-title">6. Ranking Completo de Asistencia de la Plantilla</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">Pos.</th>
+                        <th>Componente</th>
+                        <th>Sección / Rol</th>
+                        <th style="text-align: center;">Asistidas / Convocadas</th>
+                        <th style="text-align: center;">Racha</th>
+                        <th style="text-align: center;">Insignias</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asist.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${fullRankingHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">7. Componentes con Alerta de Asistencia (&lt;50%)</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Músico</th>
+                        <th>Sección</th>
+                        <th style="text-align: center;">Asistidas / Convocadas</th>
+                        <th style="text-align: center;">Faltas Injust.</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${alertsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">8. Trabajo y Estado del Repertorio</div>
+            <div class="print-grid">
+                <div class="print-stat-box" style="padding: 8px;">
+                    <div class="print-stat-title">Marchas en Catálogo</div>
+                    <div class="print-stat-value" style="font-size: 13pt;">${totalMarchas} marchas</div>
+                </div>
+                <div class="print-stat-box" style="padding: 8px;">
+                    <div class="print-stat-title">Bien Trabajadas (🟢)</div>
+                    <div class="print-stat-value" style="font-size: 13pt; color: #2ecc71;">${greenCount} (${greenPct}%)</div>
+                </div>
+                <div class="print-stat-box" style="padding: 8px;">
+                    <div class="print-stat-title">Por Trabajar (🔴)</div>
+                    <div class="print-stat-value" style="font-size: 13pt; color: #e74c3c;">${redCount} (${redPct}%)</div>
+                </div>
+            </div>
+
+            <div class="print-repertoire-flex">
+                <div class="print-repertoire-col">
+                    <div class="print-repertoire-col-title">Top 5 Marchas más Ensayadas</div>
+                    ${top5MostEnsayadasHTML}
+                </div>
+                <div class="print-repertoire-col">
+                    <div class="print-repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
+                    ${top5OlvidadasHTML}
+                </div>
+            </div>
+        </div>
+
+        <div class="print-footer" style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 8pt; color: #64748b;">
+            Asociación Musical Yacente • Salamanca • Informe Oficial de Temporada
         </div>
     `;
 

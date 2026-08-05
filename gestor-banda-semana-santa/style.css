@@ -2455,6 +2455,23 @@ svg.chevron {
         padding: 3px 0 !important;
         border-bottom: 1px solid #f1f5f9 !important;
     }
+    .print-page-block {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+        margin-bottom: 16px !important;
+    }
+    .print-section-title {
+        page-break-after: avoid !important;
+        break-after: avoid-page !important;
+    }
+    .print-grid {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+    }
+    .print-table tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid-page !important;
+    }
 }
 
 #print-report-area {
