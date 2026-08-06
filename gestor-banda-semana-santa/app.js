@@ -11808,6 +11808,9 @@ function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
             totalPerformances++;
         }
 
+        const dayRecord = state.attendance ? state.attendance[date] : null;
+        const record = dayRecord ? dayRecord[musicianId] : null;
+
         if (record && record.status === "present") {
             attended++;
             if (sessionObj.type === "actuacion") {
