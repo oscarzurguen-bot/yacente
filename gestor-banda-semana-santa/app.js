@@ -5811,19 +5811,10 @@ function renderStatsRanking(filteredDates) {
         const musicianId = m.id;
 
         // 1. Asistencia en el período filtrado
-        let totalConvocated = 0;
-        let presentsCount = 0;
-
-        filteredDates.forEach(date => {
-            const dayRecord = state.attendance[date];
-            const record = dayRecord ? dayRecord[musicianId] : null;
-            if (record) {
-                totalConvocated++;
-                if (record.status === "present") presentsCount++;
-            }
-        });
-
-        const attendancePct = totalConvocated > 0 ? (presentsCount / totalConvocated) * 100 : 0;
+        const metrics = getMusicianAttendanceMetrics(musicianId, d => filteredDates.includes(d));
+        const totalConvocated = metrics.totalConvocated;
+        const presentsCount = metrics.attended;
+        const attendancePct = metrics.attendancePct;
 
         // 2. Racha consecutiva de ensayos asistidos en el período
         let streak = 0;
@@ -7417,19 +7408,10 @@ function downloadSeasonPDFReport(selectedSeason) {
     // 5. RANKING COMPLETO DE COMPONENTES
     const fullRankingData = state.musicians.map(m => {
         const musicianId = m.id;
-        let totalConvocated = 0;
-        let presentsCount = 0;
-
-        seasonDates.forEach(date => {
-            const dayRecord = state.attendance[date];
-            const record = dayRecord ? dayRecord[musicianId] : null;
-            if (record) {
-                totalConvocated++;
-                if (record.status === "present") presentsCount++;
-            }
-        });
-
-        const attendancePct = totalConvocated > 0 ? (presentsCount / totalConvocated) * 100 : 0;
+        const metrics = getMusicianAttendanceMetrics(musicianId, d => seasonDates.includes(d));
+        const totalConvocated = metrics.totalConvocated;
+        const presentsCount = metrics.attended;
+        const attendancePct = metrics.attendancePct;
 
         const rehearsalDates = seasonDates.filter(date => {
             const session = state.sessionTypes[date];
@@ -11780,15 +11762,28 @@ function populateLoginMusicians() {
     if (currentVal) select.value = currentVal;
 }
 
-function getMusicianMedalsData(musicianId) {
-    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
-    if (!musician) return [];
+function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
+    const musician = state.musicians ? state.musicians.find(m => String(m.id) === String(musicianId)) : null;
+    if (!musician) {
+        return {
+            totalConvocated: 0,
+            attended: 0,
+            absent: 0,
+            justified: 0,
+            attendedPerformances: 0,
+            totalPerformances: 0,
+            attendancePct: 100
+        };
+    }
 
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const currentStreak = calculateMusicianStreak(musicianId);
-    
+    const allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ]));
+
     let totalConvocated = 0;
     let attended = 0;
     let absent = 0;
@@ -11796,35 +11791,80 @@ function getMusicianMedalsData(musicianId) {
     let attendedPerformances = 0;
     let totalPerformances = 0;
 
-    Object.keys(state.attendance).forEach(date => {
+    allDates.forEach(date => {
         if (date > todayStr) return;
+        if (dateFilterFn && !dateFilterFn(date)) return;
 
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        if (!record) return;
+        const session = state.sessionTypes ? state.sessionTypes[date] : null;
+        const sessionObj = session || { type: "ensayo", subtype: "general" };
 
-        const session = state.sessionTypes[date];
+        const isSpecial = sessionObj.type === "ensayo" && sessionObj.subtype && sessionObj.subtype !== "general" && sessionObj.convocatedVoices && sessionObj.convocatedVoices.length > 0;
+        if (isSpecial && !sessionObj.convocatedVoices.includes(musician.instrument)) {
+            return;
+        }
 
-        if (record.status === "present") {
+        const dayRecord = state.attendance ? state.attendance[date] : null;
+        const record = dayRecord ? dayRecord[musicianId] : null;
+
+        if (date === todayStr) {
+            if (!dayRecord || Object.keys(dayRecord).length === 0) return;
+            if (!record) return;
+            const isConfirmedRecord = record.confirmed || record.takenByDirector || record.status === "present" || record.justified || (record.reason && record.reason.trim().length > 0);
+            if (!isConfirmedRecord) return;
+        } else {
+            if (!dayRecord || Object.keys(dayRecord).length === 0) {
+                return;
+            }
+        }
+
+        totalConvocated++;
+        if (sessionObj.type === "actuacion") {
+            totalPerformances++;
+        }
+
+        if (record && record.status === "present") {
             attended++;
-            totalConvocated++;
-            if (session && session.type === "actuacion") {
+            if (sessionObj.type === "actuacion") {
                 attendedPerformances++;
             }
-        } else if (record.status === "absent") {
-            totalConvocated++;
+        } else if (record && record.status === "absent") {
             if (record.justified) {
                 justified++;
             } else {
                 absent++;
             }
-        }
-        
-        if (session && session.type === "actuacion") {
-            totalPerformances++;
+        } else {
+            absent++;
         }
     });
-    
+
     const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+
+    return {
+        totalConvocated,
+        attended,
+        absent,
+        justified,
+        attendedPerformances,
+        totalPerformances,
+        attendancePct
+    };
+}
+
+function getMusicianMedalsData(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return [];
+
+    const currentStreak = calculateMusicianStreak(musicianId);
+    
+    const metrics = getMusicianAttendanceMetrics(musicianId);
+    const totalConvocated = metrics.totalConvocated;
+    const attended = metrics.attended;
+    const absent = metrics.absent;
+    const justified = metrics.justified;
+    const attendedPerformances = metrics.attendedPerformances;
+    const totalPerformances = metrics.totalPerformances;
+    const attendancePct = metrics.attendancePct;
 
     // 6. Estudio musical
     let greenMarchas = 0;
@@ -12268,15 +12308,29 @@ function calculateMusicianStreak(musicianId) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const dates = Object.keys(state.attendance)
+    const musician = state.musicians ? state.musicians.find(m => String(m.id) === String(musicianId)) : null;
+
+    const dates = Object.keys(state.sessionTypes || {})
         .filter(d => {
-            if (d > todayStr) return false; // Excluir futuros
+            if (d > todayStr) return false;
 
             const session = state.sessionTypes[d];
             if (session && session.type !== "ensayo") return false;
 
-            const record = state.attendance[d] ? state.attendance[d][musicianId] : null;
-            if (!record) return false; // Si no hay registro, se ignora
+            const isSpecial = session && session.subtype && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
+            if (isSpecial && musician && !session.convocatedVoices.includes(musician.instrument)) {
+                return false;
+            }
+
+            const dayRecord = state.attendance[d];
+            if (!dayRecord || Object.keys(dayRecord).length === 0) return false;
+
+            if (d === todayStr) {
+                const rec = dayRecord[musicianId];
+                if (!rec || (rec.status === "absent" && !rec.confirmed && !rec.takenByDirector)) {
+                    return false;
+                }
+            }
 
             return true;
         })
@@ -12668,45 +12722,12 @@ function renderComponentFicha() {
         streakBadge.onclick = () => openStreakInfoModal();
     }
     
-    let totalConvocated = 0;
-    let attended = 0;
-    let absent = 0;
-    let justified = 0;
-    let attendedPerformances = 0;
-    let totalPerformances = 0;
-
-    const dNow = new Date();
-    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-
-    Object.keys(state.attendance).forEach(date => {
-        if (date > todayStr) return; // Excluir sesiones futuras de las estadísticas de asistencia
-
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        if (!record) return; // Si no hay registro en la base de datos para este músico, no computa (igual que el director)
-
-        const session = state.sessionTypes[date];
-
-        if (record.status === "present") {
-            attended++;
-            totalConvocated++;
-            if (session && session.type === "actuacion") {
-                attendedPerformances++;
-            }
-        } else if (record.status === "absent") {
-            totalConvocated++;
-            if (record.justified) {
-                justified++;
-            } else {
-                absent++;
-            }
-        }
-        
-        if (session && session.type === "actuacion") {
-            totalPerformances++;
-        }
-    });
-    
-    const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+    const metrics = getMusicianAttendanceMetrics(musicianId);
+    const totalConvocated = metrics.totalConvocated;
+    const attended = metrics.attended;
+    const absent = metrics.absent;
+    const justified = metrics.justified;
+    const attendancePct = metrics.attendancePct;
 
     // Poblar debug box
     const debugBox = document.getElementById("ficha-debug-box");
@@ -12880,21 +12901,8 @@ function renderComponenteRanking() {
     const rankingData = state.musicians.map(musician => {
         const musicianId = musician.id;
         
-        let totalConvocated = 0;
-        let attended = 0;
-        
-        Object.keys(state.attendance).forEach(date => {
-            if (date > todayStr) return;
-            const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-            if (!record) return;
-            
-            totalConvocated++;
-            if (record.status === "present") {
-                attended++;
-            }
-        });
-        
-        const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+        const metrics = getMusicianAttendanceMetrics(musicianId);
+        const attendancePct = metrics.attendancePct;
         const currentStreak = calculateMusicianStreak(musicianId);
         
         const medalsData = getMusicianMedalsData(musicianId);
