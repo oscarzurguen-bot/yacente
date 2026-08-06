@@ -475,6 +475,43 @@ function isPastLockBlocked(dateStr) {
     return targetDate < todayStr;
 }
 
+function isSessionConcluded(dateKey, sessionInfo = null) {
+    if (!dateKey) return false;
+    const rawDate = dateKey.split("_")[0];
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+    if (rawDate < todayStr) return true; // Fechas anteriores a hoy ya han concluido
+    if (rawDate > todayStr) return false; // Fechas futuras no han concluido
+
+    // Es el día de hoy: comprobar si la hora de fin ha transcurrido
+    const session = sessionInfo || (state && state.sessionTypes ? state.sessionTypes[dateKey] : null);
+    if (!session || !session.time) return false; // Sin hora -> contabiliza desde el día siguiente
+
+    const timeStr = String(session.time).trim();
+    if (!timeStr.includes("-")) return false; // Sin hora fin especificada -> contabiliza desde el día siguiente
+
+    const parts = timeStr.split("-");
+    const endTimePart = parts[1] ? parts[1].trim() : "";
+    if (!endTimePart) return false;
+
+    const timeParts = endTimePart.split(":");
+    if (timeParts.length < 2) return false;
+
+    let endH = parseInt(timeParts[0], 10);
+    const endM = parseInt(timeParts[1], 10) || 0;
+
+    if (isNaN(endH)) return false;
+    if (endH === 0 || endH === 24) {
+        endH = 24; // 24:00 al final de la jornada
+    }
+
+    const currentTotalMin = dNow.getHours() * 60 + dNow.getMinutes();
+    const endTotalMin = endH * 60 + endM;
+
+    return currentTotalMin >= endTotalMin;
+}
+
 let unsubMusicians = null;
 let unsubAttendance = null;
 let unsubSessionTypes = null;
@@ -4244,7 +4281,7 @@ function renderEnsayosList() {
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
         let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total}`;
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             const prev = getSessionPrevision(date);
             let badgeBg = "rgba(46, 204, 113, 0.15)";
             let badgeColor = "#2ecc71";
@@ -4506,7 +4543,7 @@ function openRehearsalDetailModal(date) {
         const dNow = new Date();
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
         
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             alertBanner.classList.remove("hidden");
             if (prevision.estimatedPct < 60) {
                 alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
@@ -4728,7 +4765,7 @@ function renderActuacionesList() {
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
         let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos`;
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             const prev = getSessionPrevision(date);
             let badgeBg = "rgba(46, 204, 113, 0.15)";
             let badgeColor = "#2ecc71";
@@ -4917,7 +4954,7 @@ function openActuacionDetailModal(date) {
         const dNow = new Date();
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
         
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             alertBanner.classList.remove("hidden");
             if (prevision.estimatedPct < 60) {
                 alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
@@ -5303,9 +5340,12 @@ function renderStatistics() {
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    const allDates = Object.keys(state.attendance);
+    const allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ]));
     const filteredDates = allDates.filter(dateStr => {
-        if (dateStr > todayStr) return false; // Excluir sesiones futuras de las estadísticas
+        if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
         const dateObj = new Date(dateStr.replace(/-/g, "/"));
         const year = dateObj.getFullYear().toString();
@@ -6336,9 +6376,15 @@ function renderMusicianDetailContent() {
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    // Filtrar fechas
-    const filteredDates = Object.keys(state.attendance).filter(dateStr => {
-        if (dateStr > todayStr) return false; // Excluir sesiones futuras de las estadísticas
+    // Obtener todas las fechas únicas de sessionTypes y attendance
+    const allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ]));
+
+    // Filtrar fechas pasadas y aplicables al filtro del modal
+    const filteredDates = allDates.filter(dateStr => {
+        if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
         const dateObj = new Date(dateStr.replace(/-/g, "/"));
         const year = dateObj.getFullYear().toString();
@@ -6358,14 +6404,20 @@ function renderMusicianDetailContent() {
     const reasonCounts = {};
 
     filteredDates.forEach(date => {
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        if (!record) return;
-        totalSessions++;
+        const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
+        const sessionObj = sessionInfo || { type: "ensayo", subtype: "general" };
 
-        if (record.status === "present") {
+        const isSpecial = sessionObj.type === "ensayo" && sessionObj.subtype && sessionObj.subtype !== "general" && sessionObj.convocatedVoices && sessionObj.convocatedVoices.length > 0;
+        if (isSpecial && !sessionObj.convocatedVoices.includes(musician.instrument)) {
+            return;
+        }
+
+        totalSessions++;
+        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
+
+        if (record && record.status === "present") {
             presents++;
         } else {
-            const sessionInfo = state.sessionTypes[date];
             let sessionLabel = "General";
             if (sessionInfo) {
                 if (sessionInfo.type === "actuacion") {
@@ -6394,20 +6446,21 @@ function renderMusicianDetailContent() {
             }
             const sessionTypeName = sessionInfo ? sessionInfo.type : "ensayo";
 
-            if (record.justified) {
+            const isJustified = record && record.justified;
+            if (isJustified) {
                 absentJustified++;
             } else {
                 absentUnjustified++;
             }
 
-            const reason = record.reason || "Sin especificar";
+            const reason = (record && record.reason) ? record.reason : "Sin especificar";
             reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
 
             absenceRecords.push({
                 date,
                 sessionLabel,
                 sessionType: sessionTypeName,
-                justified: record.justified,
+                justified: isJustified,
                 reason
             });
         }
@@ -11792,7 +11845,7 @@ function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
     let totalPerformances = 0;
 
     allDates.forEach(date => {
-        if (date >= todayStr) return;
+        if (!isSessionConcluded(date)) return;
         if (dateFilterFn && !dateFilterFn(date)) return;
 
         const session = state.sessionTypes ? state.sessionTypes[date] : null;
@@ -12329,7 +12382,7 @@ function calculateMusicianBestStreak(musicianId) {
 
     const dates = Object.keys(state.attendance)
         .filter(d => {
-            if (d > todayStr) return false; // Excluir futuros
+            if (!isSessionConcluded(d)) return false; // Excluir no concluidos
 
             const session = state.sessionTypes[d];
             if (session && session.type !== "ensayo") return false;
@@ -13025,7 +13078,7 @@ function renderComponentHistorial() {
 
     // Obtener todas las fechas en las que el músico está convocado (sólo pasadas, anteriores a hoy)
     const allConvocatedDates = allUniqueDates.filter(date => {
-        if (date >= todayStr) return false;
+        if (!isSessionConcluded(date)) return false;
         
         const session = state.sessionTypes[date];
         if (session && session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
@@ -15260,9 +15313,7 @@ function renderGeneralOverviewChart() {
     // 1. Gather all rehearsal sessions (only past ones, matching other stats)
     const rehearsalDates = Object.keys(state.attendance).filter(dateKey => {
         const session = state.sessionTypes[dateKey];
-        const d = new Date();
-        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const isPast = dateKey <= todayStr;
+        const isPast = isSessionConcluded(dateKey);
         return isPast && (!session || session.type === "ensayo");
     });
 
@@ -15506,7 +15557,10 @@ function renderSectionAttendanceComparisonChart() {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
     
-    let allDates = Object.keys(state.attendance).filter(dateKey => dateKey <= todayStr).sort((a, b) => a.localeCompare(b));
+    let allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ])).filter(dateKey => isSessionConcluded(dateKey)).sort((a, b) => a.localeCompare(b));
 
     // Time filtering
     if (timeFilter === "last3m") {
@@ -16472,7 +16526,7 @@ function renderMusicianMonthlyEvolution(musicianId) {
         let total = 0;
 
         Object.keys(state.attendance).forEach(dateStr => {
-            if (dateStr > todayStr) return;
+            if (!isSessionConcluded(dateStr)) return;
             const dateParts = dateStr.split("-");
             const y = dateParts[0];
             const m = parseInt(dateParts[1], 10);
