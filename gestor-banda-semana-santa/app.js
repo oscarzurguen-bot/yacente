@@ -12732,6 +12732,8 @@ function renderComponentFicha() {
     // Poblar debug box
     const debugBox = document.getElementById("ficha-debug-box");
     if (debugBox) {
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
         const matchingRecords = Object.keys(state.attendance)
             .map(d => ({ date: d, status: state.attendance[d][musicianId] ? state.attendance[d][musicianId].status : 'none' }))
             .filter(x => x.status !== 'none');
