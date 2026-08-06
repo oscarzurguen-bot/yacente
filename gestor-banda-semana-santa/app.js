@@ -8951,6 +8951,55 @@ function openMarchaHistoryModal(marchId) {
 // ==========================================================================
 // SECCIÓN: CALENDARIO MENSUAL Y OBJETIVOS
 // ==========================================================================
+function openQuickSessionModalForDate(dateKey) {
+    if (!dateKey) return;
+    state.isAddingNewSession = true;
+    state.currentDate = dateKey;
+
+    const attendanceDateEl = document.getElementById("attendance-date");
+    if (attendanceDateEl) {
+        attendanceDateEl.value = dateKey;
+    }
+
+    const modalQuickSession = document.getElementById("modal-quick-session");
+    if (!modalQuickSession) return;
+
+    const titleEl = document.getElementById("quick-session-title");
+    if (titleEl) {
+        titleEl.innerText = `Configurar Sesión - ${formatDateSpanish(dateKey)}`;
+    }
+
+    const actuacionNameEl = document.getElementById("quick-session-actuacion-name");
+    if (actuacionNameEl) {
+        actuacionNameEl.value = "";
+    }
+
+    const typeEl = document.getElementById("quick-session-type");
+    if (typeEl) {
+        typeEl.value = "ensayo-general";
+    }
+
+    renderRehearsalLocationOptions();
+    setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
+
+    const actuacionGroup = document.getElementById("quick-session-actuacion-group");
+    if (actuacionGroup) {
+        actuacionGroup.classList.add("hidden");
+    }
+
+    const locationGroup = document.getElementById("quick-session-location-group");
+    if (locationGroup) {
+        locationGroup.classList.remove("hidden");
+    }
+
+    const timeGroup = document.getElementById("quick-session-time-group");
+    if (timeGroup) {
+        timeGroup.classList.remove("hidden");
+    }
+
+    modalQuickSession.classList.add("active");
+}
+
 function renderCalendar() {
     const grid = document.getElementById("calendar-days-grid");
     const monthYearHeader = document.getElementById("calendar-month-year");
@@ -9006,7 +9055,9 @@ function renderCalendar() {
         dayCell.innerHTML = `<span class="calendar-day-number">${dayNum}</span>`;
         const prevMonthStr = String(prevMonth + 1).padStart(2, '0');
         const prevDayStr = String(dayNum).padStart(2, '0');
-        dayCell.setAttribute("data-date", `${prevYear}-${prevMonthStr}-${prevDayStr}`);
+        const prevDateKey = `${prevYear}-${prevMonthStr}-${prevDayStr}`;
+        dayCell.setAttribute("data-date", prevDateKey);
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(prevDateKey));
         cells.push(dayCell);
     }
 
@@ -9087,31 +9138,7 @@ function renderCalendar() {
         });
 
         // Evento click para planificar sesión (Añadir nueva sesión)
-        dayCell.addEventListener("click", () => {
-            state.isAddingNewSession = true;
-            state.currentDate = dateKey;
-            document.getElementById("attendance-date").value = dateKey;
-            
-            const modalQuickSession = document.getElementById("modal-quick-session");
-            document.getElementById("quick-session-title").innerText = `Configurar Sesión - ${formatDateSpanish(dateKey)}`;
-            
-            // Reset modal values for a fresh new session
-            document.getElementById("quick-session-actuacion-name").value = "";
-            document.getElementById("quick-session-type").value = "ensayo-general";
-            renderRehearsalLocationOptions();
-            setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
-            
-            // Hide actuation name field by default
-            const actuacionGroup = document.getElementById("quick-session-actuacion-group");
-            actuacionGroup.classList.add("hidden");
-            
-            const locationGroup = document.getElementById("quick-session-location-group");
-            if (locationGroup) {
-                locationGroup.classList.remove("hidden");
-            }
-            
-            modalQuickSession.classList.add("active");
-        });
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(dateKey));
 
         cells.push(dayCell);
     }
@@ -9131,7 +9158,9 @@ function renderCalendar() {
         dayCell.innerHTML = `<span class="calendar-day-number">${day}</span>`;
         const nextMonthStr = String(nextMonth + 1).padStart(2, '0');
         const nextDayStr = String(day).padStart(2, '0');
-        dayCell.setAttribute("data-date", `${nextYear}-${nextMonthStr}-${nextDayStr}`);
+        const nextDateKey = `${nextYear}-${nextMonthStr}-${nextDayStr}`;
+        dayCell.setAttribute("data-date", nextDateKey);
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(nextDateKey));
         cells.push(dayCell);
     }
 
