@@ -752,16 +752,24 @@ function startCloudSync() {
     });
 
     // Escucha de metadatos de sesión
-    let isInitialSessionTypesLoad = true;
+    // NOTA: isInitialSessionTypesLoad se basa en un flag PERSISTIDO (no en una variable en memoria),
+    // porque este listener se vuelve a crear cada vez que se recarga la app o se reconecta la nube
+    // (p.ej. al cerrar y reabrir la app en el móvil). Si dependiera solo de una variable local, cada
+    // reconexión trataría su primer snapshot como "carga inicial" y suprimiría en silencio la
+    // notificación de cualquier sesión creada justo en ese momento, aunque fuera realmente nueva.
+    // El flag se guarda por músico (no global) para que un dispositivo compartido entre varios
+    // músicos no trate el historial completo de sesiones como "nuevo" al cambiar de usuario.
+    const sessionSyncFlagKey = "yacente_session_sync_done_" + (getAuthMusicianId() || "admin");
+    let isInitialSessionTypesLoad = localStorage.getItem(sessionSyncFlagKey) !== "true";
     unsubSessionTypes = db.collection("sessionTypes").onSnapshot(snapshot => {
         const changes = snapshot.docChanges();
-        
+
         state.sessionTypes = {}; // Limpiar caché local para evitar datos huérfanos/demo
         snapshot.forEach(doc => {
             state.sessionTypes[doc.id] = doc.data();
         });
         localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
-        
+
         // Dispatch notifications if this is not the initial load and role is component
         if (!isInitialSessionTypesLoad) {
             changes.forEach(change => {
@@ -772,7 +780,10 @@ function startCloudSync() {
                 }
             });
         }
-        
+
+        if (isInitialSessionTypesLoad) {
+            localStorage.setItem(sessionSyncFlagKey, "true");
+        }
         isInitialSessionTypesLoad = false;
         
         if (document.getElementById("section-ensayos").classList.contains("active")) {
@@ -6473,7 +6484,7 @@ function renderMusicianDetailContent() {
     });
 
     const totalAbsent = absentJustified + absentUnjustified;
-    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 0;
+    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 100;
 
     // Tarjetas resumen
     const pctEl = document.getElementById("detail-attendance-pct");
@@ -6886,7 +6897,7 @@ function downloadMusicianPDFReport() {
     });
 
     const totalAbsent = absentJustified + absentUnjustified;
-    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 0;
+    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 100;
     const pctAbsent = totalSessions > 0 ? Math.round((totalAbsent / totalSessions) * 100) : 0;
 
     let reasonsHTML = "";
@@ -15988,7 +15999,7 @@ function formatNotificationTimestamp(dateInput) {
     }
 }
 
-function dispatchSessionNotification(sessionKey, sessionData) {
+function dispatchSessionNotification(sessionKey, sessionData, isSilent = false) {
     if (!sessionData) return;
 
     const rawDate = sessionKey.split("_")[0];
@@ -16024,7 +16035,7 @@ function dispatchSessionNotification(sessionKey, sessionData) {
                 title: title,
                 body: body,
                 date: creationDate,
-                seen: false,
+                seen: existingIdx !== -1 ? (notifs[existingIdx].seen || false) : false,
                 type: sessionData.type
             };
 
@@ -16047,9 +16058,22 @@ function dispatchSessionNotification(sessionKey, sessionData) {
 
     updateNotificationsBadge();
     if (document.body.classList.contains("component-portal")) {
-        sendBrowserNotification(title, body);
+        if (!isSilent) {
+            sendBrowserNotification(title, body);
+        }
         renderComponentNotificationsList();
     }
+}
+
+function syncAllSessionNotifications() {
+    if (!state.sessionTypes) return;
+    const keys = Object.keys(state.sessionTypes);
+    keys.forEach(key => {
+        const sessionData = state.sessionTypes[key];
+        if (sessionData) {
+            dispatchSessionNotification(key, sessionData, true);
+        }
+    });
 }
 
 function renderComponentNotificationsList() {
