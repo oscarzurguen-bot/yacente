@@ -12177,22 +12177,8 @@ function getMusicianMedalsData(musicianId) {
         let isHighest = true;
         peers.forEach(peer => {
             if (peer.id === musicianId) return;
-            
-            let pConvocated = 0;
-            let pAttended = 0;
-            Object.keys(state.attendance).forEach(date => {
-                if (date > todayStr) return;
-                const record = state.attendance[date] ? state.attendance[date][peer.id] : null;
-                if (!record) return;
-                if (record.status === "present") {
-                    pAttended++;
-                    pConvocated++;
-                } else if (record.status === "absent") {
-                    pConvocated++;
-                }
-            });
-            const peerPct = pConvocated > 0 ? (pAttended / pConvocated) * 100 : 0;
-            if (peerPct > attendancePct) {
+            const peerMetrics = getMusicianAttendanceMetrics(peer.id);
+            if (peerMetrics.attendancePct > attendancePct) {
                 isHighest = false;
             }
         });
