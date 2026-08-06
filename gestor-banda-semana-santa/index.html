@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=390">
+    <link rel="stylesheet" href="style.css?v=438">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3810,13 +3810,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=437"></script>
+    <script src="app.js?v=438"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=437
+        // Purga de caché antigua y registro del Service Worker v=438
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v437") {
+                    if (key !== "yacente-v438") {
                         caches.delete(key);
                     }
                 });
@@ -3829,9 +3829,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=437")
+                navigator.serviceWorker.register("sw.js?v=438")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v437 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v438 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

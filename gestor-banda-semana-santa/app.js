@@ -1394,6 +1394,59 @@ function dbSavePlayedMarchas(date, marchasArray) {
 
 
 
+// Helper to format start and end time hour/min dropdowns into a string "19:30 - 21:00" or single time
+function getFormattedTimeFromInputs(startHourId, startMinId, endHourId, endMinId) {
+    const startH = document.getElementById(startHourId) ? document.getElementById(startHourId).value : "";
+    const startM = document.getElementById(startMinId) ? document.getElementById(startMinId).value : "00";
+    const endH = document.getElementById(endHourId) ? document.getElementById(endHourId).value : "";
+    const endM = document.getElementById(endMinId) ? document.getElementById(endMinId).value : "00";
+
+    const startTime = startH ? `${startH}:${startM}` : "";
+    const endTime = endH ? `${endH}:${endM}` : "";
+
+    if (startTime && endTime) return `${startTime} - ${endTime}`;
+    if (startTime) return startTime;
+    if (endTime) return endTime;
+    return "";
+}
+
+function setTimeInputsFromValue(startHourId, startMinId, endHourId, endMinId, timeVal) {
+    const startH = document.getElementById(startHourId);
+    const startM = document.getElementById(startMinId);
+    const endH = document.getElementById(endHourId);
+    const endM = document.getElementById(endMinId);
+    if (!startH || !startM || !endH || !endM) return;
+
+    const str = timeVal || "";
+    const parseSingle = (s) => {
+        if (!s) return { h: "", m: "00" };
+        const parts = s.trim().split(":");
+        if (parts.length < 2) return { h: "", m: "00" };
+        let h = parts[0].padStart(2, "0");
+        if (h === "00") h = "24";
+        else if (parseInt(h, 10) < 8) h = "08";
+        const mNum = parseInt(parts[1], 10) || 0;
+        const m = (mNum >= 15 && mNum < 45) ? "30" : "00";
+        return { h, m };
+    };
+
+    if (str.includes("-")) {
+        const parts = str.split("-");
+        const s = parseSingle(parts[0]);
+        const e = parseSingle(parts[1]);
+        startH.value = s.h;
+        startM.value = s.m;
+        endH.value = e.h;
+        endM.value = e.m;
+    } else {
+        const s = parseSingle(str);
+        startH.value = s.h;
+        startM.value = s.m;
+        endH.value = "";
+        endM.value = "00";
+    }
+}
+
 // ==========================================================================
 // CONTROLADORES DE EVENTOS
 // ==========================================================================
@@ -2234,60 +2287,6 @@ function setupEventListeners() {
         renderAttendance();
         renderStatistics();
     });
-
-    // Helper to format start and end time inputs into a string "19:30 - 21:00" or single time
-    // Helper to format start and end time hour/min dropdowns into a string "19:30 - 21:00" or single time
-    function getFormattedTimeFromInputs(startHourId, startMinId, endHourId, endMinId) {
-        const startH = document.getElementById(startHourId) ? document.getElementById(startHourId).value : "";
-        const startM = document.getElementById(startMinId) ? document.getElementById(startMinId).value : "00";
-        const endH = document.getElementById(endHourId) ? document.getElementById(endHourId).value : "";
-        const endM = document.getElementById(endMinId) ? document.getElementById(endMinId).value : "00";
-
-        const startTime = startH ? `${startH}:${startM}` : "";
-        const endTime = endH ? `${endH}:${endM}` : "";
-
-        if (startTime && endTime) return `${startTime} - ${endTime}`;
-        if (startTime) return startTime;
-        if (endTime) return endTime;
-        return "";
-    }
-
-    function setTimeInputsFromValue(startHourId, startMinId, endHourId, endMinId, timeVal) {
-        const startH = document.getElementById(startHourId);
-        const startM = document.getElementById(startMinId);
-        const endH = document.getElementById(endHourId);
-        const endM = document.getElementById(endMinId);
-        if (!startH || !startM || !endH || !endM) return;
-
-        const str = timeVal || "";
-        const parseSingle = (s) => {
-            if (!s) return { h: "", m: "00" };
-            const parts = s.trim().split(":");
-            if (parts.length < 2) return { h: "", m: "00" };
-            let h = parts[0].padStart(2, "0");
-            if (h === "00") h = "24";
-            else if (parseInt(h, 10) < 8) h = "08";
-            const mNum = parseInt(parts[1], 10) || 0;
-            const m = (mNum >= 15 && mNum < 45) ? "30" : "00";
-            return { h, m };
-        };
-
-        if (str.includes("-")) {
-            const parts = str.split("-");
-            const s = parseSingle(parts[0]);
-            const e = parseSingle(parts[1]);
-            startH.value = s.h;
-            startM.value = s.m;
-            endH.value = e.h;
-            endM.value = e.m;
-        } else {
-            const s = parseSingle(str);
-            startH.value = s.h;
-            startM.value = s.m;
-            endH.value = "";
-            endM.value = "00";
-        }
-    }
 
     // ==========================================
     // MODAL DE CREAR / EDITAR ENSAYO
