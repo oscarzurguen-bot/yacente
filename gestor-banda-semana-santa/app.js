@@ -2266,6 +2266,7 @@ function setupEventListeners() {
             if (parts.length < 2) return { h: "", m: "00" };
             let h = parts[0].padStart(2, "0");
             if (h === "00") h = "24";
+            else if (parseInt(h, 10) < 8) h = "08";
             const mNum = parseInt(parts[1], 10) || 0;
             const m = (mNum >= 15 && mNum < 45) ? "30" : "00";
             return { h, m };
@@ -3061,7 +3062,8 @@ function setupEventListeners() {
             state.currentDate = sessionKey;
         }
 
-        // Save to state
+        // Save to state with createdAt timestamp
+        newSession.createdAt = new Date().toISOString();
         state.sessionTypes[sessionKey] = newSession;
         
         // Initialize attendance records for the new configuration
@@ -3069,10 +3071,12 @@ function setupEventListeners() {
         
         // Save to Database and Local Storage
         dbSaveSessionType(sessionKey, newSession);
+        dispatchSessionNotification(sessionKey, newSession);
         if (isCloudActive()) {
             const db = firebase.firestore();
-            db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-
+            if (state.attendance[sessionKey]) {
+                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            }
         } else {
             saveStateToLocalStorage();
         }
@@ -4191,7 +4195,7 @@ function renderEnsayosList() {
     let currentMonthStr = "";
 
     dates.forEach(date => {
-        const dayRecord = state.attendance[date];
+        const dayRecord = state.attendance[date] || {};
         const [yyyy, mm, dd] = date.split('-');
         const monthName = MESES[parseInt(mm) - 1];
 
@@ -4707,7 +4711,7 @@ function renderActuacionesList() {
     let currentMonthStr = "";
 
     dates.forEach(date => {
-        const dayRecord = state.attendance[date];
+        const dayRecord = state.attendance[date] || {};
         const [yyyy, mm, dd] = date.split('-');
         const monthName = MESES[parseInt(mm) - 1];
 
@@ -5395,7 +5399,7 @@ function renderStatistics() {
     });
 
     filteredDates.forEach(date => {
-        const dayRecord = state.attendance[date];
+        const dayRecord = state.attendance[date] || {};
         
         state.musicians.forEach(m => {
             const record = dayRecord[m.id];
@@ -6937,7 +6941,7 @@ function downloadMusicianPDFReport() {
                 const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
                 if (typeFilter !== "all" && sessionType !== typeFilter) return;
 
-                const rec = state.attendance[dateStr][musicianId];
+                const rec = state.attendance[dateStr] ? state.attendance[dateStr][musicianId] : null;
                 if (rec) {
                     total++;
                     if (rec.status === "present") presents++;
@@ -12050,7 +12054,7 @@ function getMusicianMedalsData(musicianId) {
     // Doblete
     const performanceDateCounts = {};
     Object.keys(state.attendance).forEach(dateKey => {
-        const record = state.attendance[dateKey][musicianId];
+        const record = state.attendance[dateKey] ? state.attendance[dateKey][musicianId] : null;
         const session = state.sessionTypes[dateKey];
         if (record && record.status === "present" && session && session.type === "actuacion") {
             const baseDate = dateKey.split("_")[0];
@@ -12062,7 +12066,7 @@ function getMusicianMedalsData(musicianId) {
     // Trotamundos (calculado automáticamente en base a actuaciones asistidas marcadas como viaje)
     let tripCount = 0;
     Object.keys(state.attendance).forEach(dateKey => {
-        const record = state.attendance[dateKey][musicianId];
+        const record = state.attendance[dateKey] ? state.attendance[dateKey][musicianId] : null;
         const session = state.sessionTypes[dateKey];
         if (record && record.status === "present" && session && session.type === "actuacion" && session.isTrip === true) {
             tripCount++;
@@ -16535,7 +16539,7 @@ function renderMusicianMonthlyEvolution(musicianId) {
                 const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
                 if (typeFilter !== "all" && sessionType !== typeFilter) return;
 
-                const rec = state.attendance[dateStr][musicianId];
+                const rec = state.attendance[dateStr] ? state.attendance[dateStr][musicianId] : null;
                 if (rec) {
                     total++;
                     if (rec.status === "present") presents++;
