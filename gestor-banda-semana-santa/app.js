@@ -11792,7 +11792,7 @@ function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
     let totalPerformances = 0;
 
     allDates.forEach(date => {
-        if (date > todayStr) return;
+        if (date >= todayStr) return;
         if (dateFilterFn && !dateFilterFn(date)) return;
 
         const session = state.sessionTypes ? state.sessionTypes[date] : null;
@@ -11801,20 +11801,6 @@ function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
         const isSpecial = sessionObj.type === "ensayo" && sessionObj.subtype && sessionObj.subtype !== "general" && sessionObj.convocatedVoices && sessionObj.convocatedVoices.length > 0;
         if (isSpecial && !sessionObj.convocatedVoices.includes(musician.instrument)) {
             return;
-        }
-
-        const dayRecord = state.attendance ? state.attendance[date] : null;
-        const record = dayRecord ? dayRecord[musicianId] : null;
-
-        if (date === todayStr) {
-            if (!dayRecord || Object.keys(dayRecord).length === 0) return;
-            if (!record) return;
-            const isConfirmedRecord = record.confirmed || record.takenByDirector || record.status === "present" || record.justified || (record.reason && record.reason.trim().length > 0);
-            if (!isConfirmedRecord) return;
-        } else {
-            if (!dayRecord || Object.keys(dayRecord).length === 0) {
-                return;
-            }
         }
 
         totalConvocated++;
