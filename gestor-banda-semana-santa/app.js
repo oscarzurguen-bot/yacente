@@ -118,6 +118,7 @@ let state = {
     formacionConcierto: [],
     formacionDesfile: [],
     directorConcierto: null,
+    repertoireLinks: { youtube: "", spotify: "" },
     suggestions: [],
     rehearsalLocations: [],
     currentPreavisoDate: "",
@@ -228,6 +229,9 @@ function initApp() {
     const storedSuggestions = localStorage.getItem("harmonia_suggestions");
     state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
 
+    const storedRepertoireLinks = localStorage.getItem("harmonia_repertoire_links");
+    state.repertoireLinks = storedRepertoireLinks ? JSON.parse(storedRepertoireLinks) : { youtube: "", spotify: "" };
+
     const storedRehearsalLocations = localStorage.getItem("harmonia_rehearsal_locations");
     if (storedRehearsalLocations) {
         try {
@@ -321,6 +325,7 @@ function initApp() {
     renderMarchasList();
     renderRehearsalMarchasWidget();
     updateSuggestionsBadge();
+    renderRepertoireLinksUI();
 
     // Conectar a Firebase si está configurado
     initFirebase();
@@ -436,6 +441,7 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
+    localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks || { youtube: "", spotify: "" }));
     localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
 
     if (state.firebaseConfig) {
@@ -524,6 +530,7 @@ let unsubFormacionDesfile = null;
 let unsubAnnouncements = null;
 let unsubDeletedNotifs = null;
 let unsubSuggestions = null;
+let unsubRepertoireLinks = null;
 let unsubRehearsalLocations = null;
 
 function getDeletedNotificationIds(musicianId) {
@@ -939,6 +946,18 @@ function startCloudSync() {
         console.error("Error sync formación desfile:", err);
     });
 
+    // Escucha de enlaces de playlists del repertorio completo
+    unsubRepertoireLinks = db.collection("config").doc("repertoire_links").onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            state.repertoireLinks = { youtube: data.youtube || "", spotify: data.spotify || "" };
+            localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks));
+            renderRepertoireLinksUI();
+        }
+    }, err => {
+        console.error("Error sync enlaces de repertorio:", err);
+    });
+
     // Escucha de comunicados de la directiva
     unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
         const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1072,6 +1091,7 @@ function stopCloudSync() {
     if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
     if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
     if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
+    if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
     if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
 }
 
@@ -1364,6 +1384,78 @@ function dbSaveSuggestion(suggestion) {
         state.suggestions.unshift(suggestion);
         saveStateToLocalStorage();
         return Promise.resolve();
+    }
+}
+
+function dbSaveRepertoireLinks(links) {
+    state.repertoireLinks = links;
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("config").doc("repertoire_links").set(links)
+            .catch(err => console.error("Error al guardar enlaces de repertorio en nube:", err));
+    }
+    renderRepertoireLinksUI();
+}
+
+function renderRepertoireLinksUI() {
+    const links = state.repertoireLinks || { youtube: "", spotify: "" };
+    const youtubeUrl = (links.youtube || "").trim();
+    const spotifyUrl = (links.spotify || "").trim();
+
+    // Vista de director (section-marchas)
+    const adminYoutubeLink = document.getElementById("admin-repertoire-youtube-link");
+    const adminYoutubeLabel = document.getElementById("admin-repertoire-youtube-label");
+    const adminSpotifyLink = document.getElementById("admin-repertoire-spotify-link");
+    const adminSpotifyLabel = document.getElementById("admin-repertoire-spotify-label");
+
+    if (adminYoutubeLink && adminYoutubeLabel) {
+        if (youtubeUrl) {
+            adminYoutubeLink.href = youtubeUrl;
+            adminYoutubeLabel.innerText = "Playlist YouTube (repertorio completo)";
+            adminYoutubeLink.style.opacity = "1";
+        } else {
+            adminYoutubeLink.href = "#";
+            adminYoutubeLabel.innerText = "Sin playlist de YouTube configurada";
+            adminYoutubeLink.style.opacity = "0.6";
+        }
+    }
+    if (adminSpotifyLink && adminSpotifyLabel) {
+        if (spotifyUrl) {
+            adminSpotifyLink.href = spotifyUrl;
+            adminSpotifyLabel.innerText = "Playlist Spotify (repertorio completo)";
+            adminSpotifyLink.style.opacity = "1";
+        } else {
+            adminSpotifyLink.href = "#";
+            adminSpotifyLabel.innerText = "Sin playlist de Spotify configurada";
+            adminSpotifyLink.style.opacity = "0.6";
+        }
+    }
+
+    // Vista de músico (section-componente-repertorio)
+    const compContainer = document.getElementById("repertoire-playlists-comp-container");
+    const compYoutubeLink = document.getElementById("comp-repertoire-youtube-link");
+    const compSpotifyLink = document.getElementById("comp-repertoire-spotify-link");
+
+    if (compContainer && compYoutubeLink && compSpotifyLink) {
+        if (youtubeUrl || spotifyUrl) {
+            compContainer.classList.remove("hidden");
+        } else {
+            compContainer.classList.add("hidden");
+        }
+
+        if (youtubeUrl) {
+            compYoutubeLink.href = youtubeUrl;
+            compYoutubeLink.classList.remove("hidden");
+        } else {
+            compYoutubeLink.classList.add("hidden");
+        }
+        if (spotifyUrl) {
+            compSpotifyLink.href = spotifyUrl;
+            compSpotifyLink.classList.remove("hidden");
+        } else {
+            compSpotifyLink.classList.add("hidden");
+        }
     }
 }
 
@@ -3185,6 +3277,7 @@ function setupMarchasDragAndDrop() {
     setupLugaresEnsayoEvents();
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
+    setupRepertoireLinksModalEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -3430,6 +3523,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Estado de trabajo y estadísticas de marchas procesionales";
             dateContainer.classList.add("hidden");
             renderMarchasList();
+            renderRepertoireLinksUI();
             break;
         case "section-ajustes":
             pageTitle.innerText = "Ajustes";
@@ -3462,6 +3556,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Mi nivel de dominio de las marchas";
             dateContainer.classList.add("hidden");
             renderComponentRepertorio();
+            renderRepertoireLinksUI();
             break;
         case "section-componente-sugerencias":
             pageTitle.innerText = "Sugerencias";
@@ -14161,6 +14256,62 @@ function setupMarchaModalEvents() {
             renderMarchasList();
             renderComponentRepertorio();
             renderRehearsalMarchasWidget();
+        });
+    }
+}
+
+function setupRepertoireLinksModalEvents() {
+    const modal = document.getElementById("modal-repertoire-links");
+    const btnEdit = document.getElementById("btn-edit-repertoire-links");
+    const btnClose = document.getElementById("btn-close-repertoire-links-modal");
+    const btnCancel = document.getElementById("btn-cancel-repertoire-links-modal");
+    const form = document.getElementById("form-repertoire-links");
+
+    const openModal = () => {
+        const links = state.repertoireLinks || { youtube: "", spotify: "" };
+        const youtubeInput = document.getElementById("repertoire-youtube-playlist-input");
+        const spotifyInput = document.getElementById("repertoire-spotify-playlist-input");
+        if (youtubeInput) youtubeInput.value = links.youtube || "";
+        if (spotifyInput) spotifyInput.value = links.spotify || "";
+        if (modal) modal.classList.add("active");
+    };
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnEdit) btnEdit.addEventListener("click", openModal);
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (modal) {
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    // Si el enlace todavía no está configurado, el propio botón abre el editor
+    const adminYoutubeLink = document.getElementById("admin-repertoire-youtube-link");
+    const adminSpotifyLink = document.getElementById("admin-repertoire-spotify-link");
+    [adminYoutubeLink, adminSpotifyLink].forEach(link => {
+        if (!link) return;
+        link.addEventListener("click", (e) => {
+            if (!link.getAttribute("href") || link.getAttribute("href") === "#") {
+                e.preventDefault();
+                openModal();
+            }
+        });
+    });
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const youtubeUrl = document.getElementById("repertoire-youtube-playlist-input").value.trim();
+            const spotifyUrl = document.getElementById("repertoire-spotify-playlist-input").value.trim();
+
+            dbSaveRepertoireLinks({ youtube: youtubeUrl, spotify: spotifyUrl });
+            showToast("Enlaces de playlists actualizados", "success");
+            closeModal();
         });
     }
 }
