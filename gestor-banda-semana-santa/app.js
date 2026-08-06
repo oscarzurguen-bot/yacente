@@ -2934,13 +2934,15 @@ function setupEventListeners() {
         
         // Reset defaults
         document.getElementById("quick-session-actuacion-name").value = "";
+        if (document.getElementById("quick-session-trip-input")) document.getElementById("quick-session-trip-input").checked = false;
         setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
-        
+
         const sessionInfo = state.sessionTypes[date];
         if (sessionInfo) {
             if (sessionInfo.type === "actuacion") {
                 document.getElementById("quick-session-type").value = "actuacion";
                 document.getElementById("quick-session-actuacion-name").value = sessionInfo.name || "";
+                if (document.getElementById("quick-session-trip-input")) document.getElementById("quick-session-trip-input").checked = !!sessionInfo.isTrip;
             } else if (sessionInfo.type === "ensayo") {
                 const sub = sessionInfo.subtype;
                 if (sub === "trompetas1") {
@@ -3043,7 +3045,8 @@ function setupEventListeners() {
                 showToast("Por favor, introduce el nombre de la actuación", "error");
                 return;
             }
-            newSession = { type: "actuacion", name: actuacionName };
+            const isTrip = document.getElementById("quick-session-trip-input") ? document.getElementById("quick-session-trip-input").checked : false;
+            newSession = { type: "actuacion", name: actuacionName, isTrip: isTrip };
         }
         
         // Determine the actual session key to use
@@ -8971,6 +8974,11 @@ function openQuickSessionModalForDate(dateKey) {
     const actuacionNameEl = document.getElementById("quick-session-actuacion-name");
     if (actuacionNameEl) {
         actuacionNameEl.value = "";
+    }
+
+    const tripInputEl = document.getElementById("quick-session-trip-input");
+    if (tripInputEl) {
+        tripInputEl.checked = false;
     }
 
     const typeEl = document.getElementById("quick-session-type");

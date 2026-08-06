@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=438">
+    <link rel="stylesheet" href="style.css?v=439">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -2860,6 +2860,10 @@
                 <div class="form-group hidden" id="quick-session-actuacion-group" style="margin-top: 15px;">
                     <label for="quick-session-actuacion-name">Nombre de la Actuación</label>
                     <input type="text" id="quick-session-actuacion-name" placeholder="Ej: Domingo de Ramos, Concierto..." style="width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                        <input type="checkbox" id="quick-session-trip-input" style="width: auto; margin: 0;">
+                        <label for="quick-session-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
+                    </div>
                 </div>
 
                 <div class="modal-actions" style="margin-top: 20px;">
@@ -3810,13 +3814,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=438"></script>
+    <script src="app.js?v=439"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=438
+        // Purga de caché antigua y registro del Service Worker v=439
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v438") {
+                    if (key !== "yacente-v439") {
                         caches.delete(key);
                     }
                 });
@@ -3829,9 +3833,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=438")
+                navigator.serviceWorker.register("sw.js?v=439")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v438 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v439 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
