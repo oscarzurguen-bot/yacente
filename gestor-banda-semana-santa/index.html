@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=448">
+    <link rel="stylesheet" href="style.css?v=450">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1674,6 +1674,16 @@
                                         <div class="medal-desc">Completa 10, 25 o 50 viajes fuera de la ciudad/comunidad para conseguir 1, 2 o 3 estrellas.</div>
                                         <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
                                         <div class="medal-progress-text">0/10 viajes</div>
+                                    </div>
+                                </div>
+                                <!-- Top -->
+                                <div class="medal-card locked" id="medal-top">
+                                    <div class="medal-icon-wrapper">🥇</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Top</div>
+                                        <div class="medal-desc">Entra en el Top 25, Top 10 o Top 5 de asistencia de la banda para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">Posición no disponible</div>
                                     </div>
                                 </div>
                                 <!-- Doblete -->
@@ -3925,13 +3935,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=448"></script>
+    <script src="app.js?v=450"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=448
+        // Purga de caché antigua y registro del Service Worker v=450
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v448") {
+                    if (key !== "yacente-v450") {
                         caches.delete(key);
                     }
                 });
@@ -3944,9 +3954,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=448")
+                navigator.serviceWorker.register("sw.js?v=450")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v448 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v450 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

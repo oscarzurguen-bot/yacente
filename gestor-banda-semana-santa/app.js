@@ -12053,7 +12053,60 @@ function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
     };
 }
 
-function getMusicianMedalsData(musicianId) {
+// Suma las estrellas de las insignias desbloqueadas (igual que se muestra en Mi Ficha / Top 25),
+// anulando el total si el músico tiene activa la alerta "Volver...a ensayar".
+function countUnlockedBadgeStars(medalsData) {
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+    if (hasVolverEnsayar) return 0;
+    return medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+}
+
+// Calcula la posición (1 = mejor) de un músico en el ranking de asistencia de la banda,
+// usando EXACTAMENTE el mismo criterio de ordenación que el panel "Top 25 Asistencia" de
+// Mi Ficha (renderComponenteRanking): % de asistencia, número de insignias, % exacto, racha y nombre.
+// Para el número de insignias se usa getMusicianBaseMedalsData (todas las insignias EXCEPTO "Top"),
+// de forma que la insignia "Top" no se cuenta a sí misma y no hay referencia circular.
+function getMusicianAttendanceRank(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return null;
+
+    const ranked = (state.musicians || []).map(m => {
+        const metrics = getMusicianAttendanceMetrics(m.id);
+        return {
+            id: m.id,
+            name: m.name,
+            attendancePct: metrics.attendancePct,
+            streak: calculateMusicianStreak(m.id),
+            badgesCount: countUnlockedBadgeStars(getMusicianBaseMedalsData(m.id))
+        };
+    });
+
+    ranked.sort((a, b) => {
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) return roundDiff;
+
+        if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+
+        if (b.streak !== a.streak) return b.streak - a.streak;
+
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+
+    const idx = ranked.findIndex(r => String(r.id) === String(musicianId));
+    return idx === -1 ? null : idx + 1;
+}
+
+// Calcula todas las insignias EXCEPTO "Top". Se usa tanto para mostrar la ficha del músico
+// como, internamente, para calcular el número de insignias de cada músico a la hora de
+// desempatar el ranking de asistencia (ver getMusicianAttendanceRank) sin que la insignia
+// "Top" se cuente a sí misma (lo que crearía una referencia circular).
+function getMusicianBaseMedalsData(musicianId) {
     const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return [];
 
@@ -12492,6 +12545,54 @@ function getMusicianMedalsData(musicianId) {
     ];
 }
 
+// Devuelve todas las insignias de un músico, incluyendo "Top". El criterio para otorgar
+// "Top" se basa en la posición del músico en el mismo ranking de asistencia que alimenta
+// el panel "Top 25 Asistencia" de Mi Ficha (ver getMusicianAttendanceRank).
+function getMusicianMedalsData(musicianId) {
+    const baseMedals = getMusicianBaseMedalsData(musicianId);
+    if (baseMedals.length === 0) return baseMedals;
+
+    const attendanceRank = getMusicianAttendanceRank(musicianId);
+    let starsTop = 0;
+    let descTop = "";
+    let unlockedTop = false;
+    let progressPctTop = 0;
+    let progressTextTop = "Posición no disponible";
+
+    if (attendanceRank !== null) {
+        if (attendanceRank <= 5) {
+            starsTop = 3;
+            unlockedTop = true;
+            progressPctTop = 100;
+            descTop = `Oro conseguido: estás en el Top 5 de asistencia de la banda (posición #${attendanceRank}).`;
+            progressTextTop = `Posición #${attendanceRank} · Top 5`;
+        } else if (attendanceRank <= 10) {
+            starsTop = 2;
+            unlockedTop = true;
+            progressPctTop = 66;
+            descTop = `Plata conseguida: estás en el Top 10 de asistencia (posición #${attendanceRank}). Sube al Top 5 para el Oro.`;
+            progressTextTop = `Posición #${attendanceRank} · Top 10`;
+        } else if (attendanceRank <= 25) {
+            starsTop = 1;
+            unlockedTop = true;
+            progressPctTop = 33;
+            descTop = `Bronce conseguido: estás en el Top 25 de asistencia (posición #${attendanceRank}). Sube al Top 10 para la Plata.`;
+            progressTextTop = `Posición #${attendanceRank} · Top 25`;
+        } else {
+            starsTop = 0;
+            unlockedTop = false;
+            progressPctTop = 0;
+            descTop = "Entra en el Top 25 de asistencia de la banda para desbloquear Bronce.";
+            progressTextTop = `Posición #${attendanceRank}`;
+        }
+    }
+
+    return [
+        ...baseMedals,
+        { id: "top", title: "Top", icon: "🥇", desc: descTop, unlocked: unlockedTop, stars: starsTop, progressPct: progressPctTop, progressText: progressTextTop }
+    ];
+}
+
 function calculateMusicianStreak(musicianId) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
@@ -12720,6 +12821,11 @@ const MEDAL_TIER_DEFINITIONS = {
         { label: "Bronce 🥉", req: "1 convivencia / actividad extramusical", stars: 1 },
         { label: "Plata 🥈", req: "5 convivencias / actividades extramusicales", stars: 2 },
         { label: "Oro 🥇", req: "10 convivencias / actividades extramusicales", stars: 3 }
+    ],
+    top: [
+        { label: "Bronce 🥉", req: "Top 25 de asistencia de la banda", stars: 1 },
+        { label: "Plata 🥈", req: "Top 10 de asistencia de la banda", stars: 2 },
+        { label: "Oro 🥇", req: "Top 5 de asistencia de la banda", stars: 3 }
     ]
 };
 
@@ -13095,20 +13201,22 @@ function renderComponenteRanking() {
         const attendancePct = metrics.attendancePct;
         const currentStreak = calculateMusicianStreak(musicianId);
         
+        // Insignias mostradas en la tarjeta (incluye "Top"): total real de insignias conseguidas.
         const medalsData = getMusicianMedalsData(musicianId);
-        const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
-        const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
-            if (!m.unlocked || m.isNegative) return acc;
-            return acc + (m.stars || 1);
-        }, 0);
-        
+        const unlockedInsigniasCount = countUnlockedBadgeStars(medalsData);
+
+        // Insignias usadas para desempatar el ranking: excluye "Top" para que esta insignia
+        // no se otorgue en base a un ranking que ella misma influye (ver getMusicianAttendanceRank).
+        const baseBadgesCountForSort = countUnlockedBadgeStars(getMusicianBaseMedalsData(musicianId));
+
         return {
             id: musicianId,
             name: musician.name,
             photo: musician.photo || "",
             attendancePct,
             streak: currentStreak,
-            badgesCount: unlockedInsigniasCount
+            badgesCount: unlockedInsigniasCount,
+            baseBadgesCountForSort
         };
     });
 
@@ -13121,8 +13229,8 @@ function renderComponenteRanking() {
         }
 
         // 1. Criterio de desempate por empate en % de asistencia: Mayor número de insignias acumuladas
-        if (b.badgesCount !== a.badgesCount) {
-            return b.badgesCount - a.badgesCount;
+        if (b.baseBadgesCountForSort !== a.baseBadgesCountForSort) {
+            return b.baseBadgesCountForSort - a.baseBadgesCountForSort;
         }
 
         // 2. Si empatan también en insignias, comparar el porcentaje decimal exacto
