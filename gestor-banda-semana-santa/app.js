@@ -2196,6 +2196,20 @@ function setupEventListeners() {
         });
     }
 
+    // Modal de detalle de un compañero (Top 25 Asistencia)
+    const closePeerDetail = () => {
+        const modal = document.getElementById("modal-peer-detail");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnClosePeerDetail = document.getElementById("btn-close-peer-detail");
+    const modalPeerDetail = document.getElementById("modal-peer-detail");
+    if (btnClosePeerDetail) btnClosePeerDetail.addEventListener("click", closePeerDetail);
+    if (modalPeerDetail) {
+        modalPeerDetail.addEventListener("click", (e) => {
+            if (e.target === modalPeerDetail) closePeerDetail();
+        });
+    }
+
     // Modal de detalle de ensayo para músicos
     const closeCompRehearsal = () => {
         const modal = document.getElementById("modal-comp-rehearsal-detail");
@@ -5314,6 +5328,80 @@ function openPhotoPreviewModal(musicianId) {
             btnEditModal.classList.remove("hidden");
         } else {
             btnEditModal.classList.add("hidden");
+        }
+    }
+
+    modal.classList.add("active");
+}
+
+function openPeerDetailModal(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return;
+
+    const modal = document.getElementById("modal-peer-detail");
+    if (!modal) return;
+
+    document.getElementById("peer-detail-name").innerText = musician.name;
+    document.getElementById("peer-detail-instrument").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
+
+    const avatarLettersEl = document.getElementById("peer-detail-avatar-letters");
+    const avatarImgEl = document.getElementById("peer-detail-avatar-img");
+    const avatarWrapperEl = document.getElementById("peer-detail-avatar");
+    if (avatarWrapperEl) {
+        avatarWrapperEl.onclick = () => openPhotoPreviewModal(musicianId);
+    }
+    if (musician.photo) {
+        avatarImgEl.src = musician.photo;
+        avatarImgEl.classList.remove("hidden");
+        avatarLettersEl.classList.add("hidden");
+    } else {
+        avatarImgEl.classList.add("hidden");
+        avatarLettersEl.innerText = getInitials(musician.name);
+        avatarLettersEl.classList.remove("hidden");
+    }
+
+    const currentStreak = calculateMusicianStreak(musicianId);
+    document.getElementById("peer-detail-streak").innerText = currentStreak;
+
+    const medalsData = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+    const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+    document.getElementById("peer-detail-badges").innerText = unlockedInsigniasCount;
+
+    const metrics = getMusicianAttendanceMetrics(musicianId);
+    const attendancePct = metrics.attendancePct;
+
+    let strokeColor = "#2ECC71"; // verde
+    if (attendancePct < 50) {
+        strokeColor = "#E74C3C"; // rojo
+    } else if (attendancePct < 80) {
+        strokeColor = "#F1C40F"; // amarillo
+    }
+
+    const percentageText = document.getElementById("peer-detail-percentage-text");
+    if (percentageText) percentageText.textContent = `${Math.round(attendancePct)}%`;
+
+    const progressPath = document.getElementById("peer-detail-progress-path");
+    if (progressPath) {
+        progressPath.setAttribute("stroke-dasharray", `${Math.round(attendancePct)}, 100`);
+        progressPath.style.setProperty("stroke", strokeColor, "important");
+    }
+
+    const progressCircle = document.getElementById("peer-detail-progress-circle");
+    if (progressCircle) {
+        const svgEl = progressCircle.querySelector(".circular-chart");
+        if (svgEl) {
+            svgEl.classList.remove("gold", "red", "yellow", "green");
+            if (attendancePct < 50) {
+                svgEl.classList.add("red");
+            } else if (attendancePct < 80) {
+                svgEl.classList.add("yellow");
+            } else {
+                svgEl.classList.add("green");
+            }
         }
     }
 
@@ -13015,7 +13103,9 @@ function renderComponenteRanking() {
         }, 0);
         
         return {
+            id: musicianId,
             name: musician.name,
+            photo: musician.photo || "",
             attendancePct,
             streak: currentStreak,
             badgesCount: unlockedInsigniasCount
@@ -13056,16 +13146,22 @@ function renderComponenteRanking() {
     top25.forEach((item, index) => {
         const card = document.createElement("div");
         card.className = "comp-ranking-card";
-        
+        card.style.cursor = "pointer";
+
         // Estilo especial para el top 3
         let rankBadgeClass = "rank-badge";
         if (index === 0) rankBadgeClass += " rank-gold";
         else if (index === 1) rankBadgeClass += " rank-silver";
         else if (index === 2) rankBadgeClass += " rank-bronze";
-        
+
+        const avatarMarkup = item.photo
+            ? `<img src="${item.photo}" alt="${item.name}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--color-gold);">`
+            : `<div style="width: 30px; height: 30px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; flex-shrink: 0;">${getInitials(item.name)}</div>`;
+
         card.innerHTML = `
             <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
                 <div class="${rankBadgeClass}">${index + 1}</div>
+                ${avatarMarkup}
                 <div style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); flex: 1;">
                     ${item.name}
                 </div>
@@ -13082,7 +13178,9 @@ function renderComponenteRanking() {
                 </div>
             </div>
         `;
-        
+
+        card.addEventListener("click", () => openPeerDetailModal(item.id));
+
         container.appendChild(card);
     });
 }

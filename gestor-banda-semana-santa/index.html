@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=445">
+    <link rel="stylesheet" href="style.css?v=446">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3607,6 +3607,48 @@
             </div>
         </div>
     </div>
+    <!-- Modal: Detalle de un Compañero (desde Top 25 Asistencia) -->
+    <div id="modal-peer-detail" class="modal-overlay">
+        <div class="modal-card" style="max-width: 420px; width: 92%; text-align: center; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-peer-detail" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <div id="peer-detail-avatar" class="profile-avatar" style="margin: 0 auto 14px auto; cursor: pointer;" title="Ver foto en grande">
+                <span id="peer-detail-avatar-letters">--</span>
+                <img id="peer-detail-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+            </div>
+
+            <h3 id="peer-detail-name" style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 1.15rem;">Nombre del Músico</h3>
+            <p id="peer-detail-instrument" class="text-muted" style="margin: 0 0 18px 0; font-size: 0.85rem;">Instrumento • Rol</p>
+
+            <div class="stat-circle-progress" id="peer-detail-progress-circle" style="margin: 0 auto 14px auto;">
+                <svg viewBox="0 0 36 36" class="circular-chart gold">
+                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="circle" id="peer-detail-progress-path" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <text x="18" y="20.35" class="percentage" id="peer-detail-percentage-text">0%</text>
+                </svg>
+            </div>
+            <div class="text-muted" style="font-size: 0.8rem; margin-bottom: 16px;">Asistencia General</div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <span style="font-size: 1.3rem;">🔥</span>
+                    <span id="peer-detail-streak" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">0</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">Racha</span>
+                </div>
+                <div style="flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <span style="font-size: 1.3rem;">🏅</span>
+                    <span id="peer-detail-badges" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">0</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">Insignias</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Detalle de Ensayo / Actuación para Músicos -->
     <div id="modal-comp-rehearsal-detail" class="modal-overlay">
         <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 90vh; overflow-y: auto;">
@@ -3883,13 +3925,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=445"></script>
+    <script src="app.js?v=446"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=445
+        // Purga de caché antigua y registro del Service Worker v=446
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v445") {
+                    if (key !== "yacente-v446") {
                         caches.delete(key);
                     }
                 });
@@ -3902,9 +3944,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=445")
+                navigator.serviceWorker.register("sw.js?v=446")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v445 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v446 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
