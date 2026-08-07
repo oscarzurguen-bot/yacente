@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v446";
+const CACHE_NAME = "yacente-v447";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -97,9 +97,9 @@ self.addEventListener("fetch", (event) => {
         return;
     }
 
-    // Para recursos locales: Network First
+    // Para recursos locales: Network First (forzando red real, saltándose la caché HTTP del navegador)
     event.respondWith(
-        fetch(event.request)
+        fetch(event.request, { cache: "no-store" })
             .then((response) => {
                 // Si la respuesta es válida, guardarla en caché
                 if (response.status === 200) {
