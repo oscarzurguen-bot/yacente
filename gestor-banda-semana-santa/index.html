@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=452">
+    <link rel="stylesheet" href="style.css?v=453">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1330,6 +1330,18 @@
                         </h3>
                         <p class="text-muted" style="margin: 0;">Gestiona los locales y ubicaciones para indicar a los músicos cómo llegar en Google Maps.</p>
                     </div>
+
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-estadisticas-avanzadas" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                            Estadísticas Avanzadas
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Gráficos detallados para analizar la evolución de la banda en profundidad.</p>
+                    </div>
                 </div>
             </section>
 
@@ -1371,6 +1383,32 @@
                     <div id="admin-lugares-ensayo-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
                         <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📍</span>
                         No hay lugares de ensayo configurados todavía.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Estadísticas Avanzadas (admin) -->
+            <section id="section-otros-estadisticas-avanzadas" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+
+                <div class="card" style="padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 6px;">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">Evolución del ranking de asistencia</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Posición mensual de cada músico. Por defecto se resalta el Top 3 actual; selecciona a cualquier músico para ver solo su evolución.
+                            </p>
+                        </div>
+                        <select id="advanced-stats-musician-select" style="min-width: 220px;"></select>
+                    </div>
+
+                    <div id="advanced-stats-bump-chart-container" style="margin-top: 16px; overflow-x: auto;"></div>
+                    <div id="advanced-stats-bump-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📈</span>
+                        Todavía no hay suficientes meses con asistencia registrada para mostrar una evolución.
                     </div>
                 </div>
             </section>
@@ -1926,7 +1964,6 @@
                             </svg>
                             Cerrar Sesión
                         </button>
-                    </div>
                 </div>
             </section>
         </main>
@@ -3895,6 +3932,7 @@
             </svg>
             <span>Repertorio</span>
         </a>
+
         <a href="#" class="mobile-nav-item btn-logout-component" style="color: var(--color-absent);">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -3916,6 +3954,7 @@
                 <button class="modal-close" id="btn-close-musician-drawer" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
             <div class="musician-drawer-body">
+
                 <a href="#" class="drawer-item drawer-item-sugerencias" data-target="section-componente-sugerencias">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
                     <span>Sugerencias</span>
@@ -3935,13 +3974,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=452"></script>
+    <script src="app.js?v=453"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=452
+        // Purga de caché antigua y registro del Service Worker v=453
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v452") {
+                    if (key !== "yacente-v453") {
                         caches.delete(key);
                     }
                 });
@@ -3954,9 +3993,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=452")
+                navigator.serviceWorker.register("sw.js?v=453")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v452 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v453 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

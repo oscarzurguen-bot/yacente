@@ -3289,6 +3289,7 @@ function setupMarchasDragAndDrop() {
     setupMusicianDrawerAndSettingsEvents();
     setupSuggestionsMailboxEvents();
     setupLugaresEnsayoEvents();
+    setupAdvancedStatsEvents();
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
     setupRepertoireLinksModalEvents();
@@ -3601,6 +3602,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Gestión de ubicaciones y enlace a Google Maps";
             dateContainer.classList.add("hidden");
             renderAdminLugaresEnsayoList();
+            break;
+        case "section-otros-estadisticas-avanzadas":
+            pageTitle.innerText = "Estadísticas Avanzadas";
+            pageSubtitle.innerText = "Gráficos detallados de la banda";
+            dateContainer.classList.add("hidden");
+            renderAdvancedStatsBumpChart();
             break;
         case "section-componente-notificaciones":
             pageTitle.innerText = "Centro de Notificaciones";
@@ -15433,6 +15440,191 @@ function renderAdminLugaresEnsayoList() {
 }
 
 let currentLugarEnsayoImageDataUrl = "";
+
+let advancedStatsSelectedMusicianId = "";
+
+const MESES_CORTO_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function formatMonthShortLabelEs(monthStr) {
+    const [y, m] = monthStr.split("-");
+    return `${MESES_CORTO_ES[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+}
+
+// Calcula, para cada uno de los últimos "maxMonths" meses con datos, la posición de cada
+// músico en el ranking de asistencia DE ESE MES (no acumulado), reutilizando la misma
+// función de métricas que el resto de la app mediante su filtro de fechas opcional.
+function getMonthlyRankingSeries(maxMonths = 6) {
+    const monthSet = new Set();
+    Object.keys(state.attendance || {}).forEach(dateKey => {
+        if (!isSessionConcluded(dateKey)) return;
+        monthSet.add(dateKey.split("_")[0].slice(0, 7));
+    });
+
+    let months = Array.from(monthSet).sort();
+    if (months.length > maxMonths) {
+        months = months.slice(-maxMonths);
+    }
+
+    const perMonthEntries = months.map(monthStr => {
+        const dateFilterFn = d => d.split("_")[0].slice(0, 7) === monthStr;
+        const entries = (state.musicians || []).map(m => {
+            const metrics = getMusicianAttendanceMetrics(m.id, dateFilterFn);
+            return { id: m.id, name: m.name, pct: metrics.attendancePct, attended: metrics.attended, total: metrics.totalConvocated };
+        }).filter(e => e.total > 0);
+
+        entries.sort((a, b) => {
+            const pctDiff = b.pct - a.pct;
+            if (Math.abs(pctDiff) > 0.0001) return pctDiff;
+            if (b.attended !== a.attended) return b.attended - a.attended;
+            return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+        });
+
+        const ranks = {};
+        entries.forEach((e, idx) => { ranks[e.id] = idx + 1; });
+        return { month: monthStr, ranks };
+    });
+
+    const series = (state.musicians || []).map(m => ({
+        id: m.id,
+        name: m.name,
+        ranks: perMonthEntries.map(pm => pm.ranks[m.id] || null)
+    })).filter(s => s.ranks.some(r => r !== null));
+
+    return { months, series };
+}
+
+function renderAdvancedStatsBumpChart() {
+    const container = document.getElementById("advanced-stats-bump-chart-container");
+    const emptyState = document.getElementById("advanced-stats-bump-empty");
+    const selectEl = document.getElementById("advanced-stats-musician-select");
+    if (!container) return;
+
+    if (selectEl && selectEl.dataset.populated !== "true") {
+        const sortedMusicians = [...(state.musicians || [])].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+        selectEl.innerHTML = `<option value="">Top 3 (por defecto)</option>` +
+            sortedMusicians.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join("");
+        selectEl.dataset.populated = "true";
+    }
+    if (selectEl) selectEl.value = advancedStatsSelectedMusicianId || "";
+
+    const { months, series } = getMonthlyRankingSeries(6);
+
+    if (months.length < 2 || series.length === 0) {
+        container.innerHTML = "";
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    let maxRank = 1;
+    series.forEach(s => {
+        s.ranks.forEach(r => { if (r && r > maxRank) maxRank = r; });
+    });
+
+    let top3Ids = [];
+    for (let idx = months.length - 1; idx >= 0; idx--) {
+        const rankedThisMonth = series
+            .filter(s => s.ranks[idx] !== null)
+            .sort((a, b) => a.ranks[idx] - b.ranks[idx]);
+        if (rankedThisMonth.length > 0) {
+            top3Ids = rankedThisMonth.slice(0, 3).map(s => s.id);
+            break;
+        }
+    }
+
+    const topColors = ["#D4AF37", "#C0C0C0", "#CD7F32"];
+    const selected = advancedStatsSelectedMusicianId;
+
+    const rowHeight = maxRank > 35 ? 11 : maxRank > 20 ? 14 : maxRank > 10 ? 18 : 24;
+    const leftPad = 34, rightPad = 140, topPad = 16, bottomPad = 34;
+    const chartWidth = 700;
+    const chartHeight = topPad + (maxRank - 1) * rowHeight + bottomPad;
+    const xStep = months.length > 1 ? (chartWidth - leftPad - rightPad) / (months.length - 1) : 0;
+
+    const xFor = idx => leftPad + idx * xStep;
+    const yFor = rank => topPad + (rank - 1) * rowHeight;
+
+    function buildSeriesMarkup(s, color, strokeWidth, labeled) {
+        const allPoints = [];
+        s.ranks.forEach((r, idx) => { if (r !== null) allPoints.push({ idx, r }); });
+
+        let markup = "";
+        let segStart = 0;
+        for (let i = 1; i <= allPoints.length; i++) {
+            const brokenHere = i === allPoints.length || allPoints[i].idx !== allPoints[i - 1].idx + 1;
+            if (brokenHere) {
+                const seg = allPoints.slice(segStart, i);
+                if (seg.length > 1) {
+                    const d = seg.map((p, j) => `${j === 0 ? "M" : "L"}${xFor(p.idx)},${yFor(p.r)}`).join(" ");
+                    markup += `<path d="${d}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"/>`;
+                }
+                segStart = i;
+            }
+        }
+
+        allPoints.forEach(p => {
+            markup += `<circle cx="${xFor(p.idx)}" cy="${yFor(p.r)}" r="${labeled ? 3.5 : 2.5}" fill="${color}" style="pointer-events:none;"/>`;
+        });
+
+        const hitD = allPoints.map((p, i) => `${i === 0 ? "M" : "L"}${xFor(p.idx)},${yFor(p.r)}`).join(" ");
+        markup += `<path d="${hitD}" fill="none" stroke="transparent" stroke-width="14" data-musician-id="${s.id}"><title>${escapeHtml(s.name)}</title></path>`;
+
+        if (labeled && allPoints.length > 0) {
+            const last = allPoints[allPoints.length - 1];
+            markup += `<circle cx="${xFor(last.idx)}" cy="${yFor(last.r)}" r="6" fill="${color}" style="pointer-events:none;"/>`;
+            markup += `<text x="${xFor(last.idx) + 12}" y="${yFor(last.r) + 4}" font-size="12" fill="var(--text-primary)" style="pointer-events:none;">${escapeHtml(s.name)}</text>`;
+        }
+
+        return markup;
+    }
+
+    let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="100%" style="min-width:560px;" role="img" aria-label="Evolución mensual de la posición en el ranking de asistencia">`;
+
+    const gridStep = Math.max(1, Math.round(maxRank / 12));
+    for (let r = 1; r <= maxRank; r += gridStep) {
+        svg += `<line x1="${leftPad - 8}" y1="${yFor(r)}" x2="${chartWidth - rightPad + 8}" y2="${yFor(r)}" stroke="var(--text-muted)" stroke-opacity="0.08" stroke-width="1"/>`;
+    }
+    months.forEach((m, idx) => {
+        svg += `<text x="${xFor(idx)}" y="${chartHeight - 12}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${formatMonthShortLabelEs(m)}</text>`;
+    });
+
+    const backgroundSeries = series.filter(s => selected ? s.id !== selected : !top3Ids.includes(s.id));
+    backgroundSeries.forEach(s => {
+        svg += buildSeriesMarkup(s, "var(--text-muted)", 1.5, false);
+    });
+
+    if (selected) {
+        const s = series.find(x => x.id === selected);
+        if (s) svg += buildSeriesMarkup(s, "#D4AF37", 3, true);
+    } else {
+        top3Ids.forEach((id, i) => {
+            const s = series.find(x => x.id === id);
+            if (s) svg += buildSeriesMarkup(s, topColors[i], 2.5, true);
+        });
+    }
+
+    svg += `</svg>`;
+    container.innerHTML = svg;
+
+    container.querySelectorAll("[data-musician-id]").forEach(el => {
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => {
+            const id = el.getAttribute("data-musician-id");
+            advancedStatsSelectedMusicianId = (advancedStatsSelectedMusicianId === id) ? "" : id;
+            renderAdvancedStatsBumpChart();
+        });
+    });
+}
+
+function setupAdvancedStatsEvents() {
+    const selectEl = document.getElementById("advanced-stats-musician-select");
+    if (selectEl) {
+        selectEl.addEventListener("change", () => {
+            advancedStatsSelectedMusicianId = selectEl.value || "";
+            renderAdvancedStatsBumpChart();
+        });
+    }
+}
 
 function updateLugarEnsayoImagePreview() {
     const placeholder = document.getElementById("lugar-ensayo-image-placeholder");
