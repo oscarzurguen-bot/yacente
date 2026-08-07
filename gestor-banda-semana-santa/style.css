@@ -1573,6 +1573,11 @@ svg.chevron {
     pointer-events: all !important;
     z-index: 10000000 !important;
 }
+/* La vista ampliada de foto puede abrirse encima de otro modal (ej. detalle de músico),
+   así que necesita quedar siempre por encima independientemente del orden en el DOM */
+#modal-photo-preview.active {
+    z-index: 10000001 !important;
+}
 
 .modal-card {
     background-color: var(--bg-secondary);
