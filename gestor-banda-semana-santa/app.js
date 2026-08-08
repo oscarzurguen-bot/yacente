@@ -15578,7 +15578,7 @@ function renderAdvancedStatsBumpChart() {
         return markup;
     }
 
-    let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="100%" style="min-width:560px;" role="img" aria-label="Evolución mensual de la posición en el ranking de asistencia">`;
+    let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="${chartWidth}" height="${chartHeight}" style="width:100%; height:auto; min-width:560px; display:block;" role="img" aria-label="Evolución mensual de la posición en el ranking de asistencia">`;
 
     const gridStep = Math.max(1, Math.round(maxRank / 12));
     for (let r = 1; r <= maxRank; r += gridStep) {
