@@ -1338,7 +1338,7 @@
                                 <line x1="12" y1="20" x2="12" y2="4"></line>
                                 <line x1="6" y1="20" x2="6" y2="14"></line>
                             </svg>
-                            Estadísticas Avanzadas
+                            Estadísticas avanzadas (prueba)
                         </h3>
                         <p class="text-muted" style="margin: 0;">Gráficos detallados para analizar la evolución de la banda en profundidad.</p>
                     </div>
@@ -1394,21 +1394,28 @@
                     Volver a Otros
                 </a>
 
-                <div class="card" style="padding: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 6px;">
+                <div class="card-collapsible collapsed" id="card-advstats-ranking-evolution" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
                         <div>
                             <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">Evolución del ranking de asistencia</h3>
                             <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
                                 Posición mensual de cada músico. Por defecto se resalta el Top 3 actual; selecciona a cualquier músico para ver solo su evolución.
                             </p>
                         </div>
-                        <select id="advanced-stats-musician-select" style="min-width: 220px;"></select>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
                     </div>
+                    <div class="card-collapsible-content">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                            <select id="advanced-stats-musician-select" style="min-width: 220px;"></select>
+                        </div>
 
-                    <div id="advanced-stats-bump-chart-container" style="margin-top: 16px; overflow-x: auto;"></div>
-                    <div id="advanced-stats-bump-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
-                        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📈</span>
-                        Todavía no hay suficientes meses con asistencia registrada para mostrar una evolución.
+                        <div id="advanced-stats-bump-chart-container" style="margin-top: 10px; overflow-x: auto;"></div>
+                        <div id="advanced-stats-bump-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📈</span>
+                            Todavía no hay suficientes meses con asistencia registrada para mostrar una evolución.
+                        </div>
                     </div>
                 </div>
             </section>
