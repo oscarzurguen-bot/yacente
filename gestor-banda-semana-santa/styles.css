@@ -1250,16 +1250,97 @@ body {
   margin-top: 2px;
 }
 
-.passport-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+.passport-container {
+  width: 100%;
+  display: block;
 }
 
-@media (max-width: 360px) {
-  .passport-grid {
-    grid-template-columns: 1fr;
-  }
+.passport-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+  width: 100%;
+}
+
+/* CLASIFICACIÓN DE PASAPORTE POR COMUNIDADES Y PROVINCIAS */
+.region-classification-block {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.region-header-title {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--primary-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid rgba(245, 158, 11, 0.45);
+  padding-bottom: 6px;
+  margin-bottom: 14px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.province-group-block {
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+.province-subtitle {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-title);
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 4px solid var(--primary-gold);
+  border-radius: 4px 10px 10px 4px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .province-subtitle {
+  background: rgba(245, 158, 11, 0.12);
+  border-left-color: #D97706;
+  color: #1F2937;
+}
+
+.province-left-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.province-name-text {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.province-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.22);
+  color: var(--primary-gold);
+  padding: 3px 9px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .province-count-badge {
+  background: rgba(217, 119, 6, 0.15);
+  color: #B45309;
 }
 
 .passport-stamp-card {
@@ -1320,12 +1401,41 @@ body {
 }
 
 .stamp-town-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
   font-family: var(--font-heading);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--text-title);
   margin-bottom: 4px;
   padding-right: 26px;
+  line-height: 1.25;
+}
+
+.stamp-town-name .town-icon {
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.stamp-town-name .town-text-name {
+  flex: 1;
+  word-break: break-word;
+}
+
+.stamp-badge-capital {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.15));
+  border: 1px solid var(--primary-gold);
+  color: var(--primary-gold);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  white-space: nowrap;
 }
 
 .stamp-info-row {
