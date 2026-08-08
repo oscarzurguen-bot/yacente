@@ -130,7 +130,8 @@ let state = {
         const y = today.getFullYear();
         const m = today.getMonth() + 1;
         return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
-    })()
+    })(),
+    statsHeatmapSelectedYear: null
 };
 
 let preavisoSelectedStatus = null;
@@ -1876,6 +1877,15 @@ function setupEventListeners() {
         });
     }
 
+    // Selector de año del calendar heatmap (Estadísticas Avanzadas)
+    const heatmapYearSelect = document.getElementById("advanced-stats-heatmap-year-select");
+    if (heatmapYearSelect) {
+        heatmapYearSelect.addEventListener("change", (e) => {
+            state.statsHeatmapSelectedYear = e.target.value;
+            renderStatsCalendarHeatmap();
+        });
+    }
+
     const btnDownloadSeasonReport = document.getElementById("btn-download-season-report");
     if (btnDownloadSeasonReport) {
         btnDownloadSeasonReport.addEventListener("click", () => {
@@ -3613,6 +3623,8 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Gráficos detallados de la banda";
             dateContainer.classList.add("hidden");
             renderStatsSectionTreemap();
+            renderStatsAbsenceSunburst();
+            renderStatsCalendarHeatmap();
             renderAdvancedStatsBumpChart();
             break;
         case "section-componente-notificaciones":
@@ -15731,6 +15743,356 @@ function renderStatsSectionTreemap() {
 
         container.appendChild(cell);
     });
+}
+
+// ==========================================================================
+// SUNBURST DE MOTIVOS DE FALTA (Estadísticas Avanzadas)
+// ==========================================================================
+function hexToRgbParts(hex) {
+    const clean = hex.replace('#', '');
+    const bigint = parseInt(clean, 16);
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+// percent > 0 aclara hacia blanco, percent < 0 oscurece hacia negro (-100..100)
+function shadeHexColor(hex, percent) {
+    const { r, g, b } = hexToRgbParts(hex);
+    const target = percent < 0 ? 0 : 255;
+    const p = Math.min(Math.abs(percent), 100) / 100;
+    const nr = Math.round((target - r) * p + r);
+    const ng = Math.round((target - g) * p + g);
+    const nb = Math.round((target - b) * p + b);
+    return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+    const angleRad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+}
+
+// Genera el "d" de un anillo/gajo de donut entre dos radios y dos ángulos (grados, 0 = arriba,
+// sentido horario). Se recorta el tramo a un máximo de 359.9° para evitar el caso degenerado
+// de un arco SVG con el mismo punto de inicio y fin (círculo completo).
+function donutSlicePath(cx, cy, innerR, outerR, startAngle, endAngle) {
+    let end = endAngle;
+    if (end - startAngle >= 359.9) end = startAngle + 359.9;
+    const largeArc = (end - startAngle) > 180 ? 1 : 0;
+    const p1 = polarToCartesian(cx, cy, outerR, end);
+    const p2 = polarToCartesian(cx, cy, outerR, startAngle);
+    const p3 = polarToCartesian(cx, cy, innerR, startAngle);
+    const p4 = polarToCartesian(cx, cy, innerR, end);
+    return [
+        `M ${p1.x} ${p1.y}`,
+        `A ${outerR} ${outerR} 0 ${largeArc} 0 ${p2.x} ${p2.y}`,
+        `L ${p3.x} ${p3.y}`,
+        `A ${innerR} ${innerR} 0 ${largeArc} 1 ${p4.x} ${p4.y}`,
+        "Z"
+    ].join(" ");
+}
+
+// Recorta simétricamente un pequeño hueco angular entre gajos contiguos, salvo que el gajo
+// sea demasiado fino (en cuyo caso se dibuja sin hueco para no invertir el arco).
+function trimAngleGap(start, end, gapDeg) {
+    const span = end - start;
+    if (span <= gapDeg * 3) return { start, end };
+    return { start: start + gapDeg / 2, end: end - gapDeg / 2 };
+}
+
+// Todas las faltas históricas (convocatorias concluidas, sin filtros), agrupadas por
+// justificada/no justificada y, dentro de cada una, por motivo exacto introducido.
+function computeAbsenceReasonSunburstData() {
+    const groups = {
+        justificada: { total: 0, reasons: {} },
+        no_justificada: { total: 0, reasons: {} }
+    };
+
+    const allDates = getAllSessionDatesCached();
+    allDates.forEach(date => {
+        if (!isSessionConcluded(date)) return;
+        const dayRecord = state.attendance[date] || {};
+        state.musicians.forEach(m => {
+            const record = dayRecord[m.id];
+            if (!record || record.status !== "absent") return;
+            if (isMusicianOnLeaveOnDate(m, date)) return;
+
+            const bucket = record.justified ? groups.justificada : groups.no_justificada;
+            bucket.total++;
+            const reason = (record.reason || "").trim() || "Sin especificar";
+            bucket.reasons[reason] = (bucket.reasons[reason] || 0) + 1;
+        });
+    });
+
+    return groups;
+}
+
+function renderStatsAbsenceSunburst() {
+    const container = document.getElementById("advanced-stats-sunburst-container");
+    const emptyState = document.getElementById("advanced-stats-sunburst-empty");
+    if (!container) return;
+
+    const groups = computeAbsenceReasonSunburstData();
+    const totalAbsences = groups.justificada.total + groups.no_justificada.total;
+
+    container.innerHTML = "";
+
+    if (totalAbsences === 0) {
+        container.classList.add("hidden");
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+
+    const CX = 200, CY = 200;
+    const INNER_R0 = 54, INNER_R1 = 106;
+    const OUTER_R0 = 110, OUTER_R1 = 174;
+    const GAP_DEG = 0.8;
+
+    const groupDefs = [
+        { key: "justificada", label: "Justificada", baseColor: "#E67E22" },
+        { key: "no_justificada", label: "No justificada", baseColor: "#E74C3C" }
+    ];
+
+    let innerPaths = "";
+    let outerPaths = "";
+    const legendGroups = [];
+    let angleCursor = 0;
+
+    groupDefs.forEach(gd => {
+        const grp = groups[gd.key];
+        if (grp.total === 0) return;
+
+        const span = (grp.total / totalAbsences) * 360;
+        const start = angleCursor;
+        const end = angleCursor + span;
+        const pct = Math.round((grp.total / totalAbsences) * 100);
+
+        const innerTrim = trimAngleGap(start, end, GAP_DEG);
+        innerPaths += `<path d="${donutSlicePath(CX, CY, INNER_R0, INNER_R1, innerTrim.start, innerTrim.end)}" fill="${gd.baseColor}" stroke="var(--bg-primary)" stroke-width="1.5"><title>${gd.label}: ${grp.total} falta${grp.total === 1 ? '' : 's'} (${pct}%)</title></path>`;
+
+        const reasonEntries = Object.entries(grp.reasons).sort((a, b) => b[1] - a[1]);
+        const legendReasons = [];
+        let subCursor = start;
+        reasonEntries.forEach(([reason, count], idx) => {
+            const subSpan = (count / grp.total) * span;
+            const subStart = subCursor;
+            const subEnd = subCursor + subSpan;
+            const shadePct = reasonEntries.length <= 1 ? 0 : -25 + (idx / (reasonEntries.length - 1)) * 55;
+            const color = shadeHexColor(gd.baseColor, shadePct);
+            const reasonPct = Math.round((count / totalAbsences) * 100);
+
+            const safeReason = escapeHtml(reason);
+            const outerTrim = trimAngleGap(subStart, subEnd, GAP_DEG);
+            outerPaths += `<path d="${donutSlicePath(CX, CY, OUTER_R0, OUTER_R1, outerTrim.start, outerTrim.end)}" fill="${color}" stroke="var(--bg-primary)" stroke-width="1.5"><title>${safeReason} (${gd.label}): ${count} falta${count === 1 ? '' : 's'} (${reasonPct}%)</title></path>`;
+
+            legendReasons.push({ reason: safeReason, count, color });
+            subCursor = subEnd;
+        });
+
+        legendGroups.push({ label: gd.label, color: gd.baseColor, total: grp.total, pct, reasons: legendReasons });
+        angleCursor = end;
+    });
+
+    const svg = `
+        <svg viewBox="0 0 400 400" width="320" height="320" style="flex-shrink: 0;">
+            ${outerPaths}
+            ${innerPaths}
+            <circle cx="${CX}" cy="${CY}" r="${INNER_R0 - 4}" fill="var(--bg-card)" stroke="var(--border-color)" stroke-width="1"></circle>
+            <text x="${CX}" y="${CY - 6}" text-anchor="middle" style="font-family: 'Cinzel', serif; font-size: 28px; font-weight: 700; fill: var(--text-primary);">${totalAbsences}</text>
+            <text x="${CX}" y="${CY + 16}" text-anchor="middle" style="font-size: 12px; fill: var(--text-muted);">falta${totalAbsences === 1 ? '' : 's'} registrada${totalAbsences === 1 ? '' : 's'}</text>
+        </svg>
+    `;
+
+    let legendHTML = `<div style="display: flex; flex-direction: column; gap: 18px; min-width: 220px; max-width: 320px;">`;
+    legendGroups.forEach(g => {
+        legendHTML += `
+            <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="width: 12px; height: 12px; border-radius: 3px; background: ${g.color}; display: inline-block; flex-shrink: 0;"></span>
+                    <strong style="font-size: 0.9rem; color: var(--text-primary);">${g.label}</strong>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${g.total} (${g.pct}%)</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px; padding-left: 20px;">
+                    ${g.reasons.map(r => `
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-secondary);">
+                            <span style="width: 9px; height: 9px; border-radius: 2px; background: ${r.color}; display: inline-block; flex-shrink: 0;"></span>
+                            <span style="flex: 1; overflow-wrap: anywhere;">${r.reason}</span>
+                            <span style="font-weight: 600; color: var(--text-primary);">${r.count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+    legendHTML += `</div>`;
+
+    container.innerHTML = svg + legendHTML;
+}
+
+// ==========================================================================
+// CALENDAR HEATMAP ANUAL (Estadísticas Avanzadas)
+// ==========================================================================
+const MESES_CORTO_ES_HEATMAP = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+// Asistencia media (día completo, todas las convocatorias de ese día) por fecha de calendario
+// del año indicado. Varias sesiones el mismo día (p.ej. "2024-03-15" y "2024-03-15_actuacion")
+// se agregan en una sola celda.
+function computeYearlyAttendanceHeatmapData(year) {
+    const dayBuckets = {};
+
+    const allDates = getAllSessionDatesCached();
+    allDates.forEach(dateKey => {
+        if (!isSessionConcluded(dateKey)) return;
+        const rawDate = dateKey.split("_")[0];
+        if (!rawDate.startsWith(`${year}-`)) return;
+
+        const dayRecord = state.attendance[dateKey] || {};
+        state.musicians.forEach(m => {
+            const record = dayRecord[m.id];
+            if (!record) return;
+            if (isMusicianOnLeaveOnDate(m, dateKey)) return;
+
+            if (!dayBuckets[rawDate]) dayBuckets[rawDate] = { presents: 0, total: 0 };
+            dayBuckets[rawDate].total++;
+            if (record.status === "present") dayBuckets[rawDate].presents++;
+        });
+    });
+
+    return dayBuckets;
+}
+
+// Posiciona cada día del año en la cuadrícula estilo GitHub: filas = día de la semana
+// (0 = lunes ... 6 = domingo), columnas = nº de semana desde el lunes anterior (o igual)
+// al 1 de enero, para que las columnas completas representen semanas naturales.
+function computeCalendarHeatmapLayout(year) {
+    const jan1 = new Date(year, 0, 1);
+    const dec31 = new Date(year, 11, 31);
+    const mondayOffset = (jan1.getDay() + 6) % 7; // 0 si el 1 de enero ya es lunes
+    const gridStart = new Date(year, 0, 1 - mondayOffset);
+
+    const days = [];
+    const cursor = new Date(gridStart);
+    let index = 0;
+    while (cursor <= dec31) {
+        if (cursor.getFullYear() === year) {
+            const row = (cursor.getDay() + 6) % 7;
+            const col = Math.floor(index / 7);
+            const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+            days.push({ date: dateStr, row, col, month: cursor.getMonth() });
+        }
+        cursor.setDate(cursor.getDate() + 1);
+        index++;
+    }
+    return days;
+}
+
+// Mismo esquema semántico rojo/ámbar/verde que el resto de "Estadísticas Avanzadas", pero
+// con la opacidad graduada dentro de cada franja para lograr el efecto "heatmap".
+function getHeatmapDayColor(pct) {
+    if (pct === null) return "var(--bg-compact-card)";
+    let base, zoneMin, zoneMax;
+    if (pct >= 80) { base = "#2ECC71"; zoneMin = 80; zoneMax = 100; }
+    else if (pct >= 50) { base = "#E67E22"; zoneMin = 50; zoneMax = 79; }
+    else { base = "#E74C3C"; zoneMin = 0; zoneMax = 49; }
+
+    const t = zoneMax > zoneMin ? (pct - zoneMin) / (zoneMax - zoneMin) : 1;
+    const opacity = (0.45 + t * 0.55).toFixed(2);
+    const { r, g, b } = hexToRgbParts(base);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+function renderStatsCalendarHeatmap() {
+    const container = document.getElementById("advanced-stats-heatmap-container");
+    const emptyState = document.getElementById("advanced-stats-heatmap-empty");
+    const yearSelect = document.getElementById("advanced-stats-heatmap-year-select");
+    if (!container) return;
+
+    const allDates = getAllSessionDatesCached();
+    const years = Array.from(new Set(
+        allDates
+            .map(d => parseInt(d.split("_")[0].split("-")[0], 10))
+            .filter(y => !isNaN(y))
+    )).sort((a, b) => b - a);
+
+    if (years.length === 0) {
+        container.innerHTML = "";
+        container.classList.add("hidden");
+        if (yearSelect) yearSelect.innerHTML = "";
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+
+    if (yearSelect) {
+        const wantedOptions = years.map(String);
+        const currentOptions = Array.from(yearSelect.options).map(o => o.value);
+        const optionsMatch = currentOptions.length === wantedOptions.length && currentOptions.every((v, i) => v === wantedOptions[i]);
+        if (!optionsMatch) {
+            yearSelect.innerHTML = "";
+            years.forEach(y => {
+                const opt = document.createElement("option");
+                opt.value = String(y);
+                opt.innerText = String(y);
+                yearSelect.appendChild(opt);
+            });
+        }
+        if (!state.statsHeatmapSelectedYear || !years.includes(parseInt(state.statsHeatmapSelectedYear, 10))) {
+            state.statsHeatmapSelectedYear = years[0];
+        }
+        yearSelect.value = String(state.statsHeatmapSelectedYear);
+    }
+
+    const year = parseInt(yearSelect ? yearSelect.value : years[0], 10);
+    const dayBuckets = computeYearlyAttendanceHeatmapData(year);
+    const layout = computeCalendarHeatmapLayout(year);
+
+    const CELL = 11, GAP = 3, STEP = CELL + GAP;
+    const LEFT_MARGIN = 26, TOP_MARGIN = 18;
+    const numCols = layout.reduce((max, d) => Math.max(max, d.col), 0) + 1;
+    const width = LEFT_MARGIN + numCols * STEP;
+    const height = TOP_MARGIN + 7 * STEP;
+
+    let cellsSVG = "";
+    layout.forEach(d => {
+        const bucket = dayBuckets[d.date];
+        const pct = bucket && bucket.total > 0 ? Math.round((bucket.presents / bucket.total) * 100) : null;
+        const color = getHeatmapDayColor(pct);
+        const x = LEFT_MARGIN + d.col * STEP;
+        const y = TOP_MARGIN + d.row * STEP;
+        const label = pct === null
+            ? `${formatDateSpanish(d.date)}: sin convocatoria`
+            : `${formatDateSpanish(d.date)}: ${pct}% asistencia (${bucket.presents}/${bucket.total})`;
+        cellsSVG += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2.5" fill="${color}" stroke="var(--border-color)" stroke-width="0.5"><title>${label}</title></rect>`;
+    });
+
+    // Etiquetas de mes: se coloca cada una en la columna de su primer día del año.
+    let monthLabelsSVG = "";
+    let lastLabelCol = -3;
+    for (let m = 0; m < 12; m++) {
+        const firstDay = layout.find(d => d.month === m);
+        if (!firstDay) continue;
+        if (firstDay.col - lastLabelCol < 2) continue; // evita solapes en meses muy cortos
+        const x = LEFT_MARGIN + firstDay.col * STEP;
+        monthLabelsSVG += `<text x="${x}" y="${TOP_MARGIN - 6}" style="font-size: 10px; fill: var(--text-muted);">${MESES_CORTO_ES_HEATMAP[m]}</text>`;
+        lastLabelCol = firstDay.col;
+    }
+
+    // Etiquetas de día de la semana (solo Lun/Mié/Vie, como GitHub, para no saturar).
+    const dayLabels = [{ row: 0, label: "Lun" }, { row: 2, label: "Mié" }, { row: 4, label: "Vie" }];
+    let dayLabelsSVG = "";
+    dayLabels.forEach(dl => {
+        const y = TOP_MARGIN + dl.row * STEP + CELL - 1;
+        dayLabelsSVG += `<text x="0" y="${y}" style="font-size: 9px; fill: var(--text-muted);">${dl.label}</text>`;
+    });
+
+    container.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="max-width: 100%;">
+            ${monthLabelsSVG}
+            ${dayLabelsSVG}
+            ${cellsSVG}
+        </svg>
+    `;
 }
 
 // Calcula, para cada uno de los últimos "maxMonths" meses con datos, la posición de cada

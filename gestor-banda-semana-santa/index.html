@@ -1420,6 +1420,57 @@
                     </div>
                 </div>
 
+                <div class="card-collapsible collapsed" id="card-advstats-sunburst" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">☀️ Sunburst de motivos de falta</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Anillo interior: justificada vs no justificada. Anillo exterior: el motivo concreto dentro de cada una. Muestra jerarquía y proporción a la vez.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div id="advanced-stats-sunburst-container" style="margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 24px;"></div>
+                        <div id="advanced-stats-sunburst-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">☀️</span>
+                            Todavía no hay faltas registradas para generar el sunburst.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-collapsible collapsed" id="card-advstats-heatmap" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">🗓️ Calendar heatmap</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Un año entero de un vistazo, cada día coloreado según la asistencia general de ese día. Ideal para detectar rachas y patrones estacionales.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                            <select id="advanced-stats-heatmap-year-select" style="min-width: 120px;"></select>
+                        </div>
+                        <div id="advanced-stats-heatmap-container" style="margin-top: 10px; overflow-x: auto;"></div>
+                        <div id="advanced-stats-heatmap-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🗓️</span>
+                            Todavía no hay convocatorias registradas para generar el calendario.
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; font-size: 0.78rem; color: var(--text-muted);">
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--bg-compact-card); border: 1px solid var(--border-color); display: inline-block;"></span>Sin convocatoria</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-absent); display: inline-block;"></span>&lt; 50%</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-justified); display: inline-block;"></span>50–79%</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-present); display: inline-block;"></span>≥ 80%</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card-collapsible collapsed" id="card-advstats-ranking-evolution" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
                         <div>
