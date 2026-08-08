@@ -3612,6 +3612,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageTitle.innerText = "Estadísticas Avanzadas";
             pageSubtitle.innerText = "Gráficos detallados de la banda";
             dateContainer.classList.add("hidden");
+            renderStatsSectionTreemap();
             renderAdvancedStatsBumpChart();
             break;
         case "section-componente-notificaciones":
@@ -15539,6 +15540,197 @@ const MESES_CORTO_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", 
 function formatMonthShortLabelEs(monthStr) {
     const [y, m] = monthStr.split("-");
     return `${MESES_CORTO_ES[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+}
+
+// ==========================================================================
+// TREEMAP POR VOZ/SECCIÓN (Estadísticas Avanzadas)
+// ==========================================================================
+// Algoritmo "squarified treemap" (Bruls, Huizing & van Wijk): coloca los rectángulos
+// en filas/columnas eligiendo en cada paso la orientación que mantiene los rectángulos
+// lo más cuadrados posible, en vez de simplemente repartir el ancho en proporción al valor.
+// Trabaja en un sistema de coordenadas normalizado (w × h) que luego se traduce a
+// porcentajes CSS, así que no depende del tamaño real en píxeles del contenedor.
+function squarifyTreemapLayout(items, x, y, w, h) {
+    const results = [];
+
+    function worstRatio(rowAreas, sideLength) {
+        const sum = rowAreas.reduce((a, b) => a + b, 0);
+        if (sum <= 0) return Infinity;
+        const maxA = Math.max(...rowAreas);
+        const minA = Math.min(...rowAreas);
+        const sideSq = sideLength * sideLength;
+        const sumSq = sum * sum;
+        return Math.max((sideSq * maxA) / sumSq, sumSq / (sideSq * minA));
+    }
+
+    function layout(items, x, y, w, h) {
+        if (items.length === 0 || w <= 0 || h <= 0) return;
+        if (items.length === 1) {
+            results.push({ item: items[0], x, y, w, h });
+            return;
+        }
+
+        const shortSide = Math.min(w, h);
+        let row = [items[0]];
+        let rowAreas = [items[0].area];
+        let i = 1;
+        while (i < items.length) {
+            const nextRowAreas = rowAreas.concat([items[i].area]);
+            if (worstRatio(nextRowAreas, shortSide) <= worstRatio(rowAreas, shortSide)) {
+                row.push(items[i]);
+                rowAreas = nextRowAreas;
+                i++;
+            } else {
+                break;
+            }
+        }
+
+        const rowAreaSum = rowAreas.reduce((a, b) => a + b, 0);
+        const remaining = items.slice(i);
+
+        if (w >= h) {
+            // Contenedor apaisado: el lado corto es la altura -> se apila una columna
+            // vertical a la izquierda que ocupa toda la altura disponible.
+            const colWidth = h > 0 ? rowAreaSum / h : 0;
+            let offsetY = y;
+            row.forEach((it, idx) => {
+                const itH = colWidth > 0 ? rowAreas[idx] / colWidth : 0;
+                results.push({ item: it, x, y: offsetY, w: colWidth, h: itH });
+                offsetY += itH;
+            });
+            layout(remaining, x + colWidth, y, w - colWidth, h);
+        } else {
+            // Contenedor apaisado en vertical: el lado corto es el ancho -> se apila una
+            // fila horizontal arriba que ocupa todo el ancho disponible.
+            const rowHeight = w > 0 ? rowAreaSum / w : 0;
+            let offsetX = x;
+            row.forEach((it, idx) => {
+                const itW = rowHeight > 0 ? rowAreas[idx] / rowHeight : 0;
+                results.push({ item: it, x: offsetX, y, w: itW, h: rowHeight });
+                offsetX += itW;
+            });
+            layout(remaining, x, y + rowHeight, w, h - rowHeight);
+        }
+    }
+
+    const total = items.reduce((s, it) => s + it.value, 0);
+    if (total <= 0) return [];
+    const scale = (w * h) / total;
+    const scaledItems = items.map(it => ({ ...it, area: it.value * scale }));
+    layout(scaledItems, x, y, w, h);
+    return results;
+}
+
+// Asistencia media histórica (todas las convocatorias concluidas, sin filtros) y
+// tamaño (nº de componentes activos) de cada sección, para el treemap.
+function computeSectionTreemapData() {
+    const sectionAttendance = {};
+    SECCIONES_ORDEN.forEach(sec => { sectionAttendance[sec] = { totalCheck: 0, presents: 0 }; });
+
+    const allDates = getAllSessionDatesCached();
+    allDates.forEach(date => {
+        if (!isSessionConcluded(date)) return;
+        const dayRecord = state.attendance[date] || {};
+        state.musicians.forEach(m => {
+            const record = dayRecord[m.id];
+            if (!record) return;
+            if (isMusicianOnLeaveOnDate(m, date)) return;
+            const bucket = sectionAttendance[m.instrument];
+            if (!bucket) return;
+            bucket.totalCheck++;
+            if (record.status === "present") bucket.presents++;
+        });
+    });
+
+    const sectionCounts = {};
+    (state.musicians || []).forEach(m => {
+        if (m.status === "inactive") return;
+        sectionCounts[m.instrument] = (sectionCounts[m.instrument] || 0) + 1;
+    });
+
+    return SECCIONES_ORDEN
+        .map(sec => {
+            const count = sectionCounts[sec] || 0;
+            const att = sectionAttendance[sec];
+            const pct = att.totalCheck > 0 ? Math.round((att.presents / att.totalCheck) * 100) : null;
+            return { section: sec, value: count, pct };
+        })
+        .filter(s => s.value > 0);
+}
+
+function renderStatsSectionTreemap() {
+    const container = document.getElementById("advanced-stats-treemap-container");
+    const emptyState = document.getElementById("advanced-stats-treemap-empty");
+    if (!container) return;
+
+    const data = computeSectionTreemapData();
+
+    if (data.length === 0) {
+        container.innerHTML = "";
+        container.classList.add("hidden");
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+
+    // Coordenadas normalizadas: la relación 1000x460 aproxima el ancho/alto típico de la
+    // tarjeta para que los rectángulos salgan razonablemente cuadrados en escritorio.
+    const LAYOUT_W = 1000;
+    const LAYOUT_H = 460;
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+    const rects = squarifyTreemapLayout(sorted, 0, 0, LAYOUT_W, LAYOUT_H);
+
+    container.style.position = "relative";
+    container.style.width = "100%";
+    container.style.height = "380px";
+    container.innerHTML = "";
+
+    rects.forEach(r => {
+        const d = r.item;
+        let color = "rgba(255,255,255,0.12)";
+        let pctLabel = "Sin datos";
+        if (d.pct !== null) {
+            color = "var(--color-present)";
+            if (d.pct < 80) color = "var(--color-justified)";
+            if (d.pct < 50) color = "var(--color-absent)";
+            pctLabel = `${d.pct}% asistencia`;
+        }
+
+        const areaPx = (r.w / LAYOUT_W) * (r.h / LAYOUT_H); // fracción del área total (0-1)
+        const showSubtitle = areaPx > 0.02 && r.h > (LAYOUT_H * 0.09);
+        const fontSize = areaPx > 0.09 ? "0.95rem" : (areaPx > 0.035 ? "0.82rem" : "0.72rem");
+
+        const cell = document.createElement("div");
+        cell.title = `${d.section}: ${pctLabel} · ${d.value} componente${d.value === 1 ? '' : 's'}`;
+        cell.style.position = "absolute";
+        cell.style.left = `${(r.x / LAYOUT_W) * 100}%`;
+        cell.style.top = `${(r.y / LAYOUT_H) * 100}%`;
+        cell.style.width = `${(r.w / LAYOUT_W) * 100}%`;
+        cell.style.height = `${(r.h / LAYOUT_H) * 100}%`;
+        cell.style.boxSizing = "border-box";
+        cell.style.border = "2px solid var(--bg-primary)";
+        cell.style.background = color;
+        cell.style.color = "#FFF";
+        cell.style.display = "flex";
+        cell.style.flexDirection = "column";
+        cell.style.alignItems = "center";
+        cell.style.justifyContent = "center";
+        cell.style.textAlign = "center";
+        cell.style.padding = "4px";
+        cell.style.overflow = "hidden";
+        cell.style.cursor = "default";
+        cell.style.transition = "filter 0.15s ease";
+        cell.onmouseenter = () => { cell.style.filter = "brightness(1.12)"; };
+        cell.onmouseleave = () => { cell.style.filter = "none"; };
+
+        cell.innerHTML = `
+            <span style="font-weight: 700; font-size: ${fontSize}; line-height: 1.2; text-shadow: 0 1px 3px rgba(0,0,0,0.4); overflow-wrap: anywhere;">${d.section}</span>
+            ${showSubtitle ? `<span style="font-size: 0.78rem; opacity: 0.92; margin-top: 3px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4);">${pctLabel}</span>` : ''}
+        `;
+
+        container.appendChild(cell);
+    });
 }
 
 // Calcula, para cada uno de los últimos "maxMonths" meses con datos, la posición de cada

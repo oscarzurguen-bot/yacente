@@ -2783,9 +2783,10 @@ svg.chevron {
 .card-collapsible-header .collapse-icon {
     color: var(--color-gold);
     transition: transform 0.25s ease;
+    transform: rotate(180deg); /* Desplegado: flecha hacia arriba (para replegar) */
 }
 .card-collapsible.collapsed .card-collapsible-header .collapse-icon {
-    transform: rotate(-90deg);
+    transform: rotate(0deg); /* Replegado: flecha hacia abajo (para desplegar) */
 }
 .card-collapsible-content {
     margin-top: 16px;

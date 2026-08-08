@@ -1394,6 +1394,32 @@
                     Volver a Otros
                 </a>
 
+                <div class="card-collapsible collapsed" id="card-advstats-treemap" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">🌳 Treemap por voz/sección</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Rectángulos proporcionales al tamaño de cada sección, coloreados por su asistencia media. Un vistazo te dice qué sección va peor sin leer una sola tabla.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div id="advanced-stats-treemap-container" style="margin-top: 10px;"></div>
+                        <div id="advanced-stats-treemap-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🌳</span>
+                            Todavía no hay datos de asistencia registrados para generar el treemap.
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 0.78rem; color: var(--text-muted);">
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-present); display: inline-block;"></span>≥ 80% asistencia</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-justified); display: inline-block;"></span>50–79% asistencia</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-absent); display: inline-block;"></span>&lt; 50% asistencia</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card-collapsible collapsed" id="card-advstats-ranking-evolution" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
                         <div>
