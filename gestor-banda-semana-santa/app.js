@@ -15970,7 +15970,7 @@ function renderStatsAttendanceSunburstUnsafe() {
             ${innerPaths}
             <circle cx="${CX}" cy="${CY}" r="${INNER_R0 - 4}" fill="var(--bg-card)" stroke="var(--border-color)" stroke-width="1"></circle>
             <text x="${CX}" y="${CY - 6}" text-anchor="middle" style="font-family: 'Cinzel', serif; font-size: 28px; font-weight: 700; fill: var(--text-primary);">${totalRecords}</text>
-            <text x="${CX}" y="${CY + 16}" text-anchor="middle" style="font-size: 12px; fill: var(--text-muted);">convocatoria${totalRecords === 1 ? '' : 's'} registrada${totalRecords === 1 ? '' : 's'}</text>
+            <text x="${CX}" y="${CY + 16}" text-anchor="middle" style="font-size: 12px; fill: var(--text-muted);">registro${totalRecords === 1 ? '' : 's'}</text>
         </svg>
     `;
 
