@@ -710,6 +710,7 @@ function startCloudSync() {
         if (snapshot.size > 0) {
             state.musicians = musicians;
             localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+            invalidateMusicianStatsCache();
             renderPlantillaTable();
             populateLoginMusicians();
             if (document.getElementById("section-pasar-lista").classList.contains("active")) {
@@ -736,6 +737,7 @@ function startCloudSync() {
             state.attendance[doc.id] = doc.data();
         });
         localStorage.setItem("harmonia_attendance", JSON.stringify(state.attendance));
+        invalidateMusicianStatsCache();
         if (document.getElementById("section-pasar-lista").classList.contains("active")) {
             renderAttendance();
         }
@@ -776,6 +778,7 @@ function startCloudSync() {
             state.sessionTypes[doc.id] = doc.data();
         });
         localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
+        invalidateMusicianStatsCache();
 
         // Dispatch notifications if this is not the initial load and role is component
         if (!isInitialSessionTypesLoad) {
@@ -823,6 +826,7 @@ function startCloudSync() {
         });
         state.marchas = marchas;
         localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas));
+        invalidateMusicianStatsCache();
         if (document.getElementById("section-marchas").classList.contains("active")) {
             renderMarchasList();
         }
@@ -870,6 +874,7 @@ function startCloudSync() {
             state.musicianMarchaStatuses[doc.id] = doc.data().status;
         });
         localStorage.setItem("harmonia_musician_marcha_statuses", JSON.stringify(state.musicianMarchaStatuses));
+        invalidateMusicianStatsCache();
         if (document.getElementById("section-componente-repertorio").classList.contains("active")) {
             renderComponentRepertorio();
         }
@@ -5467,6 +5472,10 @@ function deleteMusician(id) {
 // SECCIÓN: ESTADÍSTICAS AVANZADAS
 // ==========================================================================
 function renderStatistics() {
+    // Los datos de asistencia/músicos no cambian dentro de un mismo render; forzamos un
+    // recálculo fresco aquí y dejamos que el resto de funciones auxiliares (ranking,
+    // insignias, racha...) reutilicen la caché durante esta pasada.
+    invalidateMusicianStatsCache();
     const yearFilter = document.getElementById("filter-year").value;
     const monthFilter = document.getElementById("filter-month").value;
     const typeFilter = document.getElementById("filter-type").value;
@@ -5950,6 +5959,9 @@ function renderStatsStreaks(filteredDates) {
 let showAllRankingAsistencia = false;
 
 function renderStatsRanking(filteredDates) {
+    // Idempotente: si ya se invalidó al entrar en renderStatistics() esto es un no-op
+    // barato; si se llama de forma aislada (botón "ver todos") garantiza datos frescos.
+    invalidateMusicianStatsCache();
     const container = document.getElementById("stats-ranking-container");
     if (!container) return;
 
@@ -11982,7 +11994,63 @@ function populateLoginMusicians() {
     if (currentVal) select.value = currentVal;
 }
 
+// ==========================================================================
+// CACHÉ DE ESTADÍSTICAS POR MÚSICO
+// ==========================================================================
+// getMusicianAttendanceMetrics/BaseMedalsData/AttendanceRank se llaman en cascada
+// unas a otras para calcular rankings e insignias (p.ej. renderStatsRanking llama a
+// getMusicianMedalsData por cada músico, y esa función internamente vuelve a recorrer
+// TODOS los músicos para calcular el ranking). Sin caché, esto provocaba recalcular el
+// historial completo de asistencia decenas de veces por cada carga de la página de
+// Estadísticas. La caché se invalida explícitamente (invalidateMusicianStatsCache) en
+// cada listener de sincronización con la nube y en las pantallas que la consumen, así
+// que dentro de un mismo "ciclo" de datos siempre se recalcula al menos una vez.
+let _musicianStatsCache = {
+    allDates: null,
+    metrics: new Map(),
+    streak: new Map(),
+    baseMedals: new Map(),
+    rankList: null
+};
+
+function invalidateMusicianStatsCache() {
+    _musicianStatsCache = {
+        allDates: null,
+        metrics: new Map(),
+        streak: new Map(),
+        baseMedals: new Map(),
+        rankList: null
+    };
+}
+
+function getAllSessionDatesCached() {
+    if (!_musicianStatsCache.allDates) {
+        _musicianStatsCache.allDates = Array.from(new Set([
+            ...Object.keys(state.sessionTypes || {}),
+            ...Object.keys(state.attendance || {})
+        ]));
+    }
+    return _musicianStatsCache.allDates;
+}
+
 function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
+    // Solo se cachea la variante sin filtro de fechas (la que se recalcula en cascada
+    // desde el ranking y las insignias); las llamadas con filtro son puntuales (una por
+    // músico) y no forman parte del cuello de botella.
+    if (!dateFilterFn && _musicianStatsCache.metrics.has(musicianId)) {
+        return _musicianStatsCache.metrics.get(musicianId);
+    }
+
+    const result = computeMusicianAttendanceMetrics(musicianId, dateFilterFn);
+
+    if (!dateFilterFn) {
+        _musicianStatsCache.metrics.set(musicianId, result);
+    }
+
+    return result;
+}
+
+function computeMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
     const musician = state.musicians ? state.musicians.find(m => String(m.id) === String(musicianId)) : null;
     if (!musician) {
         return {
@@ -11999,10 +12067,7 @@ function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const allDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes || {}),
-        ...Object.keys(state.attendance || {})
-    ]));
+    const allDates = getAllSessionDatesCached();
 
     let totalConvocated = 0;
     let attended = 0;
@@ -12080,32 +12145,39 @@ function getMusicianAttendanceRank(musicianId) {
     const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return null;
 
-    const ranked = (state.musicians || []).map(m => {
-        const metrics = getMusicianAttendanceMetrics(m.id);
-        return {
-            id: m.id,
-            name: m.name,
-            attendancePct: metrics.attendancePct,
-            streak: calculateMusicianStreak(m.id),
-            badgesCount: countUnlockedBadgeStars(getMusicianBaseMedalsData(m.id))
-        };
-    });
+    // El ranking completo es el mismo para todos los músicos que lo consultan dentro de
+    // un mismo ciclo de datos, así que se calcula una única vez y se reutiliza (en vez de
+    // recorrer y ordenar TODA la plantilla por cada músico que pide su posición).
+    if (!_musicianStatsCache.rankList) {
+        const ranked = (state.musicians || []).map(m => {
+            const metrics = getMusicianAttendanceMetrics(m.id);
+            return {
+                id: m.id,
+                name: m.name,
+                attendancePct: metrics.attendancePct,
+                streak: calculateMusicianStreak(m.id),
+                badgesCount: countUnlockedBadgeStars(getMusicianBaseMedalsData(m.id))
+            };
+        });
 
-    ranked.sort((a, b) => {
-        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
-        if (roundDiff !== 0) return roundDiff;
+        ranked.sort((a, b) => {
+            const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+            if (roundDiff !== 0) return roundDiff;
 
-        if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+            if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
 
-        const exactDiff = b.attendancePct - a.attendancePct;
-        if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+            const exactDiff = b.attendancePct - a.attendancePct;
+            if (Math.abs(exactDiff) > 0.0001) return exactDiff;
 
-        if (b.streak !== a.streak) return b.streak - a.streak;
+            if (b.streak !== a.streak) return b.streak - a.streak;
 
-        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
-    });
+            return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+        });
 
-    const idx = ranked.findIndex(r => String(r.id) === String(musicianId));
+        _musicianStatsCache.rankList = ranked;
+    }
+
+    const idx = _musicianStatsCache.rankList.findIndex(r => String(r.id) === String(musicianId));
     return idx === -1 ? null : idx + 1;
 }
 
@@ -12114,6 +12186,15 @@ function getMusicianAttendanceRank(musicianId) {
 // desempatar el ranking de asistencia (ver getMusicianAttendanceRank) sin que la insignia
 // "Top" se cuente a sí misma (lo que crearía una referencia circular).
 function getMusicianBaseMedalsData(musicianId) {
+    if (_musicianStatsCache.baseMedals.has(musicianId)) {
+        return _musicianStatsCache.baseMedals.get(musicianId);
+    }
+    const result = computeMusicianBaseMedalsData(musicianId);
+    _musicianStatsCache.baseMedals.set(musicianId, result);
+    return result;
+}
+
+function computeMusicianBaseMedalsData(musicianId) {
     const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return [];
 
@@ -12601,6 +12682,15 @@ function getMusicianMedalsData(musicianId) {
 }
 
 function calculateMusicianStreak(musicianId) {
+    if (_musicianStatsCache.streak.has(musicianId)) {
+        return _musicianStatsCache.streak.get(musicianId);
+    }
+    const result = computeMusicianStreak(musicianId);
+    _musicianStatsCache.streak.set(musicianId, result);
+    return result;
+}
+
+function computeMusicianStreak(musicianId) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
@@ -12970,6 +13060,7 @@ function openSingleInsigniaDetailModal(medalId) {
 
 
 function renderComponentFicha() {
+    invalidateMusicianStatsCache();
     const musicianId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
     const musician = state.musicians.find(m => m.id == musicianId);
     if (!musician) {
