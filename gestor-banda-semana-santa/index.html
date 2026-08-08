@@ -4060,11 +4060,11 @@
 
     <script src="app.js?v=463"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=454
+        // Purga de caché antigua y registro del Service Worker v=463
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v454") {
+                    if (key !== "yacente-v463") {
                         caches.delete(key);
                     }
                 });
@@ -4077,9 +4077,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=454")
+                navigator.serviceWorker.register("sw.js?v=463")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v454 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v463 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
