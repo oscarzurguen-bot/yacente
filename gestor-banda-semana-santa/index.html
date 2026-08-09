@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=467">
+    <link rel="stylesheet" href="style.css?v=468">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1163,18 +1163,18 @@
                         <!-- Summary KPI Grid -->
                         <div class="stats-overview-grid" style="margin-bottom: 20px;">
                             <div class="card stat-overview-card" style="padding: 16px;">
-                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos con Responsable</h3>
-                                <div class="huge-number" id="stats-direccion-assigned-count" style="font-size: 2rem;">0</div>
-                                <p class="text-muted" style="font-size: 0.78rem;">Sobre el total de ensayos</p>
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos Analizados</h3>
+                                <div class="huge-number" id="stats-direccion-total-count" style="font-size: 2rem;">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">En el período seleccionado</p>
                             </div>
                             <div class="card stat-overview-card" style="padding: 16px;">
-                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Sin Responsable</h3>
-                                <div class="huge-number" id="stats-direccion-unassigned-count" style="font-size: 2rem; color: var(--color-absent);">0</div>
-                                <p class="text-muted" style="font-size: 0.78rem;">Ensayos sin asignar</p>
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Responsable Más Activo</h3>
+                                <div class="huge-number" id="stats-direccion-top-responsable" style="font-size: 1.6rem; color: var(--color-gold);">-</div>
+                                <p class="text-muted" style="font-size: 0.78rem;" id="stats-direccion-top-responsable-sub">Sin datos</p>
                             </div>
                             <div class="card stat-overview-card" style="padding: 16px;">
                                 <h3 style="font-size: 0.85rem; color: var(--text-muted);">Responsables Distintos</h3>
-                                <div class="huge-number" id="stats-direccion-count" style="font-size: 2rem; color: var(--color-gold);">0</div>
+                                <div class="huge-number" id="stats-direccion-count" style="font-size: 2rem;">0</div>
                                 <p class="text-muted" style="font-size: 0.78rem;">Personas que han dirigido</p>
                             </div>
                         </div>
@@ -4128,13 +4128,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=467"></script>
+    <script src="app.js?v=468"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=467
+        // Purga de caché antigua y registro del Service Worker v=468
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v467") {
+                    if (key !== "yacente-v468") {
                         caches.delete(key);
                     }
                 });
@@ -4147,9 +4147,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=467")
+                navigator.serviceWorker.register("sw.js?v=468")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v467 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v468 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

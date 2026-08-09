@@ -6326,9 +6326,9 @@ function renderStatsEnsayos(filteredDates) {
 }
 
 function calculateDireccionStats(datesArray) {
-    let assignedCount = 0;
-    let unassignedCount = 0;
+    let totalCount = 0;
 
+    const UNASSIGNED_LABEL = "Sin asignar";
     const responsableMap = {};
 
     (datesArray || []).forEach(dateKey => {
@@ -6336,13 +6336,9 @@ function calculateDireccionStats(datesArray) {
         const type = sessionInfo ? sessionInfo.type : "ensayo";
         if (type !== "ensayo") return;
 
-        const responsable = sessionInfo && sessionInfo.responsable ? sessionInfo.responsable.trim() : "";
-        if (!responsable) {
-            unassignedCount++;
-            return;
-        }
-        assignedCount++;
+        totalCount++;
 
+        const responsable = (sessionInfo && sessionInfo.responsable && sessionInfo.responsable.trim()) || UNASSIGNED_LABEL;
         const sub = sessionInfo ? sessionInfo.subtype : "general";
         const label = getSubtypeLabel(sub, sessionInfo);
 
@@ -6358,7 +6354,7 @@ function calculateDireccionStats(datesArray) {
     });
 
     const breakdownList = Object.values(responsableMap).sort((a, b) => b.count - a.count).map(item => {
-        const pctOfTotal = assignedCount > 0 ? Math.round((item.count / assignedCount) * 100) : 0;
+        const pctOfTotal = totalCount > 0 ? Math.round((item.count / totalCount) * 100) : 0;
         const typesText = Object.entries(item.typeCounts)
             .sort((a, b) => b[1] - a[1])
             .map(([label, count]) => `${label} ×${count}`)
@@ -6370,11 +6366,13 @@ function calculateDireccionStats(datesArray) {
         };
     });
 
+    const realResponsables = breakdownList.filter(item => item.responsable !== UNASSIGNED_LABEL);
+    const topResponsable = realResponsables.length > 0 ? realResponsables[0] : null;
+
     return {
-        totalCount: assignedCount + unassignedCount,
-        assignedCount,
-        unassignedCount,
-        responsableCount: breakdownList.length,
+        totalCount,
+        responsableCount: realResponsables.length,
+        topResponsable,
         breakdownList
     };
 }
@@ -6382,31 +6380,40 @@ function calculateDireccionStats(datesArray) {
 function renderStatsDireccion(filteredDates) {
     const stats = calculateDireccionStats(filteredDates);
 
-    const assignedEl = document.getElementById("stats-direccion-assigned-count");
-    const unassignedEl = document.getElementById("stats-direccion-unassigned-count");
+    const totalEl = document.getElementById("stats-direccion-total-count");
+    const topEl = document.getElementById("stats-direccion-top-responsable");
+    const topSubEl = document.getElementById("stats-direccion-top-responsable-sub");
     const countEl = document.getElementById("stats-direccion-count");
     const bodyEl = document.getElementById("stats-direccion-breakdown-body");
 
-    if (assignedEl) assignedEl.innerText = stats.assignedCount;
-    if (unassignedEl) unassignedEl.innerText = stats.unassignedCount;
+    if (totalEl) totalEl.innerText = stats.totalCount;
     if (countEl) countEl.innerText = stats.responsableCount;
+
+    if (topEl) topEl.innerText = stats.topResponsable ? stats.topResponsable.responsable : "-";
+    if (topSubEl) {
+        topSubEl.innerText = stats.topResponsable
+            ? `${stats.topResponsable.count} ensayo${stats.topResponsable.count === 1 ? "" : "s"} dirigido${stats.topResponsable.count === 1 ? "" : "s"} (${stats.topResponsable.pctOfTotal}%)`
+            : "Sin datos";
+    }
 
     if (bodyEl) {
         if (stats.breakdownList.length === 0) {
             bodyEl.innerHTML = `
                 <tr>
                     <td colspan="4" class="text-center text-muted" style="padding: 20px;">
-                        No hay ensayos con responsable asignado en este período.
+                        No hay ensayos registrados en este período.
                     </td>
                 </tr>
             `;
         } else {
             let html = "";
             stats.breakdownList.forEach(item => {
+                const isUnassigned = item.responsable === "Sin asignar";
+                const nameColor = isUnassigned ? "var(--text-muted)" : "var(--text-primary)";
                 html += `
                     <tr>
                         <td>
-                            <strong style="color: var(--text-primary);">${item.responsable}</strong>
+                            <strong style="color: ${nameColor};">${item.responsable}</strong>
                         </td>
                         <td style="text-align: center;">
                             <span style="display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;">${item.count}</span>
