@@ -2379,6 +2379,7 @@ function setupEventListeners() {
 
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
+        if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = "";
         setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", "");
         modalRehearsal.classList.add("active");
     });
@@ -2386,6 +2387,13 @@ function setupEventListeners() {
     const closeModalRehearsal = () => modalRehearsal.classList.remove("active");
     document.getElementById("btn-close-rehearsal-modal").addEventListener("click", closeModalRehearsal);
     document.getElementById("btn-cancel-rehearsal-modal").addEventListener("click", closeModalRehearsal);
+
+    document.querySelectorAll(".rehearsal-responsable-quick-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const input = document.getElementById("rehearsal-responsable-input");
+            if (input) input.value = btn.dataset.value;
+        });
+    });
 
     document.getElementById("form-rehearsal").addEventListener("submit", (e) => {
         e.preventDefault();
@@ -2410,6 +2418,7 @@ function setupEventListeners() {
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
+        const responsableVal = document.getElementById("rehearsal-responsable-input") ? document.getElementById("rehearsal-responsable-input").value.trim() : "";
         const timeVal = getFormattedTimeFromInputs("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input");
 
         let targetKey = selectedDate;
@@ -2431,6 +2440,7 @@ function setupEventListeners() {
                     subtype: subtype,
                     convocatedVoices: convocatedVoices,
                     location: locationVal,
+                    responsable: responsableVal,
                     time: timeVal
                 };
                 if (state.attendance[editingKey]) {
@@ -2446,6 +2456,7 @@ function setupEventListeners() {
                     subtype: subtype,
                     convocatedVoices: convocatedVoices,
                     location: locationVal,
+                    responsable: responsableVal,
                     time: timeVal
                 };
             }
@@ -2482,12 +2493,13 @@ function setupEventListeners() {
             }
 
             const createdAtIso = new Date().toISOString();
-            state.sessionTypes[sessionKey] = { 
-                type: "ensayo", 
-                subtype: subtype, 
-                name: "", 
+            state.sessionTypes[sessionKey] = {
+                type: "ensayo",
+                subtype: subtype,
+                name: "",
                 convocatedVoices: convocatedVoices,
                 location: locationVal,
+                responsable: responsableVal,
                 time: timeVal,
                 createdAt: createdAtIso
             };
@@ -4095,6 +4107,7 @@ function openEditRehearsalModal(dateKey) {
     if (document.getElementById("rehearsal-date-input")) document.getElementById("rehearsal-date-input").value = rawDate;
     if (document.getElementById("rehearsal-type-input")) document.getElementById("rehearsal-type-input").value = sessionInfo.subtype || "general";
     if (document.getElementById("rehearsal-location-input")) document.getElementById("rehearsal-location-input").value = sessionInfo.location || "Parking";
+    if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = sessionInfo.responsable || "";
     setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", sessionInfo.time || "");
 
     const modal = document.getElementById("modal-rehearsal");
@@ -4548,6 +4561,9 @@ function openRehearsalDetailModal(date) {
     const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
     const timeVal = sessionInfo && sessionInfo.time ? ` | Hora: ${sessionInfo.time}` : "";
     document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}${timeVal}`;
+
+    const responsableEl = document.getElementById("rehearsal-detail-responsable");
+    if (responsableEl) responsableEl.innerText = (sessionInfo && sessionInfo.responsable) ? sessionInfo.responsable : "Sin asignar";
 
     // Marchas
     const marchasContainer = document.getElementById("rehearsal-detail-marchas");
@@ -5553,6 +5569,7 @@ function renderStatistics() {
         renderGeneralOverviewChart();
         renderDayHeatmap([]);
         renderStatsEnsayos([]);
+        renderStatsDireccion([]);
         return;
     }
 
@@ -5718,6 +5735,7 @@ function renderStatistics() {
     renderGeneralOverviewChart();
     renderDayHeatmap(filteredDates);
     renderStatsEnsayos(filteredDates);
+    renderStatsDireccion(filteredDates);
 }
 
 let showAllMarchasEnsayadas = false;
@@ -6298,6 +6316,106 @@ function renderStatsEnsayos(filteredDates) {
                         </td>
                         <td style="text-align: right; padding-right: 15px; font-weight: 700; color: ${badgeColor}; font-size: 0.9rem;">
                             ${item.formattedHours}
+                        </td>
+                    </tr>
+                `;
+            });
+            bodyEl.innerHTML = html;
+        }
+    }
+}
+
+function calculateDireccionStats(datesArray) {
+    let assignedCount = 0;
+    let unassignedCount = 0;
+
+    const responsableMap = {};
+
+    (datesArray || []).forEach(dateKey => {
+        const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+        const type = sessionInfo ? sessionInfo.type : "ensayo";
+        if (type !== "ensayo") return;
+
+        const responsable = sessionInfo && sessionInfo.responsable ? sessionInfo.responsable.trim() : "";
+        if (!responsable) {
+            unassignedCount++;
+            return;
+        }
+        assignedCount++;
+
+        const sub = sessionInfo ? sessionInfo.subtype : "general";
+        const label = getSubtypeLabel(sub, sessionInfo);
+
+        if (!responsableMap[responsable]) {
+            responsableMap[responsable] = {
+                responsable: responsable,
+                count: 0,
+                typeCounts: {}
+            };
+        }
+        responsableMap[responsable].count++;
+        responsableMap[responsable].typeCounts[label] = (responsableMap[responsable].typeCounts[label] || 0) + 1;
+    });
+
+    const breakdownList = Object.values(responsableMap).sort((a, b) => b.count - a.count).map(item => {
+        const pctOfTotal = assignedCount > 0 ? Math.round((item.count / assignedCount) * 100) : 0;
+        const typesText = Object.entries(item.typeCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, count]) => `${label} ×${count}`)
+            .join(", ");
+        return {
+            ...item,
+            pctOfTotal,
+            typesText
+        };
+    });
+
+    return {
+        totalCount: assignedCount + unassignedCount,
+        assignedCount,
+        unassignedCount,
+        responsableCount: breakdownList.length,
+        breakdownList
+    };
+}
+
+function renderStatsDireccion(filteredDates) {
+    const stats = calculateDireccionStats(filteredDates);
+
+    const assignedEl = document.getElementById("stats-direccion-assigned-count");
+    const unassignedEl = document.getElementById("stats-direccion-unassigned-count");
+    const countEl = document.getElementById("stats-direccion-count");
+    const bodyEl = document.getElementById("stats-direccion-breakdown-body");
+
+    if (assignedEl) assignedEl.innerText = stats.assignedCount;
+    if (unassignedEl) unassignedEl.innerText = stats.unassignedCount;
+    if (countEl) countEl.innerText = stats.responsableCount;
+
+    if (bodyEl) {
+        if (stats.breakdownList.length === 0) {
+            bodyEl.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted" style="padding: 20px;">
+                        No hay ensayos con responsable asignado en este período.
+                    </td>
+                </tr>
+            `;
+        } else {
+            let html = "";
+            stats.breakdownList.forEach(item => {
+                html += `
+                    <tr>
+                        <td>
+                            <strong style="color: var(--text-primary);">${item.responsable}</strong>
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;">${item.count}</span>
+                        </td>
+                        <td style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">
+                            ${item.pctOfTotal}%
+                        </td>
+                        <td style="color: var(--text-secondary); font-size: 0.85rem;">
+                            ${item.typesText}
                         </td>
                     </tr>
                 `;
