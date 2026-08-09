@@ -2260,6 +2260,7 @@ function setupEventListeners() {
         e.preventDefault();
         const id = document.getElementById("musician-id").value;
         const name = document.getElementById("musician-name").value.trim();
+        const fullName = document.getElementById("musician-fullname").value.trim();
         const instrument = document.getElementById("musician-instrument").value;
         const role = document.getElementById("musician-role").value.trim();
         const isBajaChecked = document.getElementById("musician-is-baja") ? document.getElementById("musician-is-baja").checked : false;
@@ -2292,10 +2293,11 @@ function setupEventListeners() {
                     }
                 }
 
-                state.musicians[index] = { 
-                    ...existing, 
-                    name, 
-                    instrument, 
+                state.musicians[index] = {
+                    ...existing,
+                    name,
+                    fullName,
+                    instrument,
                     role,
                     isBaja: isBajaChecked,
                     leaves: leaves
@@ -2315,11 +2317,12 @@ function setupEventListeners() {
                     endDate: null
                 });
             }
-            const newMusician = { 
-                id: newId, 
-                name, 
-                instrument, 
-                role, 
+            const newMusician = {
+                id: newId,
+                name,
+                fullName,
+                instrument,
+                role,
                 isBaja: isBajaChecked,
                 leaves: leaves,
                 pin: "", 
@@ -5454,6 +5457,7 @@ function openEditMusicianModal(id) {
 
     document.getElementById("musician-id").value = m.id;
     document.getElementById("musician-name").value = m.name;
+    document.getElementById("musician-fullname").value = m.fullName || "";
     document.getElementById("musician-instrument").value = m.instrument;
     const roleVal = formatRoleShort(m.role);
     const roleSelect = document.getElementById("musician-role");
@@ -6447,7 +6451,9 @@ function openMusicianDetailStats(musicianId) {
     if (!musician) return;
 
     document.getElementById("detail-musician-name").innerText = musician.name;
-    document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role}`;
+    document.getElementById("detail-musician-instrument").innerText = musician.fullName
+        ? `${musician.fullName} — ${musician.instrument} — ${musician.role}`
+        : `${musician.instrument} — ${musician.role}`;
 
     // Resetear filtros al abrir
     document.getElementById("detail-filter-year").value = "all";
@@ -6495,7 +6501,9 @@ function renderMusicianDetailContent() {
         : '';
 
     document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 119, 0, 0.16); color: #ff8c1a; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: 1px solid rgba(255, 120, 0, 0.65);"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>${bajaBadgeInHeader}`;
-    document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role || "Músico"}`;
+    document.getElementById("detail-musician-instrument").innerText = musician.fullName
+        ? `${musician.fullName} — ${musician.instrument} — ${musician.role || "Músico"}`
+        : `${musician.instrument} — ${musician.role || "Músico"}`;
 
     const detailChecks = [
         { id: "detail-badge-weather-check", val: !!musician.badgeWeather },
