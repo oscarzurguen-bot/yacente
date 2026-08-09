@@ -7234,6 +7234,7 @@ function downloadMusicianPDFReport() {
 
         <div class="print-musician-info">
             <h2 class="print-musician-name">${musician.name}</h2>
+            ${musician.fullName ? `<p class="print-musician-instrument"><strong>Nombre completo:</strong> ${musician.fullName}</p>` : ""}
             <p class="print-musician-instrument"><strong>Sección:</strong> ${musician.instrument} | <strong>Rol:</strong> ${musician.role}</p>
         </div>
 
