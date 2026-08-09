@@ -131,10 +131,92 @@ let state = {
         const m = today.getMonth() + 1;
         return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
     })(),
-    statsHeatmapSelectedYear: null
+    statsHeatmapSelectedSeason: null
 };
 
 let preavisoSelectedStatus = null;
+
+// ==========================================================================
+// HELPERS DE TEMPORADA (Septiembre de un año -> Agosto del siguiente)
+// ==========================================================================
+function getSeasonLabelForDate(dateStr) {
+    const parts = (dateStr || "").split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(y) || isNaN(m)) return null;
+    return m >= 9 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+}
+
+function getCurrentSeasonLabel() {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+    return getSeasonLabelForDate(todayStr);
+}
+
+function getSeasonBounds(seasonLabel) {
+    const parts = (seasonLabel || "").split("-");
+    const year1 = parseInt(parts[0], 10);
+    const year2 = parseInt(parts[1], 10);
+    return { year1, year2 };
+}
+
+function isDateInSeason(dateStr, seasonLabel) {
+    if (!seasonLabel || seasonLabel === "all") return true;
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    if (isNaN(year1) || isNaN(year2)) return true;
+    const parts = (dateStr || "").split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    return (y === year1 && m >= 9) || (y === year2 && m < 9);
+}
+
+function getSeasonMonthsArray(seasonLabel) {
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    return [
+        { label: "Sep", monthNum: 9, year: String(year1) },
+        { label: "Oct", monthNum: 10, year: String(year1) },
+        { label: "Nov", monthNum: 11, year: String(year1) },
+        { label: "Dic", monthNum: 12, year: String(year1) },
+        { label: "Ene", monthNum: 1, year: String(year2) },
+        { label: "Feb", monthNum: 2, year: String(year2) },
+        { label: "Mar", monthNum: 3, year: String(year2) },
+        { label: "Abr", monthNum: 4, year: String(year2) },
+        { label: "May", monthNum: 5, year: String(year2) },
+        { label: "Jun", monthNum: 6, year: String(year2) },
+        { label: "Jul", monthNum: 7, year: String(year2) },
+        { label: "Ago", monthNum: 8, year: String(year2) }
+    ];
+}
+
+// Devuelve las etiquetas de temporada ("YYYY-YYYY") presentes en un conjunto de fechas, más recientes primero.
+// Incluye siempre la temporada actual para que el selector nunca aparezca vacío.
+function getAvailableSeasons(dateKeys) {
+    const seasons = new Set();
+    (dateKeys || []).forEach(dateKey => {
+        const rawDate = (dateKey || "").split("_")[0];
+        const label = getSeasonLabelForDate(rawDate);
+        if (label) seasons.add(label);
+    });
+    seasons.add(getCurrentSeasonLabel());
+    return Array.from(seasons).sort().reverse();
+}
+
+// Rellena un <select> con las temporadas disponibles. Si allowAll es true añade una opción "Todas las temporadas".
+function populateSeasonSelect(selectEl, dateKeys, allowAll, selectedValue) {
+    if (!selectEl) return;
+    const seasons = getAvailableSeasons(dateKeys);
+    let optionsHtml = allowAll ? `<option value="all">Todas las temporadas</option>` : "";
+    optionsHtml += seasons.map(s => `<option value="${s}">Temporada ${s}</option>`).join("");
+    if (selectEl.innerHTML !== optionsHtml) {
+        selectEl.innerHTML = optionsHtml;
+    }
+    const validValues = allowAll ? ["all", ...seasons] : seasons;
+    if (selectedValue && validValues.includes(selectedValue)) {
+        selectEl.value = selectedValue;
+    } else {
+        selectEl.value = allowAll ? "all" : (seasons.includes(getCurrentSeasonLabel()) ? getCurrentSeasonLabel() : seasons[0]);
+    }
+}
 
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 21; // ~131.95
 
@@ -1892,11 +1974,11 @@ function setupEventListeners() {
         });
     }
 
-    // Selector de año del calendar heatmap (Estadísticas Avanzadas)
+    // Selector de temporada del calendar heatmap (Estadísticas Avanzadas)
     const heatmapYearSelect = document.getElementById("advanced-stats-heatmap-year-select");
     if (heatmapYearSelect) {
         heatmapYearSelect.addEventListener("change", (e) => {
-            state.statsHeatmapSelectedYear = e.target.value;
+            state.statsHeatmapSelectedSeason = e.target.value;
             renderStatsCalendarHeatmap();
         });
     }
@@ -4266,7 +4348,9 @@ function renderEnsayosList() {
     const emptyState = document.getElementById("ensayos-empty");
     tbody.innerHTML = "";
 
-    const filterYear = document.getElementById("rehearsals-filter-year").value;
+    const rehearsalsYearSelect = document.getElementById("rehearsals-filter-year");
+    populateSeasonSelect(rehearsalsYearSelect, Object.keys(state.attendance), true, rehearsalsYearSelect.value);
+    const filterYear = rehearsalsYearSelect.value;
     const filterMonth = document.getElementById("rehearsals-filter-month").value;
 
     const dates = Object.keys(state.attendance)
@@ -4275,9 +4359,9 @@ function renderEnsayosList() {
             if (sessionInfo && sessionInfo.type !== "ensayo") return false;
 
             const [yyyy, mm, dd] = date.split('-');
-            
-            // Year filter
-            if (filterYear !== "all" && yyyy !== filterYear) return false;
+
+            // Season filter
+            if (filterYear !== "all" && !isDateInSeason(date, filterYear)) return false;
             
             // Month filter
             if (filterMonth !== "all" && (parseInt(mm) - 1).toString() !== filterMonth) return false;
@@ -4785,7 +4869,9 @@ function renderActuacionesList() {
     const emptyState = document.getElementById("actuaciones-empty");
     tbody.innerHTML = "";
 
-    const filterYear = document.getElementById("actuaciones-filter-year").value;
+    const actuacionesYearSelect = document.getElementById("actuaciones-filter-year");
+    populateSeasonSelect(actuacionesYearSelect, Object.keys(state.attendance), true, actuacionesYearSelect.value);
+    const filterYear = actuacionesYearSelect.value;
     const filterMonth = document.getElementById("actuaciones-filter-month").value;
 
     const dates = Object.keys(state.attendance)
@@ -4794,9 +4880,9 @@ function renderActuacionesList() {
             if (!sessionInfo || sessionInfo.type !== "actuacion") return false;
 
             const [yyyy, mm, dd] = date.split('-');
-            
-            // Year filter
-            if (filterYear !== "all" && yyyy !== filterYear) return false;
+
+            // Season filter
+            if (filterYear !== "all" && !isDateInSeason(date, filterYear)) return false;
             
             // Month filter
             if (filterMonth !== "all" && (parseInt(mm) - 1).toString() !== filterMonth) return false;
@@ -5524,25 +5610,28 @@ function renderStatistics() {
     // recálculo fresco aquí y dejamos que el resto de funciones auxiliares (ranking,
     // insignias, racha...) reutilicen la caché durante esta pasada.
     invalidateMusicianStatsCache();
-    const yearFilter = document.getElementById("filter-year").value;
+
+    const allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ]));
+
+    const yearSelectEl = document.getElementById("filter-year");
+    populateSeasonSelect(yearSelectEl, allDates, true, yearSelectEl.value);
+    const yearFilter = yearSelectEl.value;
     const monthFilter = document.getElementById("filter-month").value;
     const typeFilter = document.getElementById("filter-type").value;
 
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    const allDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes || {}),
-        ...Object.keys(state.attendance || {})
-    ]));
     const filteredDates = allDates.filter(dateStr => {
         if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
         const dateObj = new Date(dateStr.replace(/-/g, "/"));
-        const year = dateObj.getFullYear().toString();
         const month = dateObj.getMonth().toString();
 
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -6675,7 +6764,7 @@ function renderMusicianDetailContent() {
         hermandadEventsInput.disabled = !isAdmin;
     }
 
-    const yearFilter = document.getElementById("detail-filter-year").value;
+    const detailYearSelect = document.getElementById("detail-filter-year");
     const monthFilter = document.getElementById("detail-filter-month").value;
     const typeFilter = document.getElementById("detail-filter-type").value;
 
@@ -6688,14 +6777,16 @@ function renderMusicianDetailContent() {
         ...Object.keys(state.attendance || {})
     ]));
 
+    populateSeasonSelect(detailYearSelect, allDates, true, detailYearSelect.value);
+    const yearFilter = detailYearSelect.value;
+
     // Filtrar fechas pasadas y aplicables al filtro del modal
     const filteredDates = allDates.filter(dateStr => {
         if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
         const dateObj = new Date(dateStr.replace(/-/g, "/"));
-        const year = dateObj.getFullYear().toString();
         const month = dateObj.getMonth().toString();
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -7104,10 +7195,9 @@ function downloadMusicianPDFReport() {
     const allDates = Object.keys(state.attendance);
     const filteredDates = allDates.filter(dateStr => {
         const dateObj = new Date(dateStr);
-        const year = dateObj.getFullYear().toString();
         const month = dateObj.getMonth().toString();
 
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -7200,34 +7290,16 @@ function downloadMusicianPDFReport() {
         `;
     }
 
-    const filterTextYear = yearFilter === "all" ? "Todos los años" : yearFilter;
+    const filterTextYear = yearFilter === "all" ? "Todas las temporadas" : `Temporada ${yearFilter}`;
     const monthsNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const filterTextMonth = monthFilter === "all" ? "Todos los meses" : monthsNames[parseInt(monthFilter)];
     const filterTextType = typeFilter === "all" ? "Ensayos y Actuaciones" : (typeFilter === "ensayo" ? "Solo Ensayos" : "Solo Actuaciones");
 
     // Calcular datos de evolución mensual para el informe impreso
     const todayPrint = new Date();
-    const curYPrint = todayPrint.getFullYear();
-    const curMPrint = todayPrint.getMonth() + 1;
     const todayStrPrint = `${todayPrint.getFullYear()}-${String(todayPrint.getMonth() + 1).padStart(2, '0')}-${String(todayPrint.getDate()).padStart(2, '0')}`;
 
-    let y1Print = yearFilter === "all" ? (curMPrint >= 9 ? curYPrint : curYPrint - 1) : parseInt(yearFilter, 10);
-    let y2Print = y1Print + 1;
-
-    const seasonMonthsPrint = [
-        { label: "Sep", monthNum: 9, year: String(y1Print) },
-        { label: "Oct", monthNum: 10, year: String(y1Print) },
-        { label: "Nov", monthNum: 11, year: String(y1Print) },
-        { label: "Dic", monthNum: 12, year: String(y1Print) },
-        { label: "Ene", monthNum: 1, year: String(y2Print) },
-        { label: "Feb", monthNum: 2, year: String(y2Print) },
-        { label: "Mar", monthNum: 3, year: String(y2Print) },
-        { label: "Abr", monthNum: 4, year: String(y2Print) },
-        { label: "May", monthNum: 5, year: String(y2Print) },
-        { label: "Jun", monthNum: 6, year: String(y2Print) },
-        { label: "Jul", monthNum: 7, year: String(y2Print) },
-        { label: "Ago", monthNum: 8, year: String(y2Print) }
-    ];
+    const seasonMonthsPrint = getSeasonMonthsArray(yearFilter === "all" ? getCurrentSeasonLabel() : yearFilter);
 
     const monthlyDataForPrint = seasonMonthsPrint.map(sm => {
         let presents = 0;
@@ -8218,7 +8290,8 @@ function openVoiceDetailStats(voiceName) {
     document.getElementById("detail-voice-name").innerText = voiceName;
     
     // Heredar los filtros actuales seleccionados en la pantalla de estadísticas principal
-    document.getElementById("voice-filter-year").value = document.getElementById("filter-year").value;
+    const inheritedSeason = document.getElementById("filter-year").value;
+    populateSeasonSelect(document.getElementById("voice-filter-year"), Object.keys(state.attendance), true, inheritedSeason);
     document.getElementById("voice-filter-month").value = document.getElementById("filter-month").value;
     document.getElementById("voice-filter-type").value = document.getElementById("filter-type").value;
     
@@ -8238,10 +8311,9 @@ function renderVoiceDetailContent() {
     const allDates = Object.keys(state.attendance);
     const filteredDates = allDates.filter(dateStr => {
         const dateObj = new Date(dateStr);
-        const year = dateObj.getFullYear().toString();
         const month = dateObj.getMonth().toString();
 
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -9563,7 +9635,12 @@ function getWeekNumber(d) {
     return weekNo;
 }
 
-function getWeeksGroupedByMonth(year) {
+const WEEKLY_GOALS_MONTH_ORDER = [
+    "Septiembre", "Octubre", "Noviembre", "Diciembre",
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto"
+];
+
+function getWeeksGroupedBySeason(seasonLabel) {
     const months = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -9571,23 +9648,28 @@ function getWeeksGroupedByMonth(year) {
     const grouped = {};
     months.forEach(m => grouped[m] = []);
 
-    // Empezar el 1 de Enero
-    let d = new Date(year, 0, 1);
-    
-    // Retroceder al lunes de la semana que contiene el 1 de Enero
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    if (isNaN(year1) || isNaN(year2)) return grouped;
+
+    // Empezar el 1 de Septiembre del primer año de la temporada
+    let d = new Date(year1, 8, 1);
+
+    // Retroceder al lunes de la semana que contiene el 1 de Septiembre
     const dayOfWeek = d.getDay(); // 0 = Domingo, 1 = Lunes...
     const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    d = new Date(year, 0, diff);
+    d = new Date(year1, 8, diff);
 
-    const end = new Date(year + 1, 0, 7);
+    // La temporada termina el 31 de Agosto del segundo año
+    const end = new Date(year2, 8, 7);
     while (d < end) {
         const monday = new Date(d);
         const sunday = new Date(d);
         sunday.setDate(monday.getDate() + 6);
 
         const monthName = months[monday.getMonth()];
-        
-        if (monday.getFullYear() === year || sunday.getFullYear() === year) {
+        const mondayInSeason = (monday.getFullYear() === year1 && monday.getMonth() >= 8) || (monday.getFullYear() === year2 && monday.getMonth() < 8);
+
+        if (mondayInSeason) {
             const weekKey = `${monday.getFullYear()}_W${String(getWeekNumber(monday)).padStart(2, '0')}`;
             grouped[monthName].push({
                 key: weekKey,
@@ -9599,23 +9681,42 @@ function getWeeksGroupedByMonth(year) {
     return grouped;
 }
 
+// Genera un rango fijo de temporadas (2 anteriores, la actual y la siguiente) para el selector de planificación semanal.
+function getWeeklyGoalsSeasonOptions() {
+    const current = getCurrentSeasonLabel();
+    const { year1 } = getSeasonBounds(current);
+    const seasons = [];
+    for (let offset = -2; offset <= 1; offset++) {
+        seasons.push(`${year1 + offset}-${year1 + offset + 1}`);
+    }
+    return seasons;
+}
+
+function populateWeeklyGoalsSeasonSelect(selectEl) {
+    if (!selectEl) return;
+    const seasons = getWeeklyGoalsSeasonOptions();
+    const currentSeason = getCurrentSeasonLabel();
+    const optionsHtml = seasons.map(s => `<option value="${s}"${s === currentSeason ? " selected" : ""}>Temporada ${s}</option>`).join("");
+    if (selectEl.innerHTML !== optionsHtml) {
+        const previousValue = selectEl.value;
+        selectEl.innerHTML = optionsHtml;
+        if (seasons.includes(previousValue)) selectEl.value = previousValue;
+    }
+}
+
 function renderWeeklyGoalsList() {
     const container = document.getElementById("weekly-goals-container");
     if (!container) return;
-    
+
     const yearSelect = document.getElementById("weekly-goals-year-select");
-    const year = parseInt(yearSelect.value) || new Date().getFullYear();
-    
+    populateWeeklyGoalsSeasonSelect(yearSelect);
+    const season = yearSelect.value || getCurrentSeasonLabel();
+
     container.innerHTML = "";
-    
-    const weeksGrouped = getWeeksGroupedByMonth(year);
-    
-    const monthNames = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
-    
-    monthNames.forEach(month => {
+
+    const weeksGrouped = getWeeksGroupedBySeason(season);
+
+    WEEKLY_GOALS_MONTH_ORDER.forEach(month => {
         const weeks = weeksGrouped[month];
         if (!weeks || weeks.length === 0) return;
         
@@ -16142,14 +16243,14 @@ const MESES_CORTO_ES_HEATMAP = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul",
 // Asistencia media (día completo, todas las convocatorias de ese día) por fecha de calendario
 // del año indicado. Varias sesiones el mismo día (p.ej. "2024-03-15" y "2024-03-15_actuacion")
 // se agregan en una sola celda.
-function computeYearlyAttendanceHeatmapData(year) {
+function computeSeasonAttendanceHeatmapData(seasonLabel) {
     const dayBuckets = {};
 
     const allDates = getAllSessionDatesCached();
     allDates.forEach(dateKey => {
         if (!isSessionConcluded(dateKey)) return;
         const rawDate = dateKey.split("_")[0];
-        if (!rawDate.startsWith(`${year}-`)) return;
+        if (!isDateInSeason(rawDate, seasonLabel)) return;
 
         const dayRecord = state.attendance[dateKey] || {};
         state.musicians.forEach(m => {
@@ -16166,20 +16267,24 @@ function computeYearlyAttendanceHeatmapData(year) {
     return dayBuckets;
 }
 
-// Posiciona cada día del año en la cuadrícula estilo GitHub: filas = día de la semana
-// (0 = lunes ... 6 = domingo), columnas = nº de semana desde el lunes anterior (o igual)
-// al 1 de enero, para que las columnas completas representen semanas naturales.
-function computeCalendarHeatmapLayout(year) {
-    const jan1 = new Date(year, 0, 1);
-    const dec31 = new Date(year, 11, 31);
-    const mondayOffset = (jan1.getDay() + 6) % 7; // 0 si el 1 de enero ya es lunes
-    const gridStart = new Date(year, 0, 1 - mondayOffset);
+// Posiciona cada día de la temporada (1 sept. año1 -> 31 ago. año2) en la cuadrícula estilo
+// GitHub: filas = día de la semana (0 = lunes ... 6 = domingo), columnas = nº de semana desde
+// el lunes anterior (o igual) al 1 de septiembre, para que las columnas completas representen
+// semanas naturales.
+function computeSeasonHeatmapLayout(seasonLabel) {
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    if (isNaN(year1) || isNaN(year2)) return [];
+
+    const seasonStart = new Date(year1, 8, 1); // 1 de septiembre
+    const seasonEnd = new Date(year2, 7, 31); // 31 de agosto
+    const mondayOffset = (seasonStart.getDay() + 6) % 7; // 0 si el 1 de septiembre ya es lunes
+    const gridStart = new Date(year1, 8, 1 - mondayOffset);
 
     const days = [];
     const cursor = new Date(gridStart);
     let index = 0;
-    while (cursor <= dec31) {
-        if (cursor.getFullYear() === year) {
+    while (cursor <= seasonEnd) {
+        if (cursor >= seasonStart) {
             const row = (cursor.getDay() + 6) % 7;
             const col = Math.floor(index / 7);
             const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
@@ -16228,13 +16333,11 @@ function renderStatsCalendarHeatmapUnsafe() {
     if (!container) return;
 
     const allDates = getAllSessionDatesCached();
-    const years = Array.from(new Set(
-        allDates
-            .map(d => parseInt(d.split("_")[0].split("-")[0], 10))
-            .filter(y => !isNaN(y))
-    )).sort((a, b) => b - a);
+    const seasons = Array.from(new Set(
+        allDates.map(d => getSeasonLabelForDate(d.split("_")[0])).filter(Boolean)
+    )).sort().reverse();
 
-    if (years.length === 0) {
+    if (seasons.length === 0) {
         container.innerHTML = "";
         container.classList.add("hidden");
         if (yearSelect) yearSelect.innerHTML = "";
@@ -16245,27 +16348,27 @@ function renderStatsCalendarHeatmapUnsafe() {
     if (emptyState) emptyState.classList.add("hidden");
 
     if (yearSelect) {
-        const wantedOptions = years.map(String);
+        const wantedOptions = seasons;
         const currentOptions = Array.from(yearSelect.options).map(o => o.value);
         const optionsMatch = currentOptions.length === wantedOptions.length && currentOptions.every((v, i) => v === wantedOptions[i]);
         if (!optionsMatch) {
             yearSelect.innerHTML = "";
-            years.forEach(y => {
+            seasons.forEach(s => {
                 const opt = document.createElement("option");
-                opt.value = String(y);
-                opt.innerText = String(y);
+                opt.value = s;
+                opt.innerText = `Temporada ${s}`;
                 yearSelect.appendChild(opt);
             });
         }
-        if (!state.statsHeatmapSelectedYear || !years.includes(parseInt(state.statsHeatmapSelectedYear, 10))) {
-            state.statsHeatmapSelectedYear = years[0];
+        if (!state.statsHeatmapSelectedSeason || !seasons.includes(state.statsHeatmapSelectedSeason)) {
+            state.statsHeatmapSelectedSeason = seasons[0];
         }
-        yearSelect.value = String(state.statsHeatmapSelectedYear);
+        yearSelect.value = state.statsHeatmapSelectedSeason;
     }
 
-    const year = parseInt(yearSelect ? yearSelect.value : years[0], 10);
-    const dayBuckets = computeYearlyAttendanceHeatmapData(year);
-    const layout = computeCalendarHeatmapLayout(year);
+    const season = yearSelect ? yearSelect.value : seasons[0];
+    const dayBuckets = computeSeasonAttendanceHeatmapData(season);
+    const layout = computeSeasonHeatmapLayout(season);
 
     const CELL = 11, GAP = 3, STEP = CELL + GAP;
     const LEFT_MARGIN = 26, TOP_MARGIN = 18;
@@ -16286,17 +16389,18 @@ function renderStatsCalendarHeatmapUnsafe() {
         cellsSVG += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2.5" fill="${color}" stroke="var(--border-color)" stroke-width="0.5"><title>${label}</title></rect>`;
     });
 
-    // Etiquetas de mes: se coloca cada una en la columna de su primer día del año.
+    // Etiquetas de mes: se coloca cada una en la columna de su primer día dentro de la temporada (Sep -> Ago).
+    const SEASON_MONTH_ORDER_IDX = [8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7];
     let monthLabelsSVG = "";
     let lastLabelCol = -3;
-    for (let m = 0; m < 12; m++) {
+    SEASON_MONTH_ORDER_IDX.forEach(m => {
         const firstDay = layout.find(d => d.month === m);
-        if (!firstDay) continue;
-        if (firstDay.col - lastLabelCol < 2) continue; // evita solapes en meses muy cortos
+        if (!firstDay) return;
+        if (firstDay.col - lastLabelCol < 2) return; // evita solapes en meses muy cortos
         const x = LEFT_MARGIN + firstDay.col * STEP;
         monthLabelsSVG += `<text x="${x}" y="${TOP_MARGIN - 6}" style="font-size: 10px; fill: var(--text-muted);">${MESES_CORTO_ES_HEATMAP[m]}</text>`;
         lastLabelCol = firstDay.col;
-    }
+    });
 
     // Etiquetas de día de la semana (solo Lun/Mié/Vie, como GitHub, para no saturar).
     const dayLabels = [{ row: 0, label: "Lun" }, { row: 2, label: "Mié" }, { row: 4, label: "Vie" }];
@@ -16709,32 +16813,10 @@ function renderGeneralOverviewChart() {
     });
 
     // 2. Dynamic Season Dropdown Population
-    const uniqueSeasons = Array.from(new Set(rehearsalDates.map(date => {
-        const parts = date.split("-");
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
-    }))).sort((a,b) => b.localeCompare(a));
-
     const ovYearSelect = document.getElementById("stats-ov-year-select");
     if (ovYearSelect) {
-        const currentOptions = Array.from(ovYearSelect.options).map(o => o.value);
-        const optionsMatch = currentOptions.length === uniqueSeasons.length && currentOptions.every((val, index) => val === uniqueSeasons[index]);
-        if (!optionsMatch) {
-            ovYearSelect.innerHTML = "";
-            uniqueSeasons.forEach(season => {
-                const opt = document.createElement("option");
-                opt.value = season;
-                opt.innerText = season;
-                ovYearSelect.appendChild(opt);
-            });
-            if (uniqueSeasons.length > 0) {
-                if (!uniqueSeasons.includes(state.statsOvSelectedSeason)) {
-                    state.statsOvSelectedSeason = uniqueSeasons[0];
-                }
-                ovYearSelect.value = state.statsOvSelectedSeason;
-            }
-        }
+        populateSeasonSelect(ovYearSelect, rehearsalDates, false, state.statsOvSelectedSeason);
+        state.statsOvSelectedSeason = ovYearSelect.value;
     }
 
     if (rehearsalDates.length === 0) {
@@ -16749,59 +16831,36 @@ function renderGeneralOverviewChart() {
     let chartData = []; // Array of { label: string, pct: number, count: number }
 
     if (state.statsOvMode === "years") {
-        const yearsData = {};
+        const seasonsData = {};
         rehearsalDates.forEach(date => {
-            const year = date.split("-")[0];
-            if (!yearsData[year]) {
-                yearsData[year] = { presents: 0, total: 0, count: 0 };
+            const season = getSeasonLabelForDate(date);
+            if (!seasonsData[season]) {
+                seasonsData[season] = { presents: 0, total: 0, count: 0 };
             }
-            
+
             const dayRecord = state.attendance[date];
             state.musicians.forEach(m => {
                 if (isMusicianOnLeaveOnDate(m, date)) return;
                 const r = dayRecord[m.id];
                 if (r) {
-                    yearsData[year].total++;
+                    seasonsData[season].total++;
                     if (r.status === "present") {
-                        yearsData[year].presents++;
+                        seasonsData[season].presents++;
                     }
                 }
             });
-            yearsData[year].count++;
+            seasonsData[season].count++;
         });
 
-        const sortedYears = Object.keys(yearsData).sort((a,b) => a.localeCompare(b));
-        sortedYears.forEach(year => {
-            const data = yearsData[year];
+        const sortedSeasons = Object.keys(seasonsData).sort((a,b) => a.localeCompare(b));
+        sortedSeasons.forEach(season => {
+            const data = seasonsData[season];
             const pct = data.total > 0 ? Math.round((data.presents / data.total) * 100) : 0;
-            chartData.push({ label: year, pct: pct, count: data.count });
+            chartData.push({ label: season, pct: pct, count: data.count });
         });
     } else {
-        const selectedSeason = state.statsOvSelectedSeason || (() => {
-            const today = new Date();
-            const y = today.getFullYear();
-            const m = today.getMonth() + 1;
-            return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
-        })();
-        
-        const seasonParts = selectedSeason.split("-");
-        const year1 = seasonParts[0];
-        const year2 = seasonParts[1];
-
-        const seasonMonths = [
-            { label: "Sep", monthNum: 9, year: year1 },
-            { label: "Oct", monthNum: 10, year: year1 },
-            { label: "Nov", monthNum: 11, year: year1 },
-            { label: "Dic", monthNum: 12, year: year1 },
-            { label: "Ene", monthNum: 1, year: year2 },
-            { label: "Feb", monthNum: 2, year: year2 },
-            { label: "Mar", monthNum: 3, year: year2 },
-            { label: "Abr", monthNum: 4, year: year2 },
-            { label: "May", monthNum: 5, year: year2 },
-            { label: "Jun", monthNum: 6, year: year2 },
-            { label: "Jul", monthNum: 7, year: year2 },
-            { label: "Ago", monthNum: 8, year: year2 }
-        ];
+        const selectedSeason = state.statsOvSelectedSeason || getCurrentSeasonLabel();
+        const seasonMonths = getSeasonMonthsArray(selectedSeason);
 
         const monthsData = Array.from({ length: 12 }, () => ({ presents: 0, total: 0, count: 0 }));
         
@@ -16834,14 +16893,16 @@ function renderGeneralOverviewChart() {
         });
     }
 
+    const barMaxWidth = state.statsOvMode === "years" ? "96px" : "60px";
+
     let barsHTML = "";
     chartData.forEach(item => {
         const heightPct = item.pct;
         const tooltip = `${item.label}: ${item.pct}% asistencia (${item.count} ensayo${item.count !== 1 ? 's' : ''})`;
         const displayValue = item.count > 0 ? `${item.pct}%` : "-";
-        
+
         barsHTML += `
-            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: 60px; height: 100%; justify-content: flex-end; position: relative;">
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: ${barMaxWidth}; height: 100%; justify-content: flex-end; position: relative;">
                 <span class="bar-value" style="font-size: 0.72rem; font-weight: 700; color: var(--color-gold); margin-bottom: 6px; z-index: 2; transition: opacity 0.2s;">
                     ${displayValue}
                 </span>
@@ -17547,27 +17608,9 @@ function renderMusicianMonthlyEvolution(musicianId) {
     const typeFilter = document.getElementById("detail-filter-type").value;
 
     const today = new Date();
-    const curY = today.getFullYear();
-    const curM = today.getMonth() + 1;
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    let y1 = yearFilter === "all" ? (curM >= 9 ? curY : curY - 1) : parseInt(yearFilter, 10);
-    let y2 = y1 + 1;
-
-    const seasonMonths = [
-        { label: "Sep", monthNum: 9, year: String(y1) },
-        { label: "Oct", monthNum: 10, year: String(y1) },
-        { label: "Nov", monthNum: 11, year: String(y1) },
-        { label: "Dic", monthNum: 12, year: String(y1) },
-        { label: "Ene", monthNum: 1, year: String(y2) },
-        { label: "Feb", monthNum: 2, year: String(y2) },
-        { label: "Mar", monthNum: 3, year: String(y2) },
-        { label: "Abr", monthNum: 4, year: String(y2) },
-        { label: "May", monthNum: 5, year: String(y2) },
-        { label: "Jun", monthNum: 6, year: String(y2) },
-        { label: "Jul", monthNum: 7, year: String(y2) },
-        { label: "Ago", monthNum: 8, year: String(y2) }
-    ];
+    const seasonMonths = getSeasonMonthsArray(yearFilter === "all" ? getCurrentSeasonLabel() : yearFilter);
 
     let maxMonthPct = -1;
     let bestMonth = null;
