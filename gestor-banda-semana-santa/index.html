@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=469">
+    <link rel="stylesheet" href="style.css?v=471">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -815,7 +815,7 @@
                         <div class="filter-control-group">
                             <label for="filter-year">Temporada</label>
                             <select id="filter-year" class="filter-select">
-                                <option value="all" selected>Todas las temporadas</option>
+                                <option value="all" selected>Todas</option>
                             </select>
                         </div>
                         <div class="filter-control-group">
@@ -1580,6 +1580,10 @@
                                 <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
                             </button>
                         </div>
+                    </div>
+                    <div id="comp-baja-banner" class="hidden" style="margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: rgba(160, 160, 160, 0.14); border: 1px solid rgba(160, 160, 160, 0.4); color: #c9c9c9; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1rem;">🚫</span>
+                        <span>Estás de baja temporal. Mientras dure tu baja no cuentas para las estadísticas ni puedes enviar preavisos.</span>
                     </div>
                 </div>
 
@@ -4114,13 +4118,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=469"></script>
+    <script src="app.js?v=471"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=469
+        // Purga de caché antigua y registro del Service Worker v=471
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v469") {
+                    if (key !== "yacente-v471") {
                         caches.delete(key);
                     }
                 });
@@ -4133,9 +4137,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=469")
+                navigator.serviceWorker.register("sw.js?v=471")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v469 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v471 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

@@ -205,8 +205,8 @@ function getAvailableSeasons(dateKeys) {
 function populateSeasonSelect(selectEl, dateKeys, allowAll, selectedValue) {
     if (!selectEl) return;
     const seasons = getAvailableSeasons(dateKeys);
-    let optionsHtml = allowAll ? `<option value="all">Todas las temporadas</option>` : "";
-    optionsHtml += seasons.map(s => `<option value="${s}">Temporada ${s}</option>`).join("");
+    let optionsHtml = allowAll ? `<option value="all">Todas</option>` : "";
+    optionsHtml += seasons.map(s => `<option value="${s}">${s}</option>`).join("");
     if (selectEl.innerHTML !== optionsHtml) {
         selectEl.innerHTML = optionsHtml;
     }
@@ -9696,7 +9696,7 @@ function populateWeeklyGoalsSeasonSelect(selectEl) {
     if (!selectEl) return;
     const seasons = getWeeklyGoalsSeasonOptions();
     const currentSeason = getCurrentSeasonLabel();
-    const optionsHtml = seasons.map(s => `<option value="${s}"${s === currentSeason ? " selected" : ""}>Temporada ${s}</option>`).join("");
+    const optionsHtml = seasons.map(s => `<option value="${s}"${s === currentSeason ? " selected" : ""}>${s}</option>`).join("");
     if (selectEl.innerHTML !== optionsHtml) {
         const previousValue = selectEl.value;
         selectEl.innerHTML = optionsHtml;
@@ -12342,6 +12342,7 @@ function computeMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
     allDates.forEach(date => {
         if (!isSessionConcluded(date)) return;
         if (dateFilterFn && !dateFilterFn(date)) return;
+        if (isMusicianOnLeaveOnDate(musician, date)) return; // De baja: la fecha no cuenta ni a favor ni en contra
 
         const session = state.sessionTypes ? state.sessionTypes[date] : null;
         const sessionObj = session || { type: "ensayo", subtype: "general" };
@@ -12971,6 +12972,8 @@ function computeMusicianStreak(musicianId) {
                 return false;
             }
 
+            if (musician && isMusicianOnLeaveOnDate(musician, d)) return false; // De baja: la fecha no rompe ni cuenta en la racha
+
             const dayRecord = state.attendance[d];
             if (!dayRecord || Object.keys(dayRecord).length === 0) return false;
 
@@ -13367,7 +13370,13 @@ function renderComponentFicha() {
     
     document.getElementById("comp-profile-name").innerText = musician.name;
     document.getElementById("comp-profile-details").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
-    
+
+    const bajaBanner = document.getElementById("comp-baja-banner");
+    if (bajaBanner) {
+        const todayStr = new Date().toISOString().split("T")[0];
+        bajaBanner.classList.toggle("hidden", !isMusicianOnLeaveOnDate(musician, todayStr));
+    }
+
     const currentStreak = calculateMusicianStreak(musicianId);
     document.getElementById("comp-streak-val").innerText = currentStreak;
     
@@ -15016,9 +15025,16 @@ function logoutAdmin() {
 // PREAVISO (RSVP) PORTAL MÚSICOS
 // ==========================================================================
 function openPreavisoModal(date) {
+    const currentMusicianId = getAuthMusicianId();
+    const currentMusician = state.musicians.find(m => String(m.id) === String(currentMusicianId));
+    if (currentMusician && isMusicianOnLeaveOnDate(currentMusician, date)) {
+        showToast("Estás de baja temporal y no puedes registrar preavisos.", "error");
+        return;
+    }
+
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-    
+
     const eventDateObj = new Date(date + "T00:00:00");
     const todayDateObj = new Date(todayStr + "T00:00:00");
     const diffTime = eventDateObj.getTime() - todayDateObj.getTime();
@@ -15214,10 +15230,16 @@ function setupPreavisoEvents() {
                 showToast("Sesión de músico no válida.", "error");
                 return;
             }
-            
+
             const date = state.currentPreavisoDate;
             if (!date) return;
-            
+
+            const savingMusician = state.musicians.find(m => String(m.id) === String(musicianId));
+            if (savingMusician && isMusicianOnLeaveOnDate(savingMusician, date)) {
+                showToast("Estás de baja temporal y no puedes registrar preavisos.", "error");
+                return;
+            }
+
             let recordObj = null;
             if (preavisoSelectedStatus === "present") {
                 recordObj = {
@@ -16356,7 +16378,7 @@ function renderStatsCalendarHeatmapUnsafe() {
             seasons.forEach(s => {
                 const opt = document.createElement("option");
                 opt.value = s;
-                opt.innerText = `Temporada ${s}`;
+                opt.innerText = s;
                 yearSelect.appendChild(opt);
             });
         }
