@@ -5215,29 +5215,11 @@ function openActuacionDetailModal(date) {
     modal.classList.add("active");
 }
 
-// Renderiza las insignias del repertorio (ordenado) en el modal de detalle de la actuación,
-// y actualiza el botón "Repertorio"/"Añadir repertorio" según haya o no contenido.
+// Actualiza el botón "Repertorio"/"Añadir repertorio" del modal de detalle de la actuación
+// según haya o no contenido. No se listan las marchas individualmente: para consultarlas
+// hay que abrir el panel de repertorio pulsando el botón.
 function renderActuacionDetailRepertoire(date) {
     const repertoireIds = (state && state.actuacionRepertoire && state.actuacionRepertoire[date]) || [];
-    const marchasContainer = document.getElementById("actuacion-detail-marchas");
-    if (marchasContainer) {
-        marchasContainer.innerHTML = "";
-        if (repertoireIds.length === 0) {
-            marchasContainer.innerHTML = `<span class="text-muted" style="font-size: 0.85rem; font-style: italic;">Sin repertorio añadido todavía.</span>`;
-        } else {
-            const marchasArray = (state && state.marchas) || [];
-            repertoireIds.forEach((mId, idx) => {
-                const m = marchasArray.find(item => item.id === mId);
-                const mTitle = m ? m.title : `Marcha (${mId})`;
-                const badge = document.createElement("span");
-                badge.className = "marcha-tag";
-                badge.style.fontSize = "0.75rem";
-                badge.style.padding = "4px 10px";
-                badge.innerText = `${idx + 1}. ${mTitle}`;
-                marchasContainer.appendChild(badge);
-            });
-        }
-    }
 
     const btn = document.getElementById("btn-open-actuacion-repertoire");
     const btnLabel = document.getElementById("btn-open-actuacion-repertoire-label");
@@ -5321,11 +5303,11 @@ function renderActuacionRepertoireSearchList() {
     available.forEach(m => {
         const card = document.createElement("div");
         card.setAttribute("draggable", "true");
-        card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.85rem; color: var(--text-primary); transition: opacity 0.15s;";
+        card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary); transition: opacity 0.15s;";
         card.innerHTML = `
             <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.title)}</span>
-            <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 2px;">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
         `;
 
@@ -5344,67 +5326,79 @@ function renderActuacionRepertoireSearchList() {
     });
 }
 
+// Construye una fila compacta y arrastrable de la lista ordenada del repertorio.
+function buildRepertoireOrderRow(mId, idx, marchasArray) {
+    const m = marchasArray.find(item => item.id === mId);
+    const mTitle = m ? m.title : `Marcha (${mId})`;
+    const row = document.createElement("div");
+    row.setAttribute("draggable", "true");
+    row.style.cssText = "display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 4px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary);";
+    row.innerHTML = `
+        <span style="flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
+        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(mTitle)}</span>
+        <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    `;
+
+    row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", mId);
+        e.dataTransfer.setData("source-type", "list");
+        e.dataTransfer.setData("source-index", String(idx));
+        row.style.opacity = "0.5";
+    });
+    row.addEventListener("dragend", () => { row.style.opacity = "1"; });
+
+    row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = row.getBoundingClientRect();
+        const isAbove = (e.clientY - rect.top) < rect.height / 2;
+        row.style.borderTop = isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
+        row.style.borderBottom = !isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
+    });
+    row.addEventListener("dragleave", () => {
+        row.style.borderTop = "1px solid rgba(212, 175, 55, 0.2)";
+        row.style.borderBottom = "1px solid rgba(212, 175, 55, 0.2)";
+    });
+    row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = row.getBoundingClientRect();
+        const isAbove = (e.clientY - rect.top) < rect.height / 2;
+        handleActuacionRepertoireDrop(e, isAbove ? idx : idx + 1);
+    });
+
+    row.querySelector("button").addEventListener("click", () => {
+        removeMarchaFromActuacionRepertoire(idx);
+    });
+
+    return row;
+}
+
+// Reparte la lista ordenada en dos columnas visuales (col1 = primera mitad, col2 = segunda
+// mitad) que comparten un único scroll vertical, para que quepan repertorios largos (~35
+// marchas) sin que las tarjetas necesiten ser gigantes.
 function renderActuacionRepertoireOrderedList() {
-    const container = document.getElementById("actuacion-repertoire-ordered-list");
-    if (!container) return;
+    const col1 = document.getElementById("actuacion-repertoire-ordered-list-col1");
+    const col2 = document.getElementById("actuacion-repertoire-ordered-list-col2");
+    if (!col1 || !col2) return;
 
     const list = getActuacionRepertoireList();
     const marchasArray = (state && state.marchas) || [];
 
-    container.innerHTML = "";
+    col1.innerHTML = "";
+    col2.innerHTML = "";
 
     if (list.length === 0) {
-        container.innerHTML = `<p class="text-muted" style="font-size: 0.82rem; padding: 8px 0; text-align: center;">Arrastra marchas aquí, o pulsa "+" en la lista de la izquierda.</p>`;
+        col1.innerHTML = `<p class="text-muted" style="font-size: 0.78rem; padding: 6px 0; text-align: center;">Arrastra marchas aquí, o pulsa "+" en el banco de marchas.</p>`;
         return;
     }
 
+    const half = Math.ceil(list.length / 2);
     list.forEach((mId, idx) => {
-        const m = marchasArray.find(item => item.id === mId);
-        const mTitle = m ? m.title : `Marcha (${mId})`;
-        const row = document.createElement("div");
-        row.setAttribute("draggable", "true");
-        row.style.cssText = "display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.85rem; color: var(--text-primary);";
-        row.innerHTML = `
-            <span style="flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
-            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(mTitle)}</span>
-            <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 2px;">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        `;
-
-        row.addEventListener("dragstart", (e) => {
-            e.dataTransfer.setData("text/plain", mId);
-            e.dataTransfer.setData("source-type", "list");
-            e.dataTransfer.setData("source-index", String(idx));
-            row.style.opacity = "0.5";
-        });
-        row.addEventListener("dragend", () => { row.style.opacity = "1"; });
-
-        row.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = row.getBoundingClientRect();
-            const isAbove = (e.clientY - rect.top) < rect.height / 2;
-            row.style.borderTop = isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
-            row.style.borderBottom = !isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
-        });
-        row.addEventListener("dragleave", () => {
-            row.style.borderTop = "1px solid rgba(212, 175, 55, 0.2)";
-            row.style.borderBottom = "1px solid rgba(212, 175, 55, 0.2)";
-        });
-        row.addEventListener("drop", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = row.getBoundingClientRect();
-            const isAbove = (e.clientY - rect.top) < rect.height / 2;
-            handleActuacionRepertoireDrop(e, isAbove ? idx : idx + 1);
-        });
-
-        row.querySelector("button").addEventListener("click", () => {
-            removeMarchaFromActuacionRepertoire(idx);
-        });
-
-        container.appendChild(row);
+        const row = buildRepertoireOrderRow(mId, idx, marchasArray);
+        (idx < half ? col1 : col2).appendChild(row);
     });
 }
 
@@ -5467,10 +5461,22 @@ function setupActuacionRepertoireModalEvents() {
         searchInput.addEventListener("input", () => renderActuacionRepertoireSearchList());
     }
 
-    const orderedListContainer = document.getElementById("actuacion-repertoire-ordered-list");
-    if (orderedListContainer) {
-        orderedListContainer.addEventListener("dragover", (e) => { e.preventDefault(); });
-        orderedListContainer.addEventListener("drop", (e) => {
+    // Drop en zona vacía de la columna 1 = insertar al final de la primera mitad;
+    // drop en zona vacía de la columna 2 = insertar al final absoluto de la lista.
+    const orderedCol1 = document.getElementById("actuacion-repertoire-ordered-list-col1");
+    if (orderedCol1) {
+        orderedCol1.addEventListener("dragover", (e) => { e.preventDefault(); });
+        orderedCol1.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const list = getActuacionRepertoireList();
+            handleActuacionRepertoireDrop(e, Math.ceil(list.length / 2));
+        });
+    }
+
+    const orderedCol2 = document.getElementById("actuacion-repertoire-ordered-list-col2");
+    if (orderedCol2) {
+        orderedCol2.addEventListener("dragover", (e) => { e.preventDefault(); });
+        orderedCol2.addEventListener("drop", (e) => {
             e.preventDefault();
             handleActuacionRepertoireDrop(e, getActuacionRepertoireList().length);
         });

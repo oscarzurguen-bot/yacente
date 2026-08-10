@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=475">
+    <link rel="stylesheet" href="style.css?v=476">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3168,9 +3168,6 @@
                             <span id="btn-open-actuacion-repertoire-label">Repertorio</span>
                         </button>
                     </div>
-                    <div id="actuacion-detail-marchas" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                        <!-- Repertorio ordenado poblado aquí -->
-                    </div>
                 </div>
 
                 <!-- Resumen de Asistencia Metrics -->
@@ -3274,11 +3271,11 @@
 
     <!-- Modal: Repertorio de Actuación -->
     <div id="modal-actuacion-repertoire" class="modal-overlay">
-        <div class="modal-card" style="max-width: 760px; width: 92vw; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
-            <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+        <div class="modal-card" style="max-width: 780px; width: 94vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+            <div class="modal-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
                 <div>
-                    <h3 id="actuacion-repertoire-title" style="margin: 0; font-size: 1.15rem;">Repertorio de la Actuación</h3>
-                    <p id="actuacion-repertoire-subtitle" class="text-muted" style="margin: 4px 0 0; font-size: 0.85rem;"></p>
+                    <h3 id="actuacion-repertoire-title" style="margin: 0; font-size: 1.05rem;">Repertorio de la Actuación</h3>
+                    <p id="actuacion-repertoire-subtitle" class="text-muted" style="margin: 2px 0 0; font-size: 0.78rem;"></p>
                 </div>
                 <button class="modal-close" id="btn-close-actuacion-repertoire">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -3287,25 +3284,26 @@
                     </svg>
                 </button>
             </div>
-            <div class="modal-body" style="padding: 20px; overflow: hidden; flex: 1; display: flex; gap: 18px; box-sizing: border-box; flex-wrap: wrap;">
-                <!-- Columna izquierda: buscador de marchas -->
-                <div style="flex: 1 1 260px; min-width: 220px; display: flex; flex-direction: column; gap: 10px; max-height: 100%;">
-                    <h4 style="margin: 0; font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Repertorio de la Banda</h4>
-                    <input type="text" id="actuacion-repertoire-search" placeholder="Buscar marcha..." style="width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary);">
-                    <div id="actuacion-repertoire-search-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; min-height: 160px;">
+            <div class="modal-body" style="padding: 12px 16px; overflow: hidden; flex: 1; min-height: 0; display: flex; gap: 10px; box-sizing: border-box;">
+                <!-- Columna 1: banco de marchas -->
+                <div style="flex: 0 0 170px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
+                    <h4 style="margin: 0; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Banco de Marchas</h4>
+                    <input type="text" id="actuacion-repertoire-search" placeholder="Buscar..." style="width: 100%; box-sizing: border-box; padding: 5px 7px; font-size: 0.75rem; border-radius: 5px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary);">
+                    <div id="actuacion-repertoire-search-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 3px;">
                         <!-- Marchas disponibles, arrastrables -->
                     </div>
                 </div>
-                <!-- Columna derecha: lista ordenada -->
-                <div style="flex: 1 1 260px; min-width: 220px; display: flex; flex-direction: column; gap: 10px; max-height: 100%;">
-                    <h4 style="margin: 0; font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Orden del Repertorio</h4>
-                    <div id="actuacion-repertoire-ordered-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px dashed var(--border-color); border-radius: 8px; min-height: 160px; box-sizing: border-box;">
-                        <!-- Lista numerada, arrastrable para reordenar -->
+                <!-- Columnas 2 y 3: repertorio ordenado, con scroll vertical compartido -->
+                <div style="flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
+                    <h4 style="margin: 0; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Orden del Repertorio</h4>
+                    <div style="flex: 1; min-height: 0; overflow-y: auto; display: flex; gap: 8px; border: 1px dashed var(--border-color); border-radius: 6px; padding: 6px; box-sizing: border-box;">
+                        <div id="actuacion-repertoire-ordered-list-col1" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;"></div>
+                        <div id="actuacion-repertoire-ordered-list-col2" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;"></div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
-                <span class="text-muted" style="font-size: 0.75rem;">Los cambios se guardan automáticamente.</span>
+            <div class="modal-footer" style="padding: 10px 16px; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
+                <span class="text-muted" style="font-size: 0.72rem;">Los cambios se guardan automáticamente.</span>
                 <button class="btn btn-secondary" id="btn-close-actuacion-repertoire-footer">Cerrar</button>
             </div>
         </div>
@@ -4159,13 +4157,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=475"></script>
+    <script src="app.js?v=476"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=475
+        // Purga de caché antigua y registro del Service Worker v=476
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v475") {
+                    if (key !== "yacente-v476") {
                         caches.delete(key);
                     }
                 });
@@ -4178,9 +4176,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=475")
+                navigator.serviceWorker.register("sw.js?v=476")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v475 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v476 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
