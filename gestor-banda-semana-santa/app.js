@@ -2507,6 +2507,7 @@ function setupEventListeners() {
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
         if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = "";
+        updateResponsableQuickButtonsState();
         setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", "");
         modalRehearsal.classList.add("active");
     });
@@ -2517,10 +2518,14 @@ function setupEventListeners() {
 
     document.querySelectorAll(".rehearsal-responsable-quick-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
-            const input = document.getElementById("rehearsal-responsable-input");
-            if (input) input.value = btn.dataset.value;
+            toggleResponsableQuickName(btn.dataset.value);
         });
     });
+
+    const responsableInputEl = document.getElementById("rehearsal-responsable-input");
+    if (responsableInputEl) {
+        responsableInputEl.addEventListener("input", updateResponsableQuickButtonsState);
+    }
 
     document.getElementById("form-rehearsal").addEventListener("submit", (e) => {
         e.preventDefault();
@@ -4240,10 +4245,43 @@ function openEditRehearsalModal(dateKey) {
     if (document.getElementById("rehearsal-type-input")) document.getElementById("rehearsal-type-input").value = sessionInfo.subtype || "general";
     if (document.getElementById("rehearsal-location-input")) document.getElementById("rehearsal-location-input").value = sessionInfo.location || "Parking";
     if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = sessionInfo.responsable || "";
+    updateResponsableQuickButtonsState();
     setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", sessionInfo.time || "");
 
     const modal = document.getElementById("modal-rehearsal");
     if (modal) modal.classList.add("active");
+}
+
+// Los responsables se guardan como un único texto separado por comas (p.ej. "Iván, Oscar")
+// para poder cubrir el caso habitual (una persona) sin migrar el modelo de datos, y a la vez
+// permitir varios responsables en casos puntuales.
+function getResponsableNamesFromInput() {
+    const input = document.getElementById("rehearsal-responsable-input");
+    if (!input) return [];
+    return input.value.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function updateResponsableQuickButtonsState() {
+    const names = getResponsableNamesFromInput().map(n => n.toLowerCase());
+    document.querySelectorAll(".rehearsal-responsable-quick-btn").forEach(btn => {
+        const isActive = names.includes(btn.dataset.value.toLowerCase());
+        btn.classList.toggle("btn-primary", isActive);
+        btn.classList.toggle("btn-secondary", !isActive);
+    });
+}
+
+function toggleResponsableQuickName(name) {
+    const input = document.getElementById("rehearsal-responsable-input");
+    if (!input) return;
+    const names = getResponsableNamesFromInput();
+    const idx = names.findIndex(n => n.toLowerCase() === name.toLowerCase());
+    if (idx !== -1) {
+        names.splice(idx, 1);
+    } else {
+        names.push(name);
+    }
+    input.value = names.join(", ");
+    updateResponsableQuickButtonsState();
 }
 
 function openEditActuacionModal(dateKey) {
@@ -6271,13 +6309,14 @@ function renderStatsMarchasOlvidadas() {
     
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(sessionKey => {
+            if (!isSessionConcluded(sessionKey)) return; // No contar ensayos que aún no han sucedido
             const sessionInfo = state.sessionTypes[sessionKey];
             const isRehearsal = !sessionInfo || sessionInfo.type === "ensayo";
             if (!isRehearsal) return;
-            
+
             const rawDate = sessionKey.split("_")[0];
             const list = state.playedMarchas[sessionKey] || [];
-            
+
             list.forEach(mId => {
                 if (!lastRehearsalDates[mId] || rawDate > lastRehearsalDates[mId]) {
                     lastRehearsalDates[mId] = rawDate;
@@ -6797,19 +6836,26 @@ function calculateDireccionStats(datesArray) {
 
         totalCount++;
 
-        const responsable = (sessionInfo && sessionInfo.responsable && sessionInfo.responsable.trim()) || UNASSIGNED_LABEL;
+        // Un ensayo puede tener varios responsables (casos puntuales), separados por comas;
+        // se cuenta una vez para cada uno de ellos.
+        const responsableNames = (sessionInfo && sessionInfo.responsable)
+            ? sessionInfo.responsable.split(",").map(s => s.trim()).filter(Boolean)
+            : [];
+        const responsables = responsableNames.length > 0 ? responsableNames : [UNASSIGNED_LABEL];
         const sub = sessionInfo ? sessionInfo.subtype : "general";
         const label = getSubtypeLabel(sub, sessionInfo);
 
-        if (!responsableMap[responsable]) {
-            responsableMap[responsable] = {
-                responsable: responsable,
-                count: 0,
-                typeCounts: {}
-            };
-        }
-        responsableMap[responsable].count++;
-        responsableMap[responsable].typeCounts[label] = (responsableMap[responsable].typeCounts[label] || 0) + 1;
+        responsables.forEach(responsable => {
+            if (!responsableMap[responsable]) {
+                responsableMap[responsable] = {
+                    responsable: responsable,
+                    count: 0,
+                    typeCounts: {}
+                };
+            }
+            responsableMap[responsable].count++;
+            responsableMap[responsable].typeCounts[label] = (responsableMap[responsable].typeCounts[label] || 0) + 1;
+        });
     });
 
     const breakdownList = Object.values(responsableMap).sort((a, b) => b.count - a.count).map(item => {
@@ -8406,10 +8452,11 @@ function downloadSeasonPDFReport(selectedSeason) {
     const lastRehearsalDatesSeason = {};
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(sessionKey => {
+            if (!isSessionConcluded(sessionKey)) return; // No contar ensayos que aún no han sucedido
             const sessionInfo = state.sessionTypes[sessionKey];
             const isRehearsal = !sessionInfo || sessionInfo.type === "ensayo";
             if (!isRehearsal) return;
-            
+
             const rawDate = sessionKey.split("_")[0];
             const list = state.playedMarchas[sessionKey] || [];
             
@@ -9283,10 +9330,11 @@ function renderMarchasList() {
 
     const searchQuery = document.getElementById("search-marcha") ? document.getElementById("search-marcha").value.toLowerCase().trim() : "";
 
-    // Count plays dynamically
+    // Count plays dynamically (solo ensayos que ya han sucedido)
     const playCounts = {};
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(date => {
+            if (!isSessionConcluded(date)) return;
             const list = state.playedMarchas[date] || [];
             list.forEach(mId => {
                 playCounts[mId] = (playCounts[mId] || 0) + 1;
@@ -9665,6 +9713,7 @@ function openMarchaHistoryModal(marchId) {
     document.getElementById("marcha-history-repertoire-info").innerText = m.title;
 
     const datesPlayed = Object.keys(state.playedMarchas || {}).filter(date => {
+        if (!isSessionConcluded(date)) return false; // No mostrar ensayos que aún no han sucedido
         const isRehearsal = !state.sessionTypes[date] || state.sessionTypes[date].type === "ensayo";
         return isRehearsal && state.playedMarchas[date].includes(marchId);
     }).sort((a, b) => b.localeCompare(a));
@@ -9738,6 +9787,7 @@ function openMarchaActuacionesHistoryModal(marchaId) {
     document.getElementById("marcha-actuaciones-history-repertoire-info").innerText = m.title;
 
     const actuacionDates = Object.keys(state.actuacionRepertoire || {}).filter(date => {
+        if (!isSessionConcluded(date)) return false; // No mostrar actuaciones que aún no han sucedido
         const sessionInfo = state.sessionTypes[date];
         return sessionInfo && sessionInfo.type === "actuacion" && (state.actuacionRepertoire[date] || []).includes(marchaId);
     }).sort((a, b) => b.localeCompare(a));
