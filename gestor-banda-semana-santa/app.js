@@ -6455,13 +6455,8 @@ function calculateDireccionStats(datesArray) {
         };
     });
 
-    const realResponsables = breakdownList.filter(item => item.responsable !== UNASSIGNED_LABEL);
-    const topResponsable = realResponsables.length > 0 ? realResponsables[0] : null;
-
     return {
         totalCount,
-        responsableCount: realResponsables.length,
-        topResponsable,
         breakdownList
     };
 }
@@ -6469,21 +6464,7 @@ function calculateDireccionStats(datesArray) {
 function renderStatsDireccion(filteredDates) {
     const stats = calculateDireccionStats(filteredDates);
 
-    const totalEl = document.getElementById("stats-direccion-total-count");
-    const topEl = document.getElementById("stats-direccion-top-responsable");
-    const topSubEl = document.getElementById("stats-direccion-top-responsable-sub");
-    const countEl = document.getElementById("stats-direccion-count");
     const bodyEl = document.getElementById("stats-direccion-breakdown-body");
-
-    if (totalEl) totalEl.innerText = stats.totalCount;
-    if (countEl) countEl.innerText = stats.responsableCount;
-
-    if (topEl) topEl.innerText = stats.topResponsable ? stats.topResponsable.responsable : "-";
-    if (topSubEl) {
-        topSubEl.innerText = stats.topResponsable
-            ? `${stats.topResponsable.count} ensayo${stats.topResponsable.count === 1 ? "" : "s"} dirigido${stats.topResponsable.count === 1 ? "" : "s"} (${stats.topResponsable.pctOfTotal}%)`
-            : "Sin datos";
-    }
 
     if (bodyEl) {
         if (stats.breakdownList.length === 0) {

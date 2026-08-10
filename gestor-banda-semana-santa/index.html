@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=472">
+    <link rel="stylesheet" href="style.css?v=473">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1155,24 +1155,6 @@
                     </div>
                     <div class="card-collapsible-content">
                         <p class="text-muted" style="margin-bottom: 20px; font-size: 0.85rem;">Ensayos dirigidos por cada responsable en el período seleccionado.</p>
-                        <!-- Summary KPI Grid -->
-                        <div class="stats-overview-grid" style="margin-bottom: 20px;">
-                            <div class="card stat-overview-card" style="padding: 16px;">
-                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos Analizados</h3>
-                                <div class="huge-number" id="stats-direccion-total-count" style="font-size: 2rem;">0</div>
-                                <p class="text-muted" style="font-size: 0.78rem;">En el período seleccionado</p>
-                            </div>
-                            <div class="card stat-overview-card" style="padding: 16px;">
-                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Responsable Más Activo</h3>
-                                <div class="huge-number" id="stats-direccion-top-responsable" style="font-size: 1.6rem; color: var(--color-gold);">-</div>
-                                <p class="text-muted" style="font-size: 0.78rem;" id="stats-direccion-top-responsable-sub">Sin datos</p>
-                            </div>
-                            <div class="card stat-overview-card" style="padding: 16px;">
-                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Responsables Distintos</h3>
-                                <div class="huge-number" id="stats-direccion-count" style="font-size: 2rem;">0</div>
-                                <p class="text-muted" style="font-size: 0.78rem;">Personas que han dirigido</p>
-                            </div>
-                        </div>
 
                         <!-- Gráfico de tarta: ensayos dirigidos por responsable -->
                         <h4 style="font-size: 0.92rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
@@ -4124,13 +4106,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=472"></script>
+    <script src="app.js?v=473"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=472
+        // Purga de caché antigua y registro del Service Worker v=473
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v472") {
+                    if (key !== "yacente-v473") {
                         caches.delete(key);
                     }
                 });
@@ -4143,9 +4125,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=472")
+                navigator.serviceWorker.register("sw.js?v=473")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v472 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v473 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
