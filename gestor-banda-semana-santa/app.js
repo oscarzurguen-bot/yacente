@@ -6519,6 +6519,61 @@ function renderStatsDireccion(filteredDates) {
             bodyEl.innerHTML = html;
         }
     }
+
+    renderStatsDireccionPieChart(stats.breakdownList, stats.totalCount);
+}
+
+const DIRECCION_PIE_PALETTE = ["#D4AF37", "#3b82f6", "#2ecc71", "#e67e22", "#9b59b6", "#1abc9c", "#e84393", "#e74c3c", "#00b894", "#0984e3"];
+const DIRECCION_PIE_UNASSIGNED_COLOR = "#8a8a8a";
+
+function renderStatsDireccionPieChart(breakdownList, totalCount) {
+    const container = document.getElementById("stats-direccion-piechart-container");
+    if (!container) return;
+
+    if (!breakdownList || breakdownList.length === 0 || !totalCount) {
+        container.innerHTML = `<p class="text-muted" style="font-size: 0.85rem; padding: 4px 0;">No hay datos suficientes para el gráfico.</p>`;
+        return;
+    }
+
+    const cx = 90, cy = 90, outerR = 80, innerR = 46;
+    let angle = 0;
+    let colorIdx = 0;
+    let slicesSVG = "";
+    let legendHTML = "";
+
+    breakdownList.forEach(item => {
+        const isUnassigned = item.responsable === "Sin asignar";
+        const color = isUnassigned ? DIRECCION_PIE_UNASSIGNED_COLOR : DIRECCION_PIE_PALETTE[colorIdx % DIRECCION_PIE_PALETTE.length];
+        if (!isUnassigned) colorIdx++;
+
+        const span = totalCount > 0 ? (item.count / totalCount) * 360 : 0;
+        const trimmed = trimAngleGap(angle, angle + span, 2);
+        const path = donutSlicePath(cx, cy, innerR, outerR, trimmed.start, trimmed.end);
+        const title = `${item.responsable}: ${item.count} ensayo${item.count === 1 ? "" : "s"} (${item.pctOfTotal}%)`;
+        slicesSVG += `<path d="${path}" fill="${color}" stroke="var(--bg-card)" stroke-width="1.5"><title>${title}</title></path>`;
+
+        legendHTML += `
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; padding: 3px 0;">
+                <span style="width: 10px; height: 10px; border-radius: 3px; background: ${color}; flex-shrink: 0;"></span>
+                <span style="color: ${isUnassigned ? "var(--text-muted)" : "var(--text-primary)"}; font-weight: 600;">${item.responsable}</span>
+                <span style="color: var(--text-secondary); margin-left: auto; padding-left: 10px; white-space: nowrap;">${item.count} · ${item.pctOfTotal}%</span>
+            </div>
+        `;
+        angle += span;
+    });
+
+    container.innerHTML = `
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center;">
+            <svg viewBox="0 0 180 180" width="180" height="180" style="flex-shrink: 0;">
+                ${slicesSVG}
+                <text x="90" y="86" text-anchor="middle" style="font-size: 20px; font-weight: 700; fill: var(--text-primary); font-family: 'Outfit', sans-serif;">${totalCount}</text>
+                <text x="90" y="102" text-anchor="middle" style="font-size: 9px; fill: var(--text-muted); font-family: 'Outfit', sans-serif;">ENSAYOS</text>
+            </svg>
+            <div style="flex: 1; min-width: 180px;">
+                ${legendHTML}
+            </div>
+        </div>
+    `;
 }
 
 // Renderiza la cuadrícula de componentes con sus anillos SVG circulares de progreso
