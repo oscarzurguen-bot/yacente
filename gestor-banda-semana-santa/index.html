@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=473">
+    <link rel="stylesheet" href="style.css?v=474">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -880,6 +880,7 @@
                             <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 6px; border: 1px solid var(--border-color);">
                                 <button id="btn-stats-ov-years" class="btn btn-primary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; cursor: pointer;">Temporada</button>
                                 <button id="btn-stats-ov-months" class="btn btn-secondary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Meses</button>
+                                <button id="btn-stats-ov-sessions" class="btn btn-secondary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Ensayos</button>
                             </div>
                             <div id="stats-ov-month-filter-container" class="hidden" style="display: flex; align-items: center; gap: 8px;">
                                 <label for="stats-ov-year-select" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; margin: 0;">Seleccionar Temporada:</label>
@@ -4106,13 +4107,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=473"></script>
+    <script src="app.js?v=474"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=473
+        // Purga de caché antigua y registro del Service Worker v=474
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v473") {
+                    if (key !== "yacente-v474") {
                         caches.delete(key);
                     }
                 });
@@ -4125,9 +4126,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=473")
+                navigator.serviceWorker.register("sw.js?v=474")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v473 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v474 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

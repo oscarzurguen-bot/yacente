@@ -1928,44 +1928,38 @@ function setupEventListeners() {
         });
     }
 
-    // Alternancia en Visión General (Estadísticas)
+    // Alternancia en Visión General (Estadísticas): Temporada / Meses / Ensayos
     const btnOvYears = document.getElementById("btn-stats-ov-years");
     const btnOvMonths = document.getElementById("btn-stats-ov-months");
+    const btnOvSessions = document.getElementById("btn-stats-ov-sessions");
     const ovYearSelect = document.getElementById("stats-ov-year-select");
 
-    if (btnOvYears && btnOvMonths) {
-        btnOvYears.addEventListener("click", () => {
-            state.statsOvMode = "years";
-            btnOvYears.classList.remove("btn-secondary");
-            btnOvYears.classList.add("btn-primary");
-            btnOvYears.style.background = "";
-            btnOvYears.style.color = "";
-            
-            btnOvMonths.classList.remove("btn-primary");
-            btnOvMonths.classList.add("btn-secondary");
-            btnOvMonths.style.background = "transparent";
-            btnOvMonths.style.color = "var(--text-secondary)";
-            
-            document.getElementById("stats-ov-month-filter-container").classList.add("hidden");
-            renderGeneralOverviewChart();
+    const ovModeButtons = [
+        { btn: btnOvYears, mode: "years" },
+        { btn: btnOvMonths, mode: "months" },
+        { btn: btnOvSessions, mode: "sessions" }
+    ];
+
+    const setActiveOvMode = (mode) => {
+        state.statsOvMode = mode;
+        ovModeButtons.forEach(({ btn, mode: btnMode }) => {
+            if (!btn) return;
+            const isActive = btnMode === mode;
+            btn.classList.toggle("btn-primary", isActive);
+            btn.classList.toggle("btn-secondary", !isActive);
+            btn.style.background = isActive ? "" : "transparent";
+            btn.style.color = isActive ? "" : "var(--text-secondary)";
         });
-        
-        btnOvMonths.addEventListener("click", () => {
-            state.statsOvMode = "months";
-            btnOvMonths.classList.remove("btn-secondary");
-            btnOvMonths.classList.add("btn-primary");
-            btnOvMonths.style.background = "";
-            btnOvMonths.style.color = "";
-            
-            btnOvYears.classList.remove("btn-primary");
-            btnOvYears.classList.add("btn-secondary");
-            btnOvYears.style.background = "transparent";
-            btnOvYears.style.color = "var(--text-secondary)";
-            
-            document.getElementById("stats-ov-month-filter-container").classList.remove("hidden");
-            renderGeneralOverviewChart();
-        });
-    }
+
+        const filterContainer = document.getElementById("stats-ov-month-filter-container");
+        if (filterContainer) filterContainer.classList.toggle("hidden", mode === "years");
+
+        renderGeneralOverviewChart();
+    };
+
+    ovModeButtons.forEach(({ btn, mode }) => {
+        if (btn) btn.addEventListener("click", () => setActiveOvMode(mode));
+    });
 
     if (ovYearSelect) {
         ovYearSelect.addEventListener("change", (e) => {
@@ -16886,6 +16880,11 @@ function renderGeneralOverviewChart() {
         return;
     }
 
+    if (state.statsOvMode === "sessions") {
+        renderOverviewSessionsChart(container, rehearsalDates);
+        return;
+    }
+
     let chartData = []; // Array of { label: string, pct: number, count: number }
 
     if (state.statsOvMode === "years") {
@@ -16999,6 +16998,77 @@ function renderGeneralOverviewChart() {
             </div>
         </div>
         <div style="height: 25px; width: 100%;"></div>
+    `;
+}
+
+// Vista "Ensayos" de Visión General: un punto de asistencia % por cada ensayo de la temporada
+// seleccionada, unidos por una línea, para ver la evolución ensayo a ensayo (no por período).
+function renderOverviewSessionsChart(container, rehearsalDates) {
+    const selectedSeason = state.statsOvSelectedSeason || getCurrentSeasonLabel();
+
+    const points = rehearsalDates
+        .filter(date => isDateInSeason(date, selectedSeason))
+        .sort((a, b) => a.localeCompare(b))
+        .map(date => {
+            let presents = 0;
+            let total = 0;
+            const dayRecord = state.attendance[date];
+            state.musicians.forEach(m => {
+                if (isMusicianOnLeaveOnDate(m, date)) return;
+                const r = dayRecord[m.id];
+                if (r) {
+                    total++;
+                    if (r.status === "present") presents++;
+                }
+            });
+            const pct = total > 0 ? Math.round((presents / total) * 100) : null;
+            return { date, pct, presents, total };
+        })
+        .filter(p => p.pct !== null);
+
+    if (points.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 30px 10px; text-align: center; border-left: 2px solid var(--border-color); border-bottom: 2px solid var(--border-color); box-sizing: border-box; min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                <p class="text-muted" style="margin: 0; font-size: 0.88rem;">No hay ensayos registrados en la temporada ${selectedSeason}.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const plotHeight = 250, topMargin = 20, bottomMargin = 34, leftMargin = 42, stepX = 46, rightPad = 20;
+    const width = leftMargin + Math.max(points.length - 1, 0) * stepX + rightPad;
+    const svgHeight = topMargin + plotHeight + bottomMargin;
+    const yForPct = pct => topMargin + plotHeight - (pct / 100) * plotHeight;
+
+    let gridLinesSVG = "";
+    [0, 25, 50, 75, 100].forEach(mark => {
+        const y = yForPct(mark);
+        gridLinesSVG += `<line x1="${leftMargin}" y1="${y}" x2="${width - rightPad + 10}" y2="${y}" stroke="${mark === 0 ? "var(--border-color)" : "rgba(255,255,255,0.06)"}" stroke-width="1" stroke-dasharray="${mark === 0 ? "0" : "3,3"}" />`;
+        gridLinesSVG += `<text x="${leftMargin - 8}" y="${y + 3}" text-anchor="end" style="font-size: 9px; fill: var(--text-muted);">${mark}%</text>`;
+    });
+
+    const coords = points.map((p, i) => ({ ...p, x: leftMargin + i * stepX, y: yForPct(p.pct) }));
+    const polylinePoints = coords.map(c => `${c.x},${c.y}`).join(" ");
+
+    let dotsSVG = "";
+    let xLabelsSVG = "";
+    coords.forEach(c => {
+        const dateParts = c.date.split("-");
+        const shortLabel = `${dateParts[2]}/${dateParts[1]}`;
+        const tooltip = `${formatDateSpanish(c.date)}: ${c.pct}% asistencia (${c.presents}/${c.total})`;
+        dotsSVG += `<circle cx="${c.x}" cy="${c.y}" r="4" fill="var(--color-gold)" stroke="var(--bg-card)" stroke-width="1.5" style="cursor: help;"><title>${tooltip}</title></circle>`;
+        xLabelsSVG += `<text x="${c.x}" y="${topMargin + plotHeight + 18}" text-anchor="middle" style="font-size: 9px; fill: var(--text-color); font-weight: 600;">${shortLabel}</text>`;
+    });
+
+    container.innerHTML = `
+        <div style="overflow-x: auto; width: 100%;">
+            <svg viewBox="0 0 ${width} ${svgHeight}" width="${width}" height="${svgHeight}" style="min-width: ${width}px; font-family: 'Outfit', sans-serif;">
+                ${gridLinesSVG}
+                <polyline points="${polylinePoints}" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                ${dotsSVG}
+                ${xLabelsSVG}
+            </svg>
+        </div>
     `;
 }
 
