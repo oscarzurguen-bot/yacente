@@ -112,6 +112,7 @@ let state = {
     currentDate: "",
     marchas: [],
     playedMarchas: {},
+    actuacionRepertoire: {},
     marchasViewMode: "list",
     calendarGoals: {},
     weeklyGoals: {},
@@ -308,6 +309,9 @@ function initApp() {
 
     const storedWeeklyGoals = localStorage.getItem("harmonia_weekly_goals");
     state.weeklyGoals = storedWeeklyGoals ? JSON.parse(storedWeeklyGoals) : {};
+
+    const storedActuacionRepertoire = localStorage.getItem("harmonia_actuacion_repertoire");
+    state.actuacionRepertoire = storedActuacionRepertoire ? JSON.parse(storedActuacionRepertoire) : {};
 
     const storedSuggestions = localStorage.getItem("harmonia_suggestions");
     state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
@@ -521,6 +525,7 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
     localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas || []));
     localStorage.setItem("harmonia_played_marchas", JSON.stringify(state.playedMarchas || {}));
+    localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire || {}));
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
@@ -606,6 +611,7 @@ let unsubAttendance = null;
 let unsubSessionTypes = null;
 let unsubMarchas = null;
 let unsubPlayedMarchas = null;
+let unsubActuacionRepertoire = null;
 let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
@@ -936,6 +942,23 @@ function startCloudSync() {
         console.error("Error sync marchas ensayadas:", err);
     });
 
+    // Escucha de repertorios ordenados de actuaciones
+    unsubActuacionRepertoire = db.collection("actuacionRepertoire").onSnapshot(snapshot => {
+        state.actuacionRepertoire = {};
+        snapshot.forEach(doc => {
+            state.actuacionRepertoire[doc.id] = doc.data().marchas || [];
+        });
+        localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire));
+        if (document.getElementById("modal-actuacion-detail").classList.contains("active") && state.activeDetailDate) {
+            renderActuacionDetailRepertoire(state.activeDetailDate);
+        }
+        if (document.getElementById("modal-actuacion-repertoire").classList.contains("active")) {
+            renderActuacionRepertoireModal();
+        }
+    }, err => {
+        console.error("Error sync repertorio de actuación:", err);
+    });
+
     // Escucha de objetivos semanales por año
     unsubWeeklyGoals = db.collection("weeklyGoals").onSnapshot(snapshot => {
         state.weeklyGoals = {}; // Limpiar caché local
@@ -1172,6 +1195,7 @@ function stopCloudSync() {
     if (unsubSessionTypes) { unsubSessionTypes(); unsubSessionTypes = null; }
     if (unsubMarchas) { unsubMarchas(); unsubMarchas = null; }
     if (unsubPlayedMarchas) { unsubPlayedMarchas(); unsubPlayedMarchas = null; }
+    if (unsubActuacionRepertoire) { unsubActuacionRepertoire(); unsubActuacionRepertoire = null; }
     if (unsubWeeklyGoals) { unsubWeeklyGoals(); unsubWeeklyGoals = null; }
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
@@ -1222,7 +1246,13 @@ function syncLocalToCloud() {
         const ref = db.collection("playedMarchas").doc(date);
         batch.set(ref, { marchas: state.playedMarchas[date] });
     });
-    
+
+    // Subir repertorios ordenados de actuaciones
+    Object.keys(state.actuacionRepertoire || {}).forEach(date => {
+        const ref = db.collection("actuacionRepertoire").doc(date);
+        batch.set(ref, { marchas: state.actuacionRepertoire[date] });
+    });
+
     // Subir configuraciones del simulador
     const refConcierto = db.collection("config").doc("formacion_concierto");
     batch.set(refConcierto, {
@@ -1268,12 +1298,14 @@ function disconnectFirebase() {
     const storedSessionTypes = localStorage.getItem("harmonia_session_types");
     const storedMarchas = localStorage.getItem("harmonia_marchas");
     const storedPlayedMarchas = localStorage.getItem("harmonia_played_marchas");
-    
+    const storedActuacionRepertoire = localStorage.getItem("harmonia_actuacion_repertoire");
+
     state.musicians = storedMusicians ? JSON.parse(storedMusicians) : [];
     state.attendance = storedAttendance ? JSON.parse(storedAttendance) : {};
     state.sessionTypes = storedSessionTypes ? JSON.parse(storedSessionTypes) : {};
     state.marchas = storedMarchas ? JSON.parse(storedMarchas) : [];
     state.playedMarchas = storedPlayedMarchas ? JSON.parse(storedPlayedMarchas) : {};
+    state.actuacionRepertoire = storedActuacionRepertoire ? JSON.parse(storedActuacionRepertoire) : {};
     
     // Recargar formaciones de simulador locales
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
@@ -1574,6 +1606,16 @@ function dbSavePlayedMarchas(date, marchasArray) {
         const db = firebase.firestore();
         db.collection("playedMarchas").doc(date).set({ marchas: marchasArray })
             .catch(err => console.error("Error al guardar marchas tocadas en nube:", err));
+    } else {
+        saveStateToLocalStorage();
+    }
+}
+
+function dbSaveActuacionRepertoire(date, marchaIdsArray) {
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("actuacionRepertoire").doc(date).set({ marchas: marchaIdsArray })
+            .catch(err => console.error("Error al guardar repertorio de actuación en nube:", err));
     } else {
         saveStateToLocalStorage();
     }
@@ -3414,6 +3456,7 @@ function setupMarchasDragAndDrop() {
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
     setupRepertoireLinksModalEvents();
+    setupActuacionRepertoireModalEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -5053,7 +5096,6 @@ function openActuacionDetailModal(date) {
     // Safety guards on global state objects
     const dayRecord = (state && state.attendance) ? state.attendance[date] : null;
     const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
-    const playedTodayIds = (state && state.playedMarchas && state.playedMarchas[date]) || [];
 
     const actuacionName = sessionInfo ? (sessionInfo.name || "Actuación") : "Actuación";
 
@@ -5061,24 +5103,8 @@ function openActuacionDetailModal(date) {
     document.getElementById("actuacion-detail-title").innerText = actuacionName;
     document.getElementById("actuacion-detail-subtitle").innerText = formatDateSpanish(date);
 
-    // Marchas
-    const marchasContainer = document.getElementById("actuacion-detail-marchas");
-    marchasContainer.innerHTML = "";
-    if (playedTodayIds.length === 0) {
-        marchasContainer.innerHTML = `<span class="text-muted" style="font-size: 0.85rem; font-style: italic;">Ninguna marcha registrada en esta actuación.</span>`;
-    } else {
-        playedTodayIds.forEach(mId => {
-            const marchasArray = (state && state.marchas) || [];
-            const m = marchasArray.find(item => item.id === mId);
-            const mTitle = m ? m.title : `Marcha (${mId})`;
-            const badge = document.createElement("span");
-            badge.className = "marcha-tag";
-            badge.style.fontSize = "0.75rem";
-            badge.style.padding = "4px 10px";
-            badge.innerText = mTitle;
-            marchasContainer.appendChild(badge);
-        });
-    }
+    // Repertorio
+    renderActuacionDetailRepertoire(date);
 
     // Attendance calculation
     let presentCount = 0;
@@ -5145,7 +5171,7 @@ function openActuacionDetailModal(date) {
         const rawDate = date.split("_")[0];
         const dNow = new Date();
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-        
+
         if (!isSessionConcluded(rawDate)) {
             alertBanner.classList.remove("hidden");
             if (prevision.estimatedPct < 60) {
@@ -5187,6 +5213,268 @@ function openActuacionDetailModal(date) {
 
     // Open modal
     modal.classList.add("active");
+}
+
+// Renderiza las insignias del repertorio (ordenado) en el modal de detalle de la actuación,
+// y actualiza el botón "Repertorio"/"Añadir repertorio" según haya o no contenido.
+function renderActuacionDetailRepertoire(date) {
+    const repertoireIds = (state && state.actuacionRepertoire && state.actuacionRepertoire[date]) || [];
+    const marchasContainer = document.getElementById("actuacion-detail-marchas");
+    if (marchasContainer) {
+        marchasContainer.innerHTML = "";
+        if (repertoireIds.length === 0) {
+            marchasContainer.innerHTML = `<span class="text-muted" style="font-size: 0.85rem; font-style: italic;">Sin repertorio añadido todavía.</span>`;
+        } else {
+            const marchasArray = (state && state.marchas) || [];
+            repertoireIds.forEach((mId, idx) => {
+                const m = marchasArray.find(item => item.id === mId);
+                const mTitle = m ? m.title : `Marcha (${mId})`;
+                const badge = document.createElement("span");
+                badge.className = "marcha-tag";
+                badge.style.fontSize = "0.75rem";
+                badge.style.padding = "4px 10px";
+                badge.innerText = `${idx + 1}. ${mTitle}`;
+                marchasContainer.appendChild(badge);
+            });
+        }
+    }
+
+    const btn = document.getElementById("btn-open-actuacion-repertoire");
+    const btnLabel = document.getElementById("btn-open-actuacion-repertoire-label");
+    if (btn && btnLabel) {
+        const hasRepertoire = repertoireIds.length > 0;
+        btnLabel.innerText = hasRepertoire ? "Repertorio" : "Añadir repertorio";
+        btn.style.background = hasRepertoire ? "rgba(212, 175, 55, 0.1)" : "rgba(255, 255, 255, 0.04)";
+        btn.style.borderColor = hasRepertoire ? "rgba(212, 175, 55, 0.3)" : "var(--border-color)";
+        btn.style.color = hasRepertoire ? "var(--color-gold)" : "var(--text-muted)";
+    }
+}
+
+// ==========================================================================
+// PANEL: REPERTORIO ORDENADO DE UNA ACTUACIÓN (setlist con arrastrar y soltar)
+// ==========================================================================
+let currentRepertoireDate = null;
+
+function openActuacionRepertoireModal(date) {
+    if (!date) return;
+    currentRepertoireDate = date;
+
+    const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
+    const actuacionName = sessionInfo ? (sessionInfo.name || "Actuación") : "Actuación";
+    document.getElementById("actuacion-repertoire-subtitle").innerText = `${actuacionName} — ${formatDateSpanish(date)}`;
+
+    const searchInput = document.getElementById("actuacion-repertoire-search");
+    if (searchInput) searchInput.value = "";
+
+    renderActuacionRepertoireModal();
+    document.getElementById("modal-actuacion-repertoire").classList.add("active");
+}
+
+function closeActuacionRepertoireModal() {
+    document.getElementById("modal-actuacion-repertoire").classList.remove("active");
+    if (currentRepertoireDate) {
+        renderActuacionDetailRepertoire(currentRepertoireDate);
+    }
+    currentRepertoireDate = null;
+}
+
+function renderActuacionRepertoireModal() {
+    if (!currentRepertoireDate) return;
+    renderActuacionRepertoireSearchList();
+    renderActuacionRepertoireOrderedList();
+}
+
+function getActuacionRepertoireList() {
+    if (!currentRepertoireDate) return [];
+    if (!state.actuacionRepertoire) state.actuacionRepertoire = {};
+    if (!state.actuacionRepertoire[currentRepertoireDate]) state.actuacionRepertoire[currentRepertoireDate] = [];
+    return state.actuacionRepertoire[currentRepertoireDate];
+}
+
+function saveActuacionRepertoireList() {
+    if (!currentRepertoireDate) return;
+    dbSaveActuacionRepertoire(currentRepertoireDate, getActuacionRepertoireList());
+}
+
+function renderActuacionRepertoireSearchList() {
+    const container = document.getElementById("actuacion-repertoire-search-list");
+    if (!container) return;
+
+    const searchInput = document.getElementById("actuacion-repertoire-search");
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    const currentList = getActuacionRepertoireList();
+
+    const available = (state.marchas || [])
+        .filter(m => !currentList.includes(m.id))
+        .filter(m => !query || m.title.toLowerCase().includes(query))
+        .sort((a, b) => a.title.localeCompare(b.title, 'es'));
+
+    container.innerHTML = "";
+    if (available.length === 0) {
+        const msg = (state.marchas || []).length === 0
+            ? "No hay marchas en el repertorio de la banda."
+            : "No quedan marchas que coincidan con la búsqueda.";
+        container.innerHTML = `<p class="text-muted" style="font-size: 0.82rem; padding: 8px 0;">${msg}</p>`;
+        return;
+    }
+
+    available.forEach(m => {
+        const card = document.createElement("div");
+        card.setAttribute("draggable", "true");
+        card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.85rem; color: var(--text-primary); transition: opacity 0.15s;";
+        card.innerHTML = `
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.title)}</span>
+            <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 2px;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+        `;
+
+        card.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", m.id);
+            e.dataTransfer.setData("source-type", "search");
+            card.style.opacity = "0.5";
+        });
+        card.addEventListener("dragend", () => { card.style.opacity = "1"; });
+
+        card.querySelector("button").addEventListener("click", () => {
+            addMarchaToActuacionRepertoire(m.id);
+        });
+
+        container.appendChild(card);
+    });
+}
+
+function renderActuacionRepertoireOrderedList() {
+    const container = document.getElementById("actuacion-repertoire-ordered-list");
+    if (!container) return;
+
+    const list = getActuacionRepertoireList();
+    const marchasArray = (state && state.marchas) || [];
+
+    container.innerHTML = "";
+
+    if (list.length === 0) {
+        container.innerHTML = `<p class="text-muted" style="font-size: 0.82rem; padding: 8px 0; text-align: center;">Arrastra marchas aquí, o pulsa "+" en la lista de la izquierda.</p>`;
+        return;
+    }
+
+    list.forEach((mId, idx) => {
+        const m = marchasArray.find(item => item.id === mId);
+        const mTitle = m ? m.title : `Marcha (${mId})`;
+        const row = document.createElement("div");
+        row.setAttribute("draggable", "true");
+        row.style.cssText = "display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.85rem; color: var(--text-primary);";
+        row.innerHTML = `
+            <span style="flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
+            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(mTitle)}</span>
+            <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 2px;">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        `;
+
+        row.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", mId);
+            e.dataTransfer.setData("source-type", "list");
+            e.dataTransfer.setData("source-index", String(idx));
+            row.style.opacity = "0.5";
+        });
+        row.addEventListener("dragend", () => { row.style.opacity = "1"; });
+
+        row.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = row.getBoundingClientRect();
+            const isAbove = (e.clientY - rect.top) < rect.height / 2;
+            row.style.borderTop = isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
+            row.style.borderBottom = !isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
+        });
+        row.addEventListener("dragleave", () => {
+            row.style.borderTop = "1px solid rgba(212, 175, 55, 0.2)";
+            row.style.borderBottom = "1px solid rgba(212, 175, 55, 0.2)";
+        });
+        row.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = row.getBoundingClientRect();
+            const isAbove = (e.clientY - rect.top) < rect.height / 2;
+            handleActuacionRepertoireDrop(e, isAbove ? idx : idx + 1);
+        });
+
+        row.querySelector("button").addEventListener("click", () => {
+            removeMarchaFromActuacionRepertoire(idx);
+        });
+
+        container.appendChild(row);
+    });
+}
+
+function handleActuacionRepertoireDrop(e, targetIndex) {
+    const marchaId = e.dataTransfer.getData("text/plain");
+    const sourceType = e.dataTransfer.getData("source-type");
+    if (!marchaId) return;
+
+    const list = getActuacionRepertoireList();
+
+    if (sourceType === "list") {
+        const sourceIndex = parseInt(e.dataTransfer.getData("source-index"), 10);
+        if (isNaN(sourceIndex)) return;
+        let insertAt = targetIndex;
+        list.splice(sourceIndex, 1);
+        if (sourceIndex < insertAt) insertAt--;
+        list.splice(insertAt, 0, marchaId);
+    } else {
+        if (list.includes(marchaId)) return;
+        const insertAt = Math.min(targetIndex, list.length);
+        list.splice(insertAt, 0, marchaId);
+    }
+
+    saveActuacionRepertoireList();
+    renderActuacionRepertoireModal();
+}
+
+function addMarchaToActuacionRepertoire(marchaId) {
+    const list = getActuacionRepertoireList();
+    if (list.includes(marchaId)) return;
+    list.push(marchaId);
+    saveActuacionRepertoireList();
+    renderActuacionRepertoireModal();
+}
+
+function removeMarchaFromActuacionRepertoire(index) {
+    const list = getActuacionRepertoireList();
+    list.splice(index, 1);
+    saveActuacionRepertoireList();
+    renderActuacionRepertoireModal();
+}
+
+function setupActuacionRepertoireModalEvents() {
+    const closeModal = () => closeActuacionRepertoireModal();
+
+    const btnClose = document.getElementById("btn-close-actuacion-repertoire");
+    const btnCloseFooter = document.getElementById("btn-close-actuacion-repertoire-footer");
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    const btnOpen = document.getElementById("btn-open-actuacion-repertoire");
+    if (btnOpen) {
+        btnOpen.addEventListener("click", () => {
+            if (state.activeDetailDate) openActuacionRepertoireModal(state.activeDetailDate);
+        });
+    }
+
+    const searchInput = document.getElementById("actuacion-repertoire-search");
+    if (searchInput) {
+        searchInput.addEventListener("input", () => renderActuacionRepertoireSearchList());
+    }
+
+    const orderedListContainer = document.getElementById("actuacion-repertoire-ordered-list");
+    if (orderedListContainer) {
+        orderedListContainer.addEventListener("dragover", (e) => { e.preventDefault(); });
+        orderedListContainer.addEventListener("drop", (e) => {
+            e.preventDefault();
+            handleActuacionRepertoireDrop(e, getActuacionRepertoireList().length);
+        });
+    }
 }
 
 function isMusicianOnLeaveOnDate(musician, dateStr) {

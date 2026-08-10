@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=474">
+    <link rel="stylesheet" href="style.css?v=475">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -3145,18 +3145,31 @@
                 </button>
             </div>
             <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
-                <!-- Marchas Tocadas Section -->
+                <!-- Repertorio Section -->
                 <div>
-                    <h4 style="margin: 0 0 10px 0; font-family: inherit; font-size: 0.95rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 18V5l12-2v13"></path>
-                            <circle cx="6" cy="18" r="3"></circle>
-                            <circle cx="18" cy="16" r="3"></circle>
-                        </svg>
-                        Marchas Tocadas
-                    </h4>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+                        <h4 style="margin: 0; font-family: inherit; font-size: 0.95rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            Repertorio
+                        </h4>
+                        <button type="button" id="btn-open-actuacion-repertoire" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 0.78rem; font-weight: 600; border-radius: 6px; cursor: pointer; background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--color-gold);">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            <span id="btn-open-actuacion-repertoire-label">Repertorio</span>
+                        </button>
+                    </div>
                     <div id="actuacion-detail-marchas" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                        <!-- Marcha badges populating here -->
+                        <!-- Repertorio ordenado poblado aquí -->
                     </div>
                 </div>
 
@@ -3255,6 +3268,45 @@
                     Pasar Lista
                 </button>
                 <button class="btn btn-secondary" id="btn-close-actuacion-detail-footer">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Repertorio de Actuación -->
+    <div id="modal-actuacion-repertoire" class="modal-overlay">
+        <div class="modal-card" style="max-width: 760px; width: 92vw; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+            <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                <div>
+                    <h3 id="actuacion-repertoire-title" style="margin: 0; font-size: 1.15rem;">Repertorio de la Actuación</h3>
+                    <p id="actuacion-repertoire-subtitle" class="text-muted" style="margin: 4px 0 0; font-size: 0.85rem;"></p>
+                </div>
+                <button class="modal-close" id="btn-close-actuacion-repertoire">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px; overflow: hidden; flex: 1; display: flex; gap: 18px; box-sizing: border-box; flex-wrap: wrap;">
+                <!-- Columna izquierda: buscador de marchas -->
+                <div style="flex: 1 1 260px; min-width: 220px; display: flex; flex-direction: column; gap: 10px; max-height: 100%;">
+                    <h4 style="margin: 0; font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Repertorio de la Banda</h4>
+                    <input type="text" id="actuacion-repertoire-search" placeholder="Buscar marcha..." style="width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary);">
+                    <div id="actuacion-repertoire-search-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px; min-height: 160px;">
+                        <!-- Marchas disponibles, arrastrables -->
+                    </div>
+                </div>
+                <!-- Columna derecha: lista ordenada -->
+                <div style="flex: 1 1 260px; min-width: 220px; display: flex; flex-direction: column; gap: 10px; max-height: 100%;">
+                    <h4 style="margin: 0; font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Orden del Repertorio</h4>
+                    <div id="actuacion-repertoire-ordered-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px dashed var(--border-color); border-radius: 8px; min-height: 160px; box-sizing: border-box;">
+                        <!-- Lista numerada, arrastrable para reordenar -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
+                <span class="text-muted" style="font-size: 0.75rem;">Los cambios se guardan automáticamente.</span>
+                <button class="btn btn-secondary" id="btn-close-actuacion-repertoire-footer">Cerrar</button>
             </div>
         </div>
     </div>
@@ -4107,13 +4159,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=474"></script>
+    <script src="app.js?v=475"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=474
+        // Purga de caché antigua y registro del Service Worker v=475
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v474") {
+                    if (key !== "yacente-v475") {
                         caches.delete(key);
                     }
                 });
@@ -4126,9 +4178,9 @@
                 }
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=474")
+                navigator.serviceWorker.register("sw.js?v=475")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v474 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v475 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
