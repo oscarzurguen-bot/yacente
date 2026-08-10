@@ -1961,6 +1961,15 @@ function setupEventListeners() {
         });
     }
 
+    const btnToggleActuacion = document.getElementById("btn-toggle-all-marchas-actuacion");
+    if (btnToggleActuacion) {
+        btnToggleActuacion.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAllMarchasActuacion = !showAllMarchasActuacion;
+            renderStatistics();
+        });
+    }
+
     const btnToggleOlvidadas = document.getElementById("btn-toggle-all-marchas-olvidadas");
     if (btnToggleOlvidadas) {
         btnToggleOlvidadas.addEventListener("click", (e) => {
@@ -3012,6 +3021,10 @@ function setupEventListeners() {
     // ==========================================
     document.getElementById("btn-close-marcha-history-modal").addEventListener("click", () => {
         document.getElementById("modal-marcha-history").classList.remove("active");
+    });
+
+    document.getElementById("btn-close-marcha-actuaciones-history-modal").addEventListener("click", () => {
+        document.getElementById("modal-marcha-actuaciones-history").classList.remove("active");
     });
     document.getElementById("modal-marcha-history").addEventListener("click", (e) => {
         if (e.target === e.currentTarget) {
@@ -5940,6 +5953,7 @@ function renderStatistics() {
         if (streakContainer) streakContainer.innerHTML = "";
         document.getElementById("alerts-table-body").innerHTML = "<tr><td colspan='5' class='text-center text-muted'>Sin alertas de asistencia en este período.</td></tr>";
         renderStatsMarchasTop10([]);
+        renderStatsMarchasActuacion([]);
         renderStatsStreaks([]);
         renderStatsRanking([]);
         renderStatsMarchasOlvidadas();
@@ -6106,6 +6120,7 @@ function renderStatistics() {
 
     window.lastFilteredDatesForStats = filteredDates;
     renderStatsMarchasTop10(filteredDates);
+    renderStatsMarchasActuacion(filteredDates);
     renderStatsStreaks(filteredDates);
     renderStatsRanking(filteredDates);
     renderStatsMarchasOlvidadas();
@@ -6117,6 +6132,7 @@ function renderStatistics() {
 
 let showAllMarchasEnsayadas = false;
 let showAllMarchasOlvidadas = false;
+let showAllMarchasActuacion = false;
 
 function renderStatsMarchasTop10(filteredDates) {
     const playCounts = {};
@@ -6175,6 +6191,72 @@ function renderStatsMarchasTop10(filteredDates) {
                 <td><span class="musician-count-badge" style="background-color: var(--bg-primary);">Nivel ${m.difficulty || 1}</span></td>
                 <td>${statusLabel}</td>
             `;
+            tbody.appendChild(tr);
+        });
+    }
+}
+
+// Cuenta, por marcha, en cuántas actuaciones distintas del período aparece en su repertorio
+// ordenado (state.actuacionRepertoire) — no confundir con "playedMarchas" (uso en ensayos).
+function renderStatsMarchasActuacion(filteredDates) {
+    const playCounts = {};
+    if (state.actuacionRepertoire) {
+        filteredDates.forEach(date => {
+            const sessionInfo = state.sessionTypes[date];
+            if (!sessionInfo || sessionInfo.type !== "actuacion") return;
+            const list = state.actuacionRepertoire[date] || [];
+            new Set(list).forEach(mId => {
+                playCounts[mId] = (playCounts[mId] || 0) + 1;
+            });
+        });
+    }
+
+    const allMarchas = (state.marchas || [])
+        .map(m => ({ ...m, count: playCounts[m.id] || 0 }))
+        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'es'));
+
+    const displayMarchas = showAllMarchasActuacion ? allMarchas : allMarchas.slice(0, 5);
+
+    const toggleBtn = document.getElementById("btn-toggle-all-marchas-actuacion");
+    if (toggleBtn) {
+        toggleBtn.innerText = showAllMarchasActuacion ? "−" : "+";
+        toggleBtn.title = showAllMarchasActuacion ? "Mostrar Top 5" : `Ver todas las marchas (${allMarchas.length})`;
+    }
+
+    const tbody = document.getElementById("stats-marchas-actuacion-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    if (displayMarchas.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted" style="padding: 20px;">
+                    No hay marchas registradas en el repertorio de la banda.
+                </td>
+            </tr>
+        `;
+    } else {
+        displayMarchas.forEach((m, idx) => {
+            let statusLabel = "";
+            if (m.status === "green") {
+                statusLabel = `<span style="color: var(--color-present); font-weight: 600;">🟢 Bien</span>`;
+            } else if (m.status === "yellow") {
+                statusLabel = `<span style="color: var(--color-justified); font-weight: 600;">🟡 Proceso</span>`;
+            } else {
+                statusLabel = `<span style="color: var(--color-absent); font-weight: 600;">🔴 Trabajar</span>`;
+            }
+
+            const tr = document.createElement("tr");
+            tr.style.cursor = "pointer";
+            tr.title = "Ver actuaciones en las que se ha tocado";
+            tr.innerHTML = `
+                <td><strong>#${idx + 1}</strong></td>
+                <td><strong>${escapeHtml(m.title)}</strong></td>
+                <td style="font-weight: bold; color: var(--color-gold); font-size: 0.92rem; padding-left: 20px;">${m.count}</td>
+                <td><span class="musician-count-badge" style="background-color: var(--bg-primary);">Nivel ${m.difficulty || 1}</span></td>
+                <td>${statusLabel}</td>
+            `;
+            tr.addEventListener("click", () => openMarchaActuacionesHistoryModal(m.id));
             tbody.appendChild(tr);
         });
     }
@@ -9645,6 +9727,46 @@ function openMarchaHistoryModal(marchId) {
     }
 
     document.getElementById("modal-marcha-history").classList.add("active");
+}
+
+// Lista las actuaciones (nombre + fecha) en cuyo repertorio ordenado aparece la marcha dada.
+function openMarchaActuacionesHistoryModal(marchaId) {
+    const m = state.marchas.find(item => item.id === marchaId);
+    if (!m) return;
+
+    document.getElementById("marcha-actuaciones-history-title").innerText = "Actuaciones";
+    document.getElementById("marcha-actuaciones-history-repertoire-info").innerText = m.title;
+
+    const actuacionDates = Object.keys(state.actuacionRepertoire || {}).filter(date => {
+        const sessionInfo = state.sessionTypes[date];
+        return sessionInfo && sessionInfo.type === "actuacion" && (state.actuacionRepertoire[date] || []).includes(marchaId);
+    }).sort((a, b) => b.localeCompare(a));
+
+    const tbody = document.getElementById("marcha-actuaciones-history-table-body");
+    const emptyState = document.getElementById("marcha-actuaciones-history-empty");
+    const tableCard = tbody.closest(".card-table");
+    tbody.innerHTML = "";
+
+    if (actuacionDates.length === 0) {
+        emptyState.classList.remove("hidden");
+        tableCard.classList.add("hidden");
+    } else {
+        emptyState.classList.add("hidden");
+        tableCard.classList.remove("hidden");
+
+        actuacionDates.forEach(date => {
+            const sessionInfo = state.sessionTypes[date];
+            const actuacionName = sessionInfo.name || "Actuación";
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="font-weight: 600;">${escapeHtml(actuacionName)}</td>
+                <td style="white-space: nowrap; color: var(--text-secondary);">${formatDateSpanish(date)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById("modal-marcha-actuaciones-history").classList.add("active");
 }
 
 // ==========================================================================
