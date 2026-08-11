@@ -14596,8 +14596,19 @@ function openCompRehearsalDetailModal(date) {
     const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
     const rawDate = date.split("_")[0];
     
-    // Safety check for played marches
-    const playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+    // Check repertoire/played marchas: for performance check actuacionRepertoire first, then playedMarchas
+    let playedTodayIds = [];
+    if (sessionType === "actuacion") {
+        playedTodayIds = (state && state.actuacionRepertoire && (state.actuacionRepertoire[date] || state.actuacionRepertoire[rawDate])) || [];
+        if (playedTodayIds.length === 0) {
+            playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+        }
+    } else {
+        playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+        if (playedTodayIds.length === 0) {
+            playedTodayIds = (state && state.actuacionRepertoire && (state.actuacionRepertoire[date] || state.actuacionRepertoire[rawDate])) || [];
+        }
+    }
 
     // Title and Subtitle
     const titleEl = document.getElementById("comp-rehearsal-detail-title");
@@ -14672,14 +14683,26 @@ function openCompRehearsalDetailModal(date) {
         countsEl.innerText = `${presentCount} presentes de ${totalConvocated} convocados`;
     }
 
-    // Render Played Marches List
+    // Section title label update ("Repertorio" for actuacion vs "Marchas Ensayadas" for ensayo)
+    const marchasLabelEl = document.getElementById("comp-rehearsal-detail-marchas-label");
+    if (marchasLabelEl) {
+        marchasLabelEl.innerText = sessionType === "actuacion" ? "Repertorio" : "Marchas Ensayadas";
+    }
+
+    // Render Played Marches / Repertoire List
     const marchasContainer = document.getElementById("comp-rehearsal-detail-marchas");
     if (marchasContainer) {
         marchasContainer.innerHTML = "";
+        marchasContainer.style.maxHeight = "250px";
+        marchasContainer.style.overflowY = "auto";
+
         if (playedTodayIds.length === 0) {
+            const emptyText = sessionType === "actuacion" 
+                ? "No hay registro de repertorio en esta actuación." 
+                : "No hay registro de marchas tocadas en este ensayo.";
             marchasContainer.innerHTML = `
                 <div class="empty-state" style="padding: 16px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);">
-                    <p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">No hay registro de marchas tocadas en este ${sessionType}.</p>
+                    <p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">${emptyText}</p>
                 </div>
             `;
         } else {
