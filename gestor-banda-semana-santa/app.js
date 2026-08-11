@@ -1407,6 +1407,14 @@ function dbDeleteSession(date) {
 // dejaba su registro de marchas huérfano (contando en estadísticas y en el historial de una
 // marcha aunque el evento ya no existiera). Esto sanea datos ya huérfanos de esa época.
 function cleanupOrphanedMarchasRecords() {
+    // Si hay nube configurada pero firebase.initializeApp() todavía no se ha ejecutado (p.ej.
+    // durante el arranque, initApp() renderiza antes de llamar a initFirebase()), no tocamos
+    // nada esta pasada: borrar solo en local se revertiría en cuanto llegue el primer snapshot
+    // de Firestore con los huérfanos todavía presentes. Se reintentará en el próximo render.
+    if (isCloudActive() && !(typeof firebase !== "undefined" && firebase.apps && firebase.apps.length > 0)) {
+        return false;
+    }
+
     let changed = false;
 
     Object.keys(state.playedMarchas || {}).forEach(date => {
