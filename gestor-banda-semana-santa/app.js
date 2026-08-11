@@ -5514,22 +5514,12 @@ function renderActuacionRepertoireSearchList() {
     }
 
     available.forEach(m => {
-        let statusCircle = "🔴";
-        let statusTitle = "Por trabajar";
-        if (m.status === "green") { statusCircle = "🟢"; statusTitle = "Bien trabajada"; }
-        else if (m.status === "yellow") { statusCircle = "🟡"; statusTitle = "En proceso"; }
-
-        const diffNum = m.difficulty || 1;
-        const diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
-
         const card = document.createElement("div");
         card.setAttribute("draggable", "true");
         card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary); transition: opacity 0.15s;";
         card.innerHTML = `
             <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;">
-                <span style="flex-shrink: 0; font-size: 0.65rem; line-height: 1;" title="${statusTitle}">${statusCircle}</span>
                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(m.title)}</span>
-                ${diffBadge}
             </div>
             <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -9932,10 +9922,28 @@ function renderRehearsalMarchasWidget() {
         const marcha = (state.marchas || []).find(m => m.id === mId);
         const name = marcha ? marcha.title : "Marcha Desconocida";
         
+        let statusCircle = "";
+        let diffBadge = "";
+        if (marcha) {
+            let statusTitle = "Por trabajar";
+            let circleSymbol = "🔴";
+            if (marcha.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
+            else if (marcha.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
+            statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
+
+            const diffNum = marcha.difficulty || 1;
+            diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
+        }
+
         const badge = document.createElement("div");
         badge.className = "marcha-tag";
+        badge.style.display = "inline-flex";
+        badge.style.alignItems = "center";
+        badge.style.gap = "4px";
         badge.innerHTML = `
-            <span>${name}</span>
+            ${statusCircle}
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(name)}</span>
+            ${diffBadge}
             <button class="marcha-tag-delete" title="Quitar marcha" data-id="${mId}">&times;</button>
         `;
 
