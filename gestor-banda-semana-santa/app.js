@@ -1402,6 +1402,41 @@ function dbDeleteSession(date) {
     }
 }
 
+// Purga entradas de playedMarchas/actuacionRepertoire cuya sesión ya no existe en sessionTypes.
+// Antes de que dbDeleteSession limpiara también estos dos campos, borrar un ensayo/actuación
+// dejaba su registro de marchas huérfano (contando en estadísticas y en el historial de una
+// marcha aunque el evento ya no existiera). Esto sanea datos ya huérfanos de esa época.
+function cleanupOrphanedMarchasRecords() {
+    let changed = false;
+
+    Object.keys(state.playedMarchas || {}).forEach(date => {
+        if (!state.sessionTypes[date]) {
+            delete state.playedMarchas[date];
+            changed = true;
+            if (isCloudActive()) {
+                firebase.firestore().collection("playedMarchas").doc(date).delete()
+                    .catch(err => console.error("Error al purgar marchas ensayadas huérfanas en nube:", err));
+            }
+        }
+    });
+
+    Object.keys(state.actuacionRepertoire || {}).forEach(date => {
+        if (!state.sessionTypes[date]) {
+            delete state.actuacionRepertoire[date];
+            changed = true;
+            if (isCloudActive()) {
+                firebase.firestore().collection("actuacionRepertoire").doc(date).delete()
+                    .catch(err => console.error("Error al purgar repertorio de actuación huérfano en nube:", err));
+            }
+        }
+    });
+
+    if (changed && !isCloudActive()) {
+        saveStateToLocalStorage();
+    }
+    return changed;
+}
+
 function dbDeleteSuggestionByAdmin(suggestion) {
     if (suggestion.deletedByMusician) {
         return dbHardDeleteSuggestion(suggestion);
@@ -5968,6 +6003,7 @@ function renderStatistics() {
     // recálculo fresco aquí y dejamos que el resto de funciones auxiliares (ranking,
     // insignias, racha...) reutilicen la caché durante esta pasada.
     invalidateMusicianStatsCache();
+    cleanupOrphanedMarchasRecords();
 
     const allDates = Array.from(new Set([
         ...Object.keys(state.sessionTypes || {}),
@@ -9314,6 +9350,8 @@ function getDemoRepertoire() {
 }
 
 function renderMarchasList() {
+    cleanupOrphanedMarchasRecords();
+
     const pageTitle = document.getElementById("page-title");
     if (pageTitle && document.getElementById("section-marchas").classList.contains("active")) {
         pageTitle.innerText = `Repertorio (${state.marchas ? state.marchas.length : 0})`;
