@@ -14760,9 +14760,9 @@ function openCompRehearsalDetailModal(date) {
 
                 const titleText = m ? m.title : `Marcha (${mId})`;
                 itemDiv.innerHTML = `
-                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px;">
+                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🎵 ${escapeHtml(titleText)}</span>
                         ${statusCircle}
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">🎵 ${escapeHtml(titleText)}</span>
                         ${diffBadge}
                     </div>
                 `;
