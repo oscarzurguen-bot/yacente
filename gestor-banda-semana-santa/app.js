@@ -5514,11 +5514,23 @@ function renderActuacionRepertoireSearchList() {
     }
 
     available.forEach(m => {
+        let statusCircle = "🔴";
+        let statusTitle = "Por trabajar";
+        if (m.status === "green") { statusCircle = "🟢"; statusTitle = "Bien trabajada"; }
+        else if (m.status === "yellow") { statusCircle = "🟡"; statusTitle = "En proceso"; }
+
+        const diffNum = m.difficulty || 1;
+        const diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
+
         const card = document.createElement("div");
         card.setAttribute("draggable", "true");
         card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary); transition: opacity 0.15s;";
         card.innerHTML = `
-            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.title)}</span>
+            <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;">
+                <span style="flex-shrink: 0; font-size: 0.65rem; line-height: 1;" title="${statusTitle}">${statusCircle}</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(m.title)}</span>
+                ${diffBadge}
+            </div>
             <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
@@ -5543,12 +5555,28 @@ function renderActuacionRepertoireSearchList() {
 function buildRepertoireOrderRow(mId, idx, marchasArray) {
     const m = marchasArray.find(item => item.id === mId);
     const mTitle = m ? m.title : `Marcha (${mId})`;
+
+    let statusCircle = "";
+    let diffBadge = "";
+    if (m) {
+        let statusTitle = "Por trabajar";
+        let circleSymbol = "🔴";
+        if (m.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
+        else if (m.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
+        statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
+
+        const diffNum = m.difficulty || 1;
+        diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
+    }
+
     const row = document.createElement("div");
     row.setAttribute("draggable", "true");
-    row.style.cssText = "display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 4px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary);";
+    row.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary);";
     row.innerHTML = `
         <span style="flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
-        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(mTitle)}</span>
+        ${statusCircle}
+        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(mTitle)}</span>
+        ${diffBadge}
         <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
@@ -14717,10 +14745,25 @@ function openCompRehearsalDetailModal(date) {
                 itemDiv.style.display = "flex";
                 itemDiv.style.alignItems = "center";
 
+                let statusCircle = "";
+                let diffBadge = "";
+                if (m) {
+                    let statusTitle = "Por trabajar";
+                    let circleSymbol = "🔴";
+                    if (m.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
+                    else if (m.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
+                    statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
+
+                    const diffNum = m.difficulty || 1;
+                    diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
+                }
+
                 const titleText = m ? m.title : `Marcha (${mId})`;
                 itemDiv.innerHTML = `
-                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        🎵 ${titleText}
+                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px;">
+                        ${statusCircle}
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">🎵 ${escapeHtml(titleText)}</span>
+                        ${diffBadge}
                     </div>
                 `;
                 marchasContainer.appendChild(itemDiv);

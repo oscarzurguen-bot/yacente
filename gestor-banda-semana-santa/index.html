@@ -4243,13 +4243,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=489"></script>
+    <script src="app.js?v=490"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=489
+        // Purga de caché antigua y registro del Service Worker v=490
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v489") {
+                    if (key !== "yacente-v490") {
                         caches.delete(key);
                     }
                 });
@@ -4271,9 +4271,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=489")
+                navigator.serviceWorker.register("sw.js?v=490")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v489 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v490 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
