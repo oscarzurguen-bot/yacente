@@ -14711,29 +14711,18 @@ function openCompRehearsalDetailModal(date) {
                 const m = marchasArray.find(item => item.id === mId);
                 const itemDiv = document.createElement("div");
                 itemDiv.style.background = "rgba(212, 175, 55, 0.08)";
-                itemDiv.style.border = "1px solid rgba(212, 175, 55, 0.25)";
-                itemDiv.style.borderRadius = "8px";
-                itemDiv.style.padding = "10px 14px";
+                itemDiv.style.border = "1px solid rgba(212, 175, 55, 0.2)";
+                itemDiv.style.borderRadius = "6px";
+                itemDiv.style.padding = "6px 10px";
                 itemDiv.style.display = "flex";
                 itemDiv.style.alignItems = "center";
-                itemDiv.style.justifyContent = "space-between";
-                itemDiv.style.gap = "10px";
 
-                if (m) {
-                    itemDiv.innerHTML = `
-                        <div style="min-width: 0; flex: 1;">
-                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🎵 ${m.title}</div>
-                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">${m.composer || m.author || "Autor Desconocido"}</div>
-                        </div>
-                        ${m.difficulty ? `<span class="badge" style="background: rgba(255,255,255,0.06); color: var(--color-gold); font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(212, 175, 55, 0.3); font-weight: 600;">Nivel ${m.difficulty}</span>` : ""}
-                    `;
-                } else {
-                    itemDiv.innerHTML = `
-                        <div style="min-width: 0; flex: 1;">
-                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary);">🎵 Marcha (${mId})</div>
-                        </div>
-                    `;
-                }
+                const titleText = m ? m.title : `Marcha (${mId})`;
+                itemDiv.innerHTML = `
+                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        🎵 ${titleText}
+                    </div>
+                `;
                 marchasContainer.appendChild(itemDiv);
             });
         }
