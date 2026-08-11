@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=486">
+    <link rel="stylesheet" href="style.css?v=487">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -709,26 +709,15 @@
                         <div class="filter-control-group">
                             <label for="marchas-filter-year">Temporada</label>
                             <select id="marchas-filter-year" class="filter-select">
-                                <option value="all" selected>Todas</option>
+                                <!-- Populated dynamically: siempre una temporada concreta seleccionada -->
                             </select>
-                        </div>
-                        <div class="filter-control-group">
-                            <label for="marchas-filter-month">Mes</label>
-                            <select id="marchas-filter-month" class="filter-select">
-                                <option value="all" selected>Todos</option>
-                                <option value="0">Enero</option>
-                                <option value="1">Febrero</option>
-                                <option value="2">Marzo</option>
-                                <option value="3">Abril</option>
-                                <option value="4">Mayo</option>
-                                <option value="5">Junio</option>
-                                <option value="6">Julio</option>
-                                <option value="7">Agosto</option>
-                                <option value="8">Septiembre</option>
-                                <option value="9">Octubre</option>
-                                <option value="10">Noviembre</option>
-                                <option value="11">Diciembre</option>
-                            </select>
+                            <button type="button" id="btn-download-repertorio-season-pdf" class="btn btn-secondary btn-icon" style="padding: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="Descargar repertorio de esta temporada (PDF)">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -4254,13 +4243,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=486"></script>
+    <script src="app.js?v=487"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=486
+        // Purga de caché antigua y registro del Service Worker v=487
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v486") {
+                    if (key !== "yacente-v487") {
                         caches.delete(key);
                     }
                 });
@@ -4282,9 +4271,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=486")
+                navigator.serviceWorker.register("sw.js?v=487")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v486 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v487 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {

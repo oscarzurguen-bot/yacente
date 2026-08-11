@@ -113,6 +113,7 @@ let state = {
     marchas: [],
     playedMarchas: {},
     actuacionRepertoire: {},
+    marchaSeasonRemovals: {},
     marchasViewMode: "list",
     calendarGoals: {},
     weeklyGoals: {},
@@ -219,6 +220,66 @@ function populateSeasonSelect(selectEl, dateKeys, allowAll, selectedValue) {
     }
 }
 
+// Temporadas para la página de Repertorio: incluye todas las temporadas con ensayos/actuaciones
+// programados (pasados o futuros), la temporada actual, y siempre una temporada más allá de la
+// última que tenga algo programado (para poder preparar el repertorio de la próxima temporada).
+function getRepertoireSeasonOptions() {
+    const seasons = new Set();
+    Object.keys(state.sessionTypes || {}).forEach(dateKey => {
+        const rawDate = (dateKey || "").split("_")[0];
+        const label = getSeasonLabelForDate(rawDate);
+        if (label) seasons.add(label);
+    });
+    seasons.add(getCurrentSeasonLabel());
+
+    const sorted = Array.from(seasons).sort();
+    const lastSeason = sorted[sorted.length - 1];
+    const { year1 } = getSeasonBounds(lastSeason);
+    seasons.add(`${year1 + 1}-${year1 + 2}`);
+
+    return Array.from(seasons).sort().reverse();
+}
+
+// Rellena el selector de temporada de la página de Repertorio. Nunca incluye "Todas": siempre
+// debe haber una temporada concreta seleccionada.
+function populateRepertoireSeasonSelect(selectEl, selectedValue) {
+    if (!selectEl) return;
+    const seasons = getRepertoireSeasonOptions();
+    const optionsHtml = seasons.map(s => `<option value="${s}">${s}</option>`).join("");
+    if (selectEl.innerHTML !== optionsHtml) {
+        selectEl.innerHTML = optionsHtml;
+    }
+    if (selectedValue && seasons.includes(selectedValue)) {
+        selectEl.value = selectedValue;
+    } else {
+        selectEl.value = seasons.includes(getCurrentSeasonLabel()) ? getCurrentSeasonLabel() : seasons[0];
+    }
+}
+
+// Una marcha pertenece a una temporada si no fue creada en exclusiva para otra temporada distinta,
+// y no ha sido retirada específicamente de esta temporada.
+function isMarchaInSeason(marcha, season) {
+    if (!marcha) return false;
+    if (marcha.addedInSeason && marcha.addedInSeason !== season) return false;
+    const removed = (state.marchaSeasonRemovals && state.marchaSeasonRemovals[season]) || [];
+    return !removed.includes(marcha.id);
+}
+
+function getMarchasForSeason(season) {
+    return (state.marchas || []).filter(m => isMarchaInSeason(m, season));
+}
+
+// Retira una marcha del repertorio de una temporada concreta sin afectar a las demás temporadas
+// ni borrar la marcha ni su historial de ensayos/actuaciones.
+function removeMarchaFromSeason(marchaId, season) {
+    if (!state.marchaSeasonRemovals) state.marchaSeasonRemovals = {};
+    if (!state.marchaSeasonRemovals[season]) state.marchaSeasonRemovals[season] = [];
+    if (!state.marchaSeasonRemovals[season].includes(marchaId)) {
+        state.marchaSeasonRemovals[season].push(marchaId);
+    }
+    dbSaveMarchaSeasonRemovals(state.marchaSeasonRemovals);
+}
+
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 21; // ~131.95
 
 function getAuthToken() {
@@ -318,6 +379,9 @@ function initApp() {
 
     const storedRepertoireLinks = localStorage.getItem("harmonia_repertoire_links");
     state.repertoireLinks = storedRepertoireLinks ? JSON.parse(storedRepertoireLinks) : { youtube: "", spotify: "" };
+
+    const storedMarchaSeasonRemovals = localStorage.getItem("harmonia_marcha_season_removals");
+    state.marchaSeasonRemovals = storedMarchaSeasonRemovals ? JSON.parse(storedMarchaSeasonRemovals) : {};
 
     const storedRehearsalLocations = localStorage.getItem("harmonia_rehearsal_locations");
     if (storedRehearsalLocations) {
@@ -526,6 +590,7 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas || []));
     localStorage.setItem("harmonia_played_marchas", JSON.stringify(state.playedMarchas || {}));
     localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire || {}));
+    localStorage.setItem("harmonia_marcha_season_removals", JSON.stringify(state.marchaSeasonRemovals || {}));
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
@@ -621,6 +686,7 @@ let unsubDeletedNotifs = null;
 let unsubSuggestions = null;
 let unsubRepertoireLinks = null;
 let unsubRehearsalLocations = null;
+let unsubMarchaSeasonRemovals = null;
 
 function getDeletedNotificationIds(musicianId) {
     if (!musicianId) return [];
@@ -1069,6 +1135,17 @@ function startCloudSync() {
         console.error("Error sync enlaces de repertorio:", err);
     });
 
+    // Escucha de retiradas de marchas del repertorio por temporada
+    unsubMarchaSeasonRemovals = db.collection("config").doc("marcha_season_removals").onSnapshot(doc => {
+        state.marchaSeasonRemovals = doc.exists ? (doc.data() || {}) : {};
+        localStorage.setItem("harmonia_marcha_season_removals", JSON.stringify(state.marchaSeasonRemovals));
+        if (document.getElementById("section-marchas").classList.contains("active")) {
+            renderMarchasList();
+        }
+    }, err => {
+        console.error("Error sync retiradas de repertorio por temporada:", err);
+    });
+
     // Escucha de comunicados de la directiva
     unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
         const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1205,6 +1282,7 @@ function stopCloudSync() {
     if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
     if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
     if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
+    if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1264,7 +1342,11 @@ function syncLocalToCloud() {
     batch.set(refDesfile, {
         mapStr: JSON.stringify(state.formacionDesfile)
     });
-    
+
+    // Subir retiradas de repertorio por temporada
+    const refMarchaSeasonRemovals = db.collection("config").doc("marcha_season_removals");
+    batch.set(refMarchaSeasonRemovals, state.marchaSeasonRemovals || {});
+
     batch.commit()
         .then(() => {
             showToast("Datos locales subidos a la nube con éxito", "success");
@@ -1570,6 +1652,16 @@ function dbSaveRepertoireLinks(links) {
             .catch(err => console.error("Error al guardar enlaces de repertorio en nube:", err));
     }
     renderRepertoireLinksUI();
+}
+
+function dbSaveMarchaSeasonRemovals(removals) {
+    state.marchaSeasonRemovals = removals;
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("config").doc("marcha_season_removals").set(removals)
+            .catch(err => console.error("Error al guardar retiradas de repertorio por temporada en nube:", err));
+    }
 }
 
 function renderRepertoireLinksUI() {
@@ -3103,9 +3195,13 @@ function setupEventListeners() {
     if (marchasFilterYearEl) {
         marchasFilterYearEl.addEventListener("change", () => renderMarchasList());
     }
-    const marchasFilterMonthEl = document.getElementById("marchas-filter-month");
-    if (marchasFilterMonthEl) {
-        marchasFilterMonthEl.addEventListener("change", () => renderMarchasList());
+
+    const btnDownloadRepertoireSeasonPdf = document.getElementById("btn-download-repertorio-season-pdf");
+    if (btnDownloadRepertoireSeasonPdf) {
+        btnDownloadRepertoireSeasonPdf.addEventListener("click", () => {
+            const season = document.getElementById("marchas-filter-year") ? document.getElementById("marchas-filter-year").value : "";
+            downloadRepertoireSeasonPDF(season);
+        });
     }
 
     document.getElementById("btn-view-list").addEventListener("click", () => {
@@ -3783,7 +3879,6 @@ function renderActiveSection(sectionId, forcedDirection) {
             renderStatistics();
             break;
         case "section-marchas":
-            pageTitle.innerText = `Repertorio (${state.marchas ? state.marchas.length : 0})`;
             pageSubtitle.innerText = "Estado de trabajo y estadísticas de marchas procesionales";
             dateContainer.classList.add("hidden");
             renderMarchasList();
@@ -8013,6 +8108,65 @@ function downloadMusicianPDFReport() {
     }, 10000);
 }
 
+// Descarga en PDF el listado del repertorio de una temporada concreta de la página de Repertorio:
+// solo título de la marcha, ordenado alfabéticamente y numerado, sin más datos.
+function downloadRepertoireSeasonPDF(season) {
+    if (!season) {
+        showToast("Selecciona una temporada válida", "warning");
+        return;
+    }
+
+    const seasonMarchas = getMarchasForSeason(season)
+        .slice()
+        .sort((a, b) => a.title.localeCompare(b.title, 'es'));
+
+    if (seasonMarchas.length === 0) {
+        showToast(`No hay marchas en el repertorio de la temporada ${season}`, "warning");
+        return;
+    }
+
+    const rowsHTML = seasonMarchas.map((m, idx) => `
+        <tr>
+            <td style="width: 40px; text-align: center; font-weight: 600; color: #6c757d;">${idx + 1}</td>
+            <td>${m.title}</td>
+        </tr>
+    `).join("");
+
+    const printArea = document.getElementById("print-report-area");
+
+    printArea.innerHTML = `
+        <div class="print-header">
+            <div>
+                <h1 class="print-title">YACENTE</h1>
+                <div class="print-subtitle">Repertorio de la Temporada ${season}</div>
+            </div>
+            <div class="print-meta">
+                <strong>Temporada:</strong> ${season}<br>
+                <strong>Total marchas:</strong> ${seasonMarchas.length}<br>
+                <strong>Fecha:</strong> ${new Date().toLocaleDateString("es-ES")}
+            </div>
+        </div>
+
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;">Nº</th>
+                    <th>Marcha</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHTML}
+            </tbody>
+        </table>
+    `;
+
+    window.print();
+
+    setTimeout(() => {
+        printArea.innerHTML = "";
+    }, 10000);
+}
+
 function downloadRepertoirePDFReport() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
@@ -9365,11 +9519,6 @@ function getDemoRepertoire() {
 function renderMarchasList() {
     cleanupOrphanedMarchasRecords();
 
-    const pageTitle = document.getElementById("page-title");
-    if (pageTitle && document.getElementById("section-marchas").classList.contains("active")) {
-        pageTitle.innerText = `Repertorio (${state.marchas ? state.marchas.length : 0})`;
-    }
-
     const gridContainer = document.getElementById("marchas-grid-container");
     const statusColumns = document.getElementById("marchas-status-columns");
     const difficultyColumns = document.getElementById("marchas-difficulty-columns");
@@ -9400,29 +9549,28 @@ function renderMarchasList() {
 
     const searchQuery = document.getElementById("search-marcha") ? document.getElementById("search-marcha").value.toLowerCase().trim() : "";
 
-    // Filtros de Temporada y Mes
-    const allMarchasDates = Array.from(new Set([
-        ...Object.keys(state.playedMarchas || {}),
-        ...Object.keys(state.actuacionRepertoire || {})
-    ]));
+    // Filtro de Temporada (obligatorio: no existe opción "Todas")
     const marchasYearSelect = document.getElementById("marchas-filter-year");
-    if (marchasYearSelect) populateSeasonSelect(marchasYearSelect, allMarchasDates, true, marchasYearSelect.value);
-    const marchasSeasonFilter = marchasYearSelect ? marchasYearSelect.value : "all";
-    const marchasMonthFilter = document.getElementById("marchas-filter-month") ? document.getElementById("marchas-filter-month").value : "all";
+    if (marchasYearSelect) populateRepertoireSeasonSelect(marchasYearSelect, marchasYearSelect.value);
+    const marchasSeasonFilter = marchasYearSelect ? marchasYearSelect.value : getCurrentSeasonLabel();
+
+    // Repertorio de la temporada seleccionada: por defecto todo el repertorio, salvo las marchas
+    // retiradas específicamente de esta temporada o añadidas en exclusiva a otra temporada distinta.
+    const seasonMarchas = getMarchasForSeason(marchasSeasonFilter);
+
+    const pageTitle = document.getElementById("page-title");
+    if (pageTitle && document.getElementById("section-marchas").classList.contains("active")) {
+        pageTitle.innerText = `Repertorio (${seasonMarchas.length})`;
+    }
 
     const matchesMarchasFilters = (date) => {
         if (!isSessionConcluded(date)) return false; // Solo ensayos/actuaciones que ya han sucedido
         const rawDate = date.split("_")[0];
-        if (marchasSeasonFilter !== "all" && !isDateInSeason(rawDate, marchasSeasonFilter)) return false;
-        if (marchasMonthFilter !== "all") {
-            const monthNum = (parseInt(rawDate.split("-")[1], 10) - 1).toString();
-            if (monthNum !== marchasMonthFilter) return false;
-        }
-        return true;
+        return isDateInSeason(rawDate, marchasSeasonFilter);
     };
 
     // Count plays dynamically: veces ensayada (playedMarchas) + veces tocada en actuación
-    // (actuacionRepertoire), respetando los filtros de temporada/mes seleccionados.
+    // (actuacionRepertoire), respetando la temporada seleccionada.
     const playCounts = {};
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(date => {
@@ -9446,9 +9594,9 @@ function renderMarchasList() {
     }
 
     // Sort marchas alphabetically in-place before filtering
-    (state.marchas || []).sort((a, b) => a.title.localeCompare(b.title, 'es'));
+    seasonMarchas.sort((a, b) => a.title.localeCompare(b.title, 'es'));
 
-    const filteredMarchas = (state.marchas || []).filter(m => {
+    const filteredMarchas = seasonMarchas.filter(m => {
         const titleMatch = m.title.toLowerCase().startsWith(searchQuery);
         return titleMatch;
     });
@@ -9552,7 +9700,7 @@ function renderMarchasList() {
                                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
-                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Eliminar Marcha" style="${btnStyle} color: var(--color-absent);">
+                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Quitar de esta temporada" style="${btnStyle} color: var(--color-absent);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -9580,7 +9728,7 @@ function renderMarchasList() {
                                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
-                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Eliminar Marcha" style="${btnStyle} color: var(--color-absent);">
+                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Quitar de esta temporada" style="${btnStyle} color: var(--color-absent);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -9618,35 +9766,10 @@ function renderMarchasList() {
         });
 
         card.querySelector(".delete-marcha-btn").addEventListener("click", () => {
-            if (confirm(`¿Estás seguro de que quieres eliminar la marcha "${m.title}" del repertorio? Esto también borrará sus registros de ensayos.`)) {
-                // Delete from repertoire
-                state.marchas = state.marchas.filter(item => item.id !== m.id);
-                dbDeleteMarcha(m.id);
-
-                // Clean from play history
-                if (state.playedMarchas) {
-                    Object.keys(state.playedMarchas).forEach(date => {
-                        if (state.playedMarchas[date].includes(m.id)) {
-                            state.playedMarchas[date] = state.playedMarchas[date].filter(id => id !== m.id);
-                            dbSavePlayedMarchas(date, state.playedMarchas[date]);
-                        }
-                    });
-                }
-
-                // Clean from actuación repertoire history
-                if (state.actuacionRepertoire) {
-                    Object.keys(state.actuacionRepertoire).forEach(date => {
-                        if (state.actuacionRepertoire[date].includes(m.id)) {
-                            state.actuacionRepertoire[date] = state.actuacionRepertoire[date].filter(id => id !== m.id);
-                            dbSaveActuacionRepertoire(date, state.actuacionRepertoire[date]);
-                        }
-                    });
-                }
-
-                saveStateToLocalStorage();
+            if (confirm(`¿Quitar "${m.title}" del repertorio de la temporada ${marchasSeasonFilter}? Seguirá disponible en el resto de temporadas y no se borrará su historial de ensayos.`)) {
+                removeMarchaFromSeason(m.id, marchasSeasonFilter);
                 renderMarchasList();
-                renderRehearsalMarchasWidget();
-                showToast("Marcha eliminada del repertorio", "error");
+                showToast(`Marcha retirada del repertorio de la temporada ${marchasSeasonFilter}`, "error");
             }
         });
 
@@ -15410,6 +15533,8 @@ function setupMarchaModalEvents() {
                 }
             } else {
                 const newId = "marcha-" + Date.now();
+                const marchasYearSelect = document.getElementById("marchas-filter-year");
+                const addedInSeason = marchasYearSelect && marchasYearSelect.value ? marchasYearSelect.value : getCurrentSeasonLabel();
                 const newMarcha = {
                     id: newId,
                     title,
@@ -15417,12 +15542,13 @@ function setupMarchaModalEvents() {
                     difficulty,
                     youtubeUrl,
                     spotifyUrl,
-                    notes: ""
+                    notes: "",
+                    addedInSeason
                 };
                 if (!state.marchas) state.marchas = [];
                 state.marchas.push(newMarcha);
                 dbSaveMarcha(newMarcha);
-                showToast("Marcha añadida al repertorio", "success");
+                showToast(`Marcha añadida al repertorio de la temporada ${addedInSeason}`, "success");
             }
 
             saveStateToLocalStorage();
