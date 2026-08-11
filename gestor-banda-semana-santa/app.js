@@ -3089,10 +3089,6 @@ function setupEventListeners() {
     document.getElementById("btn-close-marcha-history-modal").addEventListener("click", () => {
         document.getElementById("modal-marcha-history").classList.remove("active");
     });
-
-    document.getElementById("btn-close-marcha-actuaciones-history-modal").addEventListener("click", () => {
-        document.getElementById("modal-marcha-actuaciones-history").classList.remove("active");
-    });
     document.getElementById("modal-marcha-history").addEventListener("click", (e) => {
         if (e.target === e.currentTarget) {
             document.getElementById("modal-marcha-history").classList.remove("active");
@@ -3102,6 +3098,15 @@ function setupEventListeners() {
     document.getElementById("search-marcha").addEventListener("input", () => {
         renderMarchasList();
     });
+
+    const marchasFilterYearEl = document.getElementById("marchas-filter-year");
+    if (marchasFilterYearEl) {
+        marchasFilterYearEl.addEventListener("change", () => renderMarchasList());
+    }
+    const marchasFilterMonthEl = document.getElementById("marchas-filter-month");
+    if (marchasFilterMonthEl) {
+        marchasFilterMonthEl.addEventListener("change", () => renderMarchasList());
+    }
 
     document.getElementById("btn-view-list").addEventListener("click", () => {
         state.marchasViewMode = "list";
@@ -6357,7 +6362,7 @@ function renderStatsMarchasActuacion(filteredDates) {
                 <td><span class="musician-count-badge" style="background-color: var(--bg-primary);">Nivel ${m.difficulty || 1}</span></td>
                 <td>${statusLabel}</td>
             `;
-            tr.addEventListener("click", () => openMarchaActuacionesHistoryModal(m.id));
+            tr.addEventListener("click", () => openMarchaHistoryModal(m.id));
             tbody.appendChild(tr);
         });
     }
@@ -9395,12 +9400,45 @@ function renderMarchasList() {
 
     const searchQuery = document.getElementById("search-marcha") ? document.getElementById("search-marcha").value.toLowerCase().trim() : "";
 
-    // Count plays dynamically (solo ensayos que ya han sucedido)
+    // Filtros de Temporada y Mes
+    const allMarchasDates = Array.from(new Set([
+        ...Object.keys(state.playedMarchas || {}),
+        ...Object.keys(state.actuacionRepertoire || {})
+    ]));
+    const marchasYearSelect = document.getElementById("marchas-filter-year");
+    if (marchasYearSelect) populateSeasonSelect(marchasYearSelect, allMarchasDates, true, marchasYearSelect.value);
+    const marchasSeasonFilter = marchasYearSelect ? marchasYearSelect.value : "all";
+    const marchasMonthFilter = document.getElementById("marchas-filter-month") ? document.getElementById("marchas-filter-month").value : "all";
+
+    const matchesMarchasFilters = (date) => {
+        if (!isSessionConcluded(date)) return false; // Solo ensayos/actuaciones que ya han sucedido
+        const rawDate = date.split("_")[0];
+        if (marchasSeasonFilter !== "all" && !isDateInSeason(rawDate, marchasSeasonFilter)) return false;
+        if (marchasMonthFilter !== "all") {
+            const monthNum = (parseInt(rawDate.split("-")[1], 10) - 1).toString();
+            if (monthNum !== marchasMonthFilter) return false;
+        }
+        return true;
+    };
+
+    // Count plays dynamically: veces ensayada (playedMarchas) + veces tocada en actuación
+    // (actuacionRepertoire), respetando los filtros de temporada/mes seleccionados.
     const playCounts = {};
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(date => {
-            if (!isSessionConcluded(date)) return;
+            if (!matchesMarchasFilters(date)) return;
             const list = state.playedMarchas[date] || [];
+            list.forEach(mId => {
+                playCounts[mId] = (playCounts[mId] || 0) + 1;
+            });
+        });
+    }
+    if (state.actuacionRepertoire) {
+        Object.keys(state.actuacionRepertoire).forEach(date => {
+            const sessionInfo = state.sessionTypes[date];
+            if (!sessionInfo || sessionInfo.type !== "actuacion") return;
+            if (!matchesMarchasFilters(date)) return;
+            const list = new Set(state.actuacionRepertoire[date] || []);
             list.forEach(mId => {
                 playCounts[mId] = (playCounts[mId] || 0) + 1;
             });
@@ -9481,7 +9519,7 @@ function renderMarchasList() {
         }
 
         card.addEventListener("click", (e) => {
-            if (e.target.closest(".marcha-actions-compact") || e.target.closest(".btn-action")) {
+            if (e.target.closest(".marcha-actions-compact") || e.target.closest(".btn-action") || e.target.closest(".marcha-plays-compact")) {
                 return;
             }
             openMarchaNotesModal(m.id);
@@ -9505,17 +9543,9 @@ function renderMarchasList() {
                 <div class="marcha-right-controls" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto;">
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 6px;">
                         ${metaHtml}
-                        <span class="marcha-plays-compact" title="Veces tocada">${count} ens.</span>
+                        <span class="marcha-plays-compact" title="Veces ensayada + tocada en actuación (pulsa para ver detalle)" style="cursor: pointer;">${count}</span>
                     </div>
                     <div class="marcha-actions-compact" style="display: flex; align-items: center; gap: 3px;">
-                        <button class="btn-action history view-marcha-history-btn" data-id="${m.id}" title="Ver Ensayos" style="${btnStyle} color: var(--color-gold);">
-                            <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                        </button>
                         <button class="btn-action edit edit-marcha-btn" data-id="${m.id}" title="Editar Marcha" style="${btnStyle} color: var(--color-gold);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -9542,16 +9572,8 @@ function renderMarchasList() {
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 2px; margin-right: 0px;">
                         ${metaHtml}
                     </div>
-                    <span class="marcha-plays-compact" title="Veces tocada" style="padding: 1px 3px; font-size: 0.62rem;">${count}e</span>
+                    <span class="marcha-plays-compact" title="Veces ensayada + tocada en actuación (pulsa para ver detalle)" style="padding: 1px 3px; font-size: 0.62rem; cursor: pointer;">${count}</span>
                     <div class="marcha-actions-compact" style="display: flex; align-items: center; gap: 2px;">
-                        <button class="btn-action history view-marcha-history-btn" data-id="${m.id}" title="Ver Ensayos" style="${btnStyle} color: var(--color-gold);">
-                            <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                        </button>
                         <button class="btn-action edit edit-marcha-btn" data-id="${m.id}" title="Editar Marcha" style="${btnStyle} color: var(--color-gold);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -9586,7 +9608,8 @@ function renderMarchasList() {
         }
 
         // Bind events dynamically
-        card.querySelector(".view-marcha-history-btn").addEventListener("click", () => {
+        card.querySelector(".marcha-plays-compact").addEventListener("click", (e) => {
+            e.stopPropagation();
             openMarchaHistoryModal(m.id);
         });
 
@@ -9606,6 +9629,16 @@ function renderMarchasList() {
                         if (state.playedMarchas[date].includes(m.id)) {
                             state.playedMarchas[date] = state.playedMarchas[date].filter(id => id !== m.id);
                             dbSavePlayedMarchas(date, state.playedMarchas[date]);
+                        }
+                    });
+                }
+
+                // Clean from actuación repertoire history
+                if (state.actuacionRepertoire) {
+                    Object.keys(state.actuacionRepertoire).forEach(date => {
+                        if (state.actuacionRepertoire[date].includes(m.id)) {
+                            state.actuacionRepertoire[date] = state.actuacionRepertoire[date].filter(id => id !== m.id);
+                            dbSaveActuacionRepertoire(date, state.actuacionRepertoire[date]);
                         }
                     });
                 }
@@ -9771,17 +9804,29 @@ function renderRehearsalMarchasWidget() {
 // ==========================================================================
 // MODAL: HISTORIAL DE ENSAYOS DE UNA MARCHA
 // ==========================================================================
+// Modal combinado de historial de una marcha: ensayos (playedMarchas) + actuaciones
+// (actuacionRepertoire), cada apartado con su propia lista escroleable.
 function openMarchaHistoryModal(marchId) {
     const m = state.marchas.find(item => item.id === marchId);
     if (!m) return;
 
     document.getElementById("marcha-history-repertoire-info").innerText = m.title;
 
+    renderMarchaHistoryEnsayosSection(marchId);
+    renderMarchaHistoryActuacionesSection(marchId);
+
+    document.getElementById("modal-marcha-history").classList.add("active");
+}
+
+function renderMarchaHistoryEnsayosSection(marchId) {
     const datesPlayed = Object.keys(state.playedMarchas || {}).filter(date => {
         if (!isSessionConcluded(date)) return false; // No mostrar ensayos que aún no han sucedido
         const isRehearsal = !state.sessionTypes[date] || state.sessionTypes[date].type === "ensayo";
         return isRehearsal && state.playedMarchas[date].includes(marchId);
     }).sort((a, b) => b.localeCompare(a));
+
+    const countEl = document.getElementById("marcha-history-ensayos-count");
+    if (countEl) countEl.innerText = `(${datesPlayed.length})`;
 
     const tbody = document.getElementById("marcha-history-table-body");
     const emptyState = document.getElementById("marcha-history-empty");
@@ -9794,16 +9839,16 @@ function openMarchaHistoryModal(marchId) {
     } else {
         emptyState.classList.add("hidden");
         tableCard.classList.remove("hidden");
-        
+
         datesPlayed.forEach(date => {
             const dayRecord = state.attendance[date] || {};
             const sessionInfo = state.sessionTypes[date];
             const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
             const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
-            
+
             let present = 0;
             let total = 0;
-            
+
             state.musicians.forEach(mus => {
                 if (isSpecialRehearsal && !convocated.includes(mus.instrument)) return;
                 total++;
@@ -9811,9 +9856,9 @@ function openMarchaHistoryModal(marchId) {
                     present++;
                 }
             });
-            
+
             const ratio = total > 0 ? Math.round((present / total) * 100) : 0;
-            
+
             let labelText = "General";
             if (sessionInfo) {
                 const sub = sessionInfo.subtype;
@@ -9825,7 +9870,7 @@ function openMarchaHistoryModal(marchId) {
                 else if (sub === "voces") labelText = "Voces";
                 else if (sub === "primeras") labelText = "Primeras";
             }
-            
+
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td style="white-space: nowrap; font-weight: 600;">${formatDateSpanish(date)}</td>
@@ -9839,23 +9884,18 @@ function openMarchaHistoryModal(marchId) {
             tbody.appendChild(tr);
         });
     }
-
-    document.getElementById("modal-marcha-history").classList.add("active");
 }
 
 // Lista las actuaciones (nombre + fecha) en cuyo repertorio ordenado aparece la marcha dada.
-function openMarchaActuacionesHistoryModal(marchaId) {
-    const m = state.marchas.find(item => item.id === marchaId);
-    if (!m) return;
-
-    document.getElementById("marcha-actuaciones-history-title").innerText = "Actuaciones";
-    document.getElementById("marcha-actuaciones-history-repertoire-info").innerText = m.title;
-
+function renderMarchaHistoryActuacionesSection(marchaId) {
     const actuacionDates = Object.keys(state.actuacionRepertoire || {}).filter(date => {
         if (!isSessionConcluded(date)) return false; // No mostrar actuaciones que aún no han sucedido
         const sessionInfo = state.sessionTypes[date];
         return sessionInfo && sessionInfo.type === "actuacion" && (state.actuacionRepertoire[date] || []).includes(marchaId);
     }).sort((a, b) => b.localeCompare(a));
+
+    const countEl = document.getElementById("marcha-actuaciones-history-count");
+    if (countEl) countEl.innerText = `(${actuacionDates.length})`;
 
     const tbody = document.getElementById("marcha-actuaciones-history-table-body");
     const emptyState = document.getElementById("marcha-actuaciones-history-empty");
@@ -9880,8 +9920,6 @@ function openMarchaActuacionesHistoryModal(marchaId) {
             tbody.appendChild(tr);
         });
     }
-
-    document.getElementById("modal-marcha-actuaciones-history").classList.add("active");
 }
 
 // ==========================================================================
