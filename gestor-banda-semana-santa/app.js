@@ -2541,6 +2541,13 @@ function setupEventListeners() {
         modalPeerDetail.addEventListener("click", (e) => {
             if (e.target === modalPeerDetail) closePeerDetail();
         });
+        const peerDetailCard = modalPeerDetail.querySelector(".modal-card");
+        if (peerDetailCard) {
+            peerDetailCard.addEventListener("click", (e) => {
+                if (e.target.closest("#btn-close-peer-detail")) return;
+                spawnFloatingHearts(peerDetailCard, e.clientX, e.clientY);
+            });
+        }
     }
 
     // Modal de detalle de ensayo para músicos
@@ -6028,6 +6035,33 @@ function openPhotoPreviewModal(musicianId) {
     }
 
     modal.classList.add("active");
+}
+
+// Lanza una pequeña ráfaga de corazones flotantes desde el punto de clic, dentro de "container"
+// (que debe tener position: relative/absolute). Cada corazón se autodestruye al terminar su animación.
+function spawnFloatingHearts(container, clientX, clientY) {
+    const rect = container.getBoundingClientRect();
+    const originX = clientX - rect.left;
+    const originY = clientY - rect.top;
+
+    const count = 4;
+    for (let i = 0; i < count; i++) {
+        const heart = document.createElement("span");
+        heart.className = "floating-heart";
+        heart.textContent = "❤️";
+        heart.style.left = `${originX}px`;
+        heart.style.top = `${originY}px`;
+        heart.style.setProperty("--heart-dx", `${Math.round((Math.random() - 0.5) * 60)}px`);
+        heart.style.setProperty("--heart-rot", `${Math.round((Math.random() - 0.5) * 40)}deg`);
+        heart.style.fontSize = `${(1.05 + Math.random() * 0.7).toFixed(2)}rem`;
+        heart.style.animationDelay = `${i * 60}ms`;
+
+        heart.addEventListener("animationend", () => heart.remove());
+        // Red de seguridad por si "animationend" no llega a disparar (p.ej. reduced motion)
+        setTimeout(() => heart.remove(), 1200);
+
+        container.appendChild(heart);
+    }
 }
 
 function openPeerDetailModal(musicianId) {
