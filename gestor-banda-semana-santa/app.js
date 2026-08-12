@@ -5564,9 +5564,11 @@ function buildRepertoireOrderRow(mId, idx, marchasArray) {
     row.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary);";
     row.innerHTML = `
         <span style="flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
-        ${statusCircle}
-        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(mTitle)}</span>
-        ${diffBadge}
+        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px;">${escapeHtml(mTitle)}</span>
+        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;">
+            ${statusCircle}
+            ${diffBadge}
+        </div>
         <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
@@ -8192,7 +8194,10 @@ function downloadRepertoirePDFReport() {
     const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
-    if (!state.marchas || state.marchas.length === 0) {
+    // El músico siempre exporta el repertorio de la temporada actual.
+    const currentSeasonMarchas = getMarchasForSeason(getCurrentSeasonLabel());
+
+    if (currentSeasonMarchas.length === 0) {
         showToast("No hay marchas en el repertorio para exportar", "warning");
         return;
     }
@@ -8203,7 +8208,7 @@ function downloadRepertoirePDFReport() {
 
     // Count statistics
     const stats = { green: 0, yellow: 0, red: 0, none: 0 };
-    state.marchas.forEach(marcha => {
+    currentSeasonMarchas.forEach(marcha => {
         const key = `${musicianId}_${marcha.id}`;
         const status = state.musicianMarchaStatuses[key] || "none";
         if (status === "green") stats.green++;
@@ -8212,7 +8217,7 @@ function downloadRepertoirePDFReport() {
         else stats.none++;
     });
 
-    const sorted = [...(state.marchas || [])].sort((a, b) => a.title.localeCompare(b.title));
+    const sorted = currentSeasonMarchas.slice().sort((a, b) => a.title.localeCompare(b.title));
     
     // Determine dynamic column count to make it fit on exactly ONE page
     let columnCount = 2;
@@ -8258,7 +8263,7 @@ function downloadRepertoirePDFReport() {
         <div class="print-header">
             <div>
                 <h1 class="print-title">YACENTE</h1>
-                <div class="print-subtitle">Repertorio General y Nivel de Dominio</div>
+                <div class="print-subtitle">Repertorio de la Temporada ${getCurrentSeasonLabel()} y Nivel de Dominio</div>
             </div>
             <div class="print-meta">
                 <strong>Músico:</strong> ${musician.name}<br>
@@ -8285,10 +8290,10 @@ function downloadRepertoirePDFReport() {
                 <span>Sin marcar (${stats.none})</span>
             </div>
             <div style="margin-left: auto; font-weight: 600;">
-                Total: ${state.marchas.length} marchas
+                Total: ${currentSeasonMarchas.length} marchas
             </div>
         </div>
-        
+
         <div class="print-repertoire-grid">
             ${columnsHTML}
         </div>
@@ -9581,6 +9586,8 @@ function renderMarchasList() {
         pageTitle.innerText = `Repertorio (${seasonMarchas.length})`;
     }
 
+    // El contador de "veces tocada" se cuenta dentro de la temporada seleccionada en el filtro
+    // (igual que la pertenencia al repertorio): cada temporada tiene sus propias estadísticas.
     const matchesMarchasFilters = (date) => {
         if (!isSessionConcluded(date)) return false; // Solo ensayos/actuaciones que ya han sucedido
         const rawDate = date.split("_")[0];
@@ -9941,9 +9948,11 @@ function renderRehearsalMarchasWidget() {
         badge.style.alignItems = "center";
         badge.style.gap = "4px";
         badge.innerHTML = `
-            ${statusCircle}
-            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(name)}</span>
-            ${diffBadge}
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(name)}</span>
+            <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;">
+                ${statusCircle}
+                ${diffBadge}
+            </div>
             <button class="marcha-tag-delete" title="Quitar marcha" data-id="${mId}">&times;</button>
         `;
 
@@ -14768,10 +14777,12 @@ function openCompRehearsalDetailModal(date) {
 
                 const titleText = m ? m.title : `Marcha (${mId})`;
                 itemDiv.innerHTML = `
-                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px;">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🎵 ${escapeHtml(titleText)}</span>
-                        ${statusCircle}
-                        ${diffBadge}
+                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">🎵 ${escapeHtml(titleText)}</span>
+                        <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            ${statusCircle}
+                            ${diffBadge}
+                        </div>
                     </div>
                 `;
                 marchasContainer.appendChild(itemDiv);
@@ -15393,18 +15404,20 @@ function setupMultiEventSelectModalEvents() {
 function renderComponentRepertorio() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
-    
-    const totalCount = state.marchas ? state.marchas.length : 0;
+
+    // El músico siempre ve el repertorio de la temporada actual, sin selector de temporada.
+    const currentSeasonMarchas = getMarchasForSeason(getCurrentSeasonLabel());
+    const totalCount = currentSeasonMarchas.length;
     const titleEl = document.querySelector("#section-componente-repertorio h3");
     if (titleEl) {
         titleEl.textContent = `Mi Repertorio (${totalCount})`;
     }
-    
+
     const searchVal = document.getElementById("search-comp-marcha").value.toLowerCase().trim();
     const container = document.getElementById("componente-repertorio-lista");
     container.innerHTML = "";
-    
-    if (!state.marchas || state.marchas.length === 0) {
+
+    if (currentSeasonMarchas.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="padding: 30px 10px; text-align: center;">
                 <p class="text-muted" style="margin: 0; font-size: 0.88rem;">No hay marchas registradas en el repertorio general.</p>
@@ -15412,14 +15425,14 @@ function renderComponentRepertorio() {
         `;
         return;
     }
-    
-    const filtered = state.marchas.filter(m => {
+
+    const filtered = currentSeasonMarchas.filter(m => {
         const titleMatch = m.title && m.title.toLowerCase().includes(searchVal);
         const composer = m.composer || m.author || "";
         const composerMatch = composer.toLowerCase().includes(searchVal);
         return titleMatch || composerMatch;
     }).sort((a, b) => a.title.localeCompare(b.title));
-    
+
     if (filtered.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="padding: 30px 10px; text-align: center;">
