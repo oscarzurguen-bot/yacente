@@ -292,6 +292,16 @@ function getAuthMusicianId() {
     return sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
 }
 
+// Un músico solo puede acceder a su versión de la app si la dirección le ha rellenado el
+// "Nombre Completo" en Plantilla. Se usa tanto al iniciar sesión como al restaurar una sesión
+// guardada en el dispositivo.
+function isAuthenticatedMusicianAllowed() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return false;
+    const musician = (state.musicians || []).find(m => String(m.id) === String(musicianId));
+    return !!(musician && musician.fullName && musician.fullName.trim());
+}
+
 // ==========================================================================
 // INICIALIZACIÓN
 // ==========================================================================
@@ -453,7 +463,27 @@ function initApp() {
     // Renderizar interfaz inicial
     const isAuthenticated = getAuthToken();
     const activeRole = getAuthRole();
-    if (isAuthenticated) {
+    if (isAuthenticated && activeRole === "component" && !isAuthenticatedMusicianAllowed()) {
+        // El músico ya tenía sesión guardada en este dispositivo, pero a la dirección le falta
+        // rellenar su "Nombre Completo": se le expulsa a la pantalla de bloqueo con aviso.
+        sessionStorage.removeItem("yacente_authenticated");
+        sessionStorage.removeItem("yacente_role");
+        sessionStorage.removeItem("yacente_musician_id");
+        localStorage.removeItem("yacente_authenticated");
+        localStorage.removeItem("yacente_role");
+        localStorage.removeItem("yacente_musician_id");
+        // Diferido: más abajo, initFirebase() vuelve a llamar a showLockScreen() (que oculta
+        // el mensaje de error) al detectar que ya no hay token de sesión. Se aplica después de
+        // que el resto de initApp() (incluida esa llamada síncrona) termine.
+        setTimeout(() => {
+            showLockScreen();
+            const errorMsg = document.getElementById("lock-error-msg");
+            if (errorMsg) {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Facilita los datos solicitados a la dirección para poder acceder a tu cuenta";
+            }
+        }, 0);
+    } else if (isAuthenticated) {
         hideLockScreen();
         if (activeRole === "component") {
             document.body.classList.add("component-portal");
@@ -9472,7 +9502,14 @@ function setupFirebaseListeners() {
                 showToast("Músico no encontrado", "error");
                 return;
             }
-            
+
+            if (!musician.fullName || !musician.fullName.trim()) {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Facilita los datos solicitados a la dirección para poder acceder a tu cuenta";
+                showToast("Facilita los datos solicitados a la dirección para poder acceder a tu cuenta", "warning");
+                return;
+            }
+
             const performAuth = () => {
                 sessionStorage.setItem("yacente_authenticated", "true");
                 sessionStorage.setItem("yacente_role", "component");
