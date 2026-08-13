@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=501">
+    <link rel="stylesheet" href="style.css?v=502">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -2621,11 +2621,12 @@
                 </div>
 
                 <div class="modal-actions" style="margin-top: 0;">
-                    <button type="button" id="btn-clear-all-notifications" class="btn btn-danger" title="Vaciar notificaciones de todos los músicos" style="margin-right: auto; padding: 10px 12px;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <button type="button" id="btn-clear-all-notifications" class="btn btn-danger" title="Vaciar notificaciones de todos los músicos" style="margin-right: auto;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; vertical-align: middle;">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         </svg>
+                        Vaciar notificaciones
                     </button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-announcement-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; font-weight: 700;">📢 Enviar Notificación</button>
@@ -4249,13 +4250,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=501"></script>
+    <script src="app.js?v=502"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=501
+        // Purga de caché antigua y registro del Service Worker v=502
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v501") {
+                    if (key !== "yacente-v502") {
                         caches.delete(key);
                     }
                 });
@@ -4274,9 +4275,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=501")
+                navigator.serviceWorker.register("sw.js?v=502")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v501 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v502 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
