@@ -13644,7 +13644,7 @@ function computeMusicianBaseMedalsData(musicianId) {
     let hasPerformances = false;
     let hasPerfectYear = false;
 
-    const TITULAR_MIN_ACTUACIONES = 5;
+    const TITULAR_MIN_ACTUACIONES = 3;
     Object.keys(performancesByYear).forEach(y => {
         const stats = performancesByYear[y];
         // Exige un mínimo de actuaciones en el año para evitar que un solo bolo (o pocos)
@@ -13664,24 +13664,24 @@ function computeMusicianBaseMedalsData(musicianId) {
     if (hasPerformances) {
         if (hasPerfectYear) {
             starsTitular = 3;
-            descTitular = "Oro conseguido: Asiste al 100% de actuaciones en un año (mínimo 5 actuaciones).";
+            descTitular = "Oro conseguido: Asiste al 100% de actuaciones en un año (mínimo 3 actuaciones).";
             unlockedTitular = true;
         } else if (maxTitularPct > 95) {
             starsTitular = 2;
-            descTitular = "Plata conseguido: Asiste a >95% de las actuaciones en un año (mínimo 5 actuaciones). Necesitas el 100% para conseguir Oro.";
+            descTitular = "Plata conseguido: Asiste a >95% de las actuaciones en un año (mínimo 3 actuaciones). Necesitas el 100% para conseguir Oro.";
             unlockedTitular = true;
         } else if (maxTitularPct > 90) {
             starsTitular = 1;
-            descTitular = "Bronce conseguido: Asiste a >90% de las actuaciones en un año (mínimo 5 actuaciones). Necesitas >95% para conseguir Plata.";
+            descTitular = "Bronce conseguido: Asiste a >90% de las actuaciones en un año (mínimo 3 actuaciones). Necesitas >95% para conseguir Plata.";
             unlockedTitular = true;
         } else {
             starsTitular = 0;
-            descTitular = "Asiste a >90% de las actuaciones en un año (mínimo 5 actuaciones) para desbloquear Bronce.";
+            descTitular = "Asiste a >90% de las actuaciones en un año (mínimo 3 actuaciones) para desbloquear Bronce.";
             unlockedTitular = false;
         }
     } else {
         starsTitular = 0;
-        descTitular = "Asiste a >90% de las actuaciones en un año (mínimo 5 actuaciones) para desbloquear Bronce.";
+        descTitular = "Asiste a >90% de las actuaciones en un año (mínimo 3 actuaciones) para desbloquear Bronce.";
         unlockedTitular = false;
     }
 
