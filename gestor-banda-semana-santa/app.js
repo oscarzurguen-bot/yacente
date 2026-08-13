@@ -114,6 +114,7 @@ let state = {
     playedMarchas: {},
     actuacionRepertoire: {},
     marchaSeasonRemovals: {},
+    notificationsClearedAt: null,
     marchasViewMode: "list",
     calendarGoals: {},
     weeklyGoals: {},
@@ -393,6 +394,8 @@ function initApp() {
     const storedMarchaSeasonRemovals = localStorage.getItem("harmonia_marcha_season_removals");
     state.marchaSeasonRemovals = storedMarchaSeasonRemovals ? JSON.parse(storedMarchaSeasonRemovals) : {};
 
+    state.notificationsClearedAt = localStorage.getItem("harmonia_notifications_cleared_at") || null;
+
     const storedRehearsalLocations = localStorage.getItem("harmonia_rehearsal_locations");
     if (storedRehearsalLocations) {
         try {
@@ -621,6 +624,11 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_played_marchas", JSON.stringify(state.playedMarchas || {}));
     localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire || {}));
     localStorage.setItem("harmonia_marcha_season_removals", JSON.stringify(state.marchaSeasonRemovals || {}));
+    if (state.notificationsClearedAt) {
+        localStorage.setItem("harmonia_notifications_cleared_at", state.notificationsClearedAt);
+    } else {
+        localStorage.removeItem("harmonia_notifications_cleared_at");
+    }
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
@@ -717,6 +725,7 @@ let unsubSuggestions = null;
 let unsubRepertoireLinks = null;
 let unsubRehearsalLocations = null;
 let unsubMarchaSeasonRemovals = null;
+let unsubNotificationsClearedAt = null;
 
 function getDeletedNotificationIds(musicianId) {
     if (!musicianId) return [];
@@ -1176,6 +1185,24 @@ function startCloudSync() {
         console.error("Error sync retiradas de repertorio por temporada:", err);
     });
 
+    // Escucha de la fecha de "vaciado" de notificaciones (botón de Ajustes): cualquier
+    // notificación con fecha anterior o igual a esta marca se considera obsoleta y se filtra,
+    // en cualquier dispositivo, sin necesidad de tocar el caché local de cada músico uno a uno.
+    unsubNotificationsClearedAt = db.collection("config").doc("notifications_reset").onSnapshot(doc => {
+        state.notificationsClearedAt = doc.exists && doc.data() ? (doc.data().clearedAt || null) : null;
+        if (state.notificationsClearedAt) {
+            localStorage.setItem("harmonia_notifications_cleared_at", state.notificationsClearedAt);
+        } else {
+            localStorage.removeItem("harmonia_notifications_cleared_at");
+        }
+        updateNotificationsBadge();
+        if (document.body.classList.contains("component-portal")) {
+            renderComponentNotificationsList();
+        }
+    }, err => {
+        console.error("Error sync vaciado de notificaciones:", err);
+    });
+
     // Escucha de comunicados de la directiva
     unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
         const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1313,6 +1340,7 @@ function stopCloudSync() {
     if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
     if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
     if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
+    if (unsubNotificationsClearedAt) { unsubNotificationsClearedAt(); unsubNotificationsClearedAt = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1691,6 +1719,47 @@ function dbSaveMarchaSeasonRemovals(removals) {
         const db = firebase.firestore();
         db.collection("config").doc("marcha_season_removals").set(removals)
             .catch(err => console.error("Error al guardar retiradas de repertorio por temporada en nube:", err));
+    }
+}
+
+function dbSaveNotificationsClearedAt(clearedAt) {
+    state.notificationsClearedAt = clearedAt;
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("config").doc("notifications_reset").set({ clearedAt })
+            .catch(err => console.error("Error al guardar vaciado de notificaciones en nube:", err));
+    }
+}
+
+// Vacía el buzón de notificaciones de TODOS los músicos: borra los comunicados guardados en la
+// nube (para que ningún dispositivo nuevo los vuelva a recibir) y marca una fecha de corte que
+// oculta cualquier notificación anterior (comunicados ya cacheados localmente y avisos de
+// ensayos/actuaciones de prueba), sin afectar a asistencia, repertorio ni al resto de datos.
+function clearAllMusicianNotifications() {
+    const clearedAt = new Date().toISOString();
+    dbSaveNotificationsClearedAt(clearedAt);
+    updateNotificationsBadge();
+    if (document.body.classList.contains("component-portal")) {
+        renderComponentNotificationsList();
+    }
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("announcements").get()
+            .then(snapshot => {
+                if (snapshot.empty) return;
+                const batch = db.batch();
+                snapshot.forEach(doc => batch.delete(doc.ref));
+                return batch.commit();
+            })
+            .then(() => showToast("Notificaciones vaciadas para todos los músicos", "success"))
+            .catch(err => {
+                console.error("Error al vaciar comunicados en nube:", err);
+                showToast("Se vació la marca de corte, pero hubo un error borrando comunicados en la nube", "warning");
+            });
+    } else {
+        showToast("Notificaciones vaciadas (modo local)", "success");
     }
 }
 
@@ -3039,7 +3108,14 @@ function setupEventListeners() {
         reader.readAsText(file);
     });
 
-
+    const btnClearAllNotifications = document.getElementById("btn-clear-all-notifications");
+    if (btnClearAllNotifications) {
+        btnClearAllNotifications.addEventListener("click", () => {
+            if (confirm("¿Vaciar el buzón de notificaciones de TODOS los músicos? Se borrarán los comunicados guardados y se ocultarán los avisos de ensayos/actuaciones anteriores a este momento en cualquier dispositivo. Esto no afecta a la asistencia, el repertorio ni al resto de datos de la banda.")) {
+                clearAllMusicianNotifications();
+            }
+        });
+    }
 
     // Cambiar contraseña de administración (Modal)
     const modalChangeAdminPass = document.getElementById("modal-change-admin-password");
@@ -17958,11 +18034,13 @@ function purgeExpiredNotifications(notifs) {
     if (!Array.isArray(notifs)) return [];
     const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
     const now = Date.now();
+    const clearedAtTime = state.notificationsClearedAt ? new Date(state.notificationsClearedAt).getTime() : null;
     return notifs.filter(n => {
         if (!n) return false;
         if (!n.date) return true;
         const notifTime = new Date(n.date).getTime();
         if (isNaN(notifTime)) return true;
+        if (clearedAtTime && !isNaN(clearedAtTime) && notifTime <= clearedAtTime) return false;
         return (now - notifTime) <= ONE_WEEK_MS;
     });
 }

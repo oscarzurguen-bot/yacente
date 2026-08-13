@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=499">
+    <link rel="stylesheet" href="style.css?v=500">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1389,6 +1389,22 @@
                                     <line x1="15" y1="3" x2="15" y2="21"></line>
                                 </svg>
                                 Modo Desfile
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Notificaciones de Músicos -->
+                    <div class="card settings-card">
+                        <h3>Notificaciones de Músicos</h3>
+                        <p class="text-muted" style="margin-bottom: 20px;">Vacía el buzón de notificaciones (comunicados y avisos de ensayos/actuaciones) de todos los músicos, por ejemplo tras hacer pruebas. A partir de ahí las notificaciones vuelven a funcionar con normalidad y siguen caducando a la semana de su emisión.</p>
+
+                        <div class="settings-buttons">
+                            <button id="btn-clear-all-notifications" class="btn btn-danger">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px; vertical-align: middle;">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                Vaciar Notificaciones de Todos
                             </button>
                         </div>
                     </div>
@@ -4243,13 +4259,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=499"></script>
+    <script src="app.js?v=500"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=499
+        // Purga de caché antigua y registro del Service Worker v=500
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v499") {
+                    if (key !== "yacente-v500") {
                         caches.delete(key);
                     }
                 });
@@ -4268,9 +4284,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=499")
+                navigator.serviceWorker.register("sw.js?v=500")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v499 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v500 registrado correctamente:", registration);
                         registration.onupdatefound = () => {
                             const installingWorker = registration.installing;
                             if (installingWorker) {
