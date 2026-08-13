@@ -966,6 +966,7 @@ function startCloudSync() {
     let isInitialSessionTypesLoad = localStorage.getItem(sessionSyncFlagKey) !== "true";
     unsubSessionTypes = db.collection("sessionTypes").onSnapshot(snapshot => {
         const changes = snapshot.docChanges();
+        const previousSessionTypes = state.sessionTypes; // para comparar campos antes de sobrescribir
 
         state.sessionTypes = {}; // Limpiar caché local para evitar datos huérfanos/demo
         snapshot.forEach(doc => {
@@ -980,7 +981,20 @@ function startCloudSync() {
                 if (change.type === "added" || change.type === "modified") {
                     const sessionData = change.doc.data();
                     const sessionKey = change.doc.id;
-                    dispatchSessionNotification(sessionKey, sessionData);
+
+                    if (change.type === "modified" && sessionData.type === "ensayo") {
+                        // En la edición de un ensayo solo se avisa a los músicos si cambia el lugar,
+                        // la hora o el día (este último ya se detecta como "added" al cambiar de
+                        // clave). El responsable es información solo para la directiva y no debe
+                        // generar aviso.
+                        const oldData = previousSessionTypes ? previousSessionTypes[sessionKey] : null;
+                        if (!oldData) return;
+                        const locationChanged = (oldData.location || "") !== (sessionData.location || "");
+                        const timeChanged = (oldData.time || "") !== (sessionData.time || "");
+                        if (!locationChanged && !timeChanged) return;
+                    }
+
+                    dispatchSessionNotification(sessionKey, sessionData, false, change.type === "modified");
                 }
             });
         }
@@ -7792,7 +7806,7 @@ function renderMusicianDetailContent() {
         const categories = [
             {
                 title: "📅 Asistencia",
-                ids: ["asistencia", "comprometido", "veterano", "racha", "god", "titular", "capitan", "volver_ensayar"]
+                ids: ["asistencia", "comprometido", "veterano", "racha", "god", "titular", "top", "capitan", "volver_ensayar"]
             },
             {
                 title: "📜 Legado",
@@ -18089,12 +18103,17 @@ function formatNotificationTimestamp(dateInput) {
     }
 }
 
-function dispatchSessionNotification(sessionKey, sessionData, isSilent = false) {
+function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, isUpdate = false) {
     if (!sessionData) return;
 
     const rawDate = sessionKey.split("_")[0];
     const formattedDate = formatDateShortSpanish(rawDate);
-    const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
+    let title;
+    if (isUpdate) {
+        title = sessionData.type === "actuacion" ? "Actuación Actualizada" : "Ensayo Actualizado";
+    } else {
+        title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
+    }
     let body = "";
     if (sessionData.type === "ensayo") {
         const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
@@ -18106,7 +18125,9 @@ function dispatchSessionNotification(sessionKey, sessionData, isSilent = false) 
     }
 
     const notifId = `session_${sessionKey}_${sessionData.type}`;
-    const creationDate = sessionData.createdAt || sessionData.date || new Date().toISOString();
+    // En una actualización se usa la fecha actual (no la de creación original) para que la
+    // notificación resurja como reciente en vez de quedar enterrada u ordenada por su antigüedad.
+    const creationDate = isUpdate ? new Date().toISOString() : (sessionData.createdAt || sessionData.date || new Date().toISOString());
 
     const musicians = state.musicians || [];
     musicians.forEach(m => {
@@ -18125,7 +18146,9 @@ function dispatchSessionNotification(sessionKey, sessionData, isSilent = false) 
                 title: title,
                 body: body,
                 date: creationDate,
-                seen: existingIdx !== -1 ? (notifs[existingIdx].seen || false) : false,
+                // Una actualización real (lugar/hora) debe volver a aparecer como no leída, aunque
+                // el músico ya hubiera visto el aviso original de creación.
+                seen: isUpdate ? false : (existingIdx !== -1 ? (notifs[existingIdx].seen || false) : false),
                 type: sessionData.type
             };
 
