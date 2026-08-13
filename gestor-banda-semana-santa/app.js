@@ -3108,15 +3108,6 @@ function setupEventListeners() {
         reader.readAsText(file);
     });
 
-    const btnClearAllNotifications = document.getElementById("btn-clear-all-notifications");
-    if (btnClearAllNotifications) {
-        btnClearAllNotifications.addEventListener("click", () => {
-            if (confirm("¿Vaciar el buzón de notificaciones de TODOS los músicos? Se borrarán los comunicados guardados y se ocultarán los avisos de ensayos/actuaciones anteriores a este momento en cualquier dispositivo. Esto no afecta a la asistencia, el repertorio ni al resto de datos de la banda.")) {
-                clearAllMusicianNotifications();
-            }
-        });
-    }
-
     // Cambiar contraseña de administración (Modal)
     const modalChangeAdminPass = document.getElementById("modal-change-admin-password");
     const btnOpenChangePass = document.getElementById("btn-open-change-password-modal");
@@ -18394,6 +18385,7 @@ function setupAnnouncementEvents() {
 
     const btnClose = document.getElementById("btn-close-announcement-modal");
     const btnCancel = document.getElementById("btn-cancel-announcement-modal");
+    const btnClearAllNotifications = document.getElementById("btn-clear-all-notifications");
     const form = document.getElementById("form-send-announcement");
     const titleInput = document.getElementById("announcement-title-input");
     const bodyInput = document.getElementById("announcement-body-input");
@@ -18418,6 +18410,14 @@ function setupAnnouncementEvents() {
     if (btnOpen) btnOpen.addEventListener("click", openModal);
     if (btnClose) btnClose.addEventListener("click", closeModal);
     if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (btnClearAllNotifications) {
+        btnClearAllNotifications.addEventListener("click", () => {
+            if (confirm("¿Vaciar el buzón de notificaciones de TODOS los músicos? Se borrarán los comunicados guardados y se ocultarán los avisos de ensayos/actuaciones anteriores a este momento en cualquier dispositivo. Esto no afecta a la asistencia, el repertorio ni al resto de datos de la banda.")) {
+                clearAllMusicianNotifications();
+            }
+        });
+    }
 
     quickPills.forEach(pill => {
         pill.addEventListener("click", () => {
