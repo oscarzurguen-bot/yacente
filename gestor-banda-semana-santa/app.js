@@ -500,16 +500,22 @@ function initApp() {
     } else {
         showLockScreen();
     }
-    populateLoginMusicians();
-    renderAttendance();
-    renderPlantillaTable();
-    renderEnsayosList();
-    renderActuacionesList();
-    renderStatistics();
-    renderMarchasList();
-    renderRehearsalMarchasWidget();
-    updateSuggestionsBadge();
-    renderRepertoireLinksUI();
+    // Si cualquiera de estos renders falla (p.ej. un dato inesperado en una sesión), no debe
+    // impedir que se conecte la nube más abajo: eso dejaría la app entera inutilizable.
+    try {
+        populateLoginMusicians();
+        renderAttendance();
+        renderPlantillaTable();
+        renderEnsayosList();
+        renderActuacionesList();
+        renderStatistics();
+        renderMarchasList();
+        renderRehearsalMarchasWidget();
+        updateSuggestionsBadge();
+        renderRepertoireLinksUI();
+    } catch (err) {
+        console.error("Error al renderizar la interfaz inicial:", err);
+    }
 
     // Conectar a Firebase si está configurado
     initFirebase();
@@ -6295,7 +6301,9 @@ function renderStatistics() {
     const filteredDates = allDates.filter(dateStr => {
         if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
-        const dateObj = new Date(dateStr.replace(/-/g, "/"));
+        // dateStr puede llevar sufijo (sesiones múltiples/especiales el mismo día): quitarlo antes
+        // de parsear la fecha, si no new Date(...) da Invalid Date y el mes sale NaN.
+        const dateObj = new Date(dateStr.split("_")[0].replace(/-/g, "/"));
         const month = dateObj.getMonth().toString();
 
         const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
@@ -7564,7 +7572,9 @@ function renderMusicianDetailContent() {
     const filteredDates = allDates.filter(dateStr => {
         if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
-        const dateObj = new Date(dateStr.replace(/-/g, "/"));
+        // dateStr puede llevar sufijo (sesiones múltiples/especiales el mismo día): quitarlo antes
+        // de parsear la fecha, si no new Date(...) da Invalid Date y el mes sale NaN.
+        const dateObj = new Date(dateStr.split("_")[0].replace(/-/g, "/"));
         const month = dateObj.getMonth().toString();
         const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
@@ -18547,9 +18557,15 @@ function renderDayHeatmap(filteredDates) {
     }));
 
     filteredDates.forEach(dateStr => {
-        const dateObj = new Date(dateStr.replace(/-/g, "/"));
+        // dateStr puede llevar sufijo (p.ej. "2026-05-01_1" o "2026-05-01_trompetas1" para sesiones
+        // múltiples/especiales el mismo día); hay que quedarse solo con la fecha real antes de parsear,
+        // si no new Date(...) da Invalid Date y dayIdx sale NaN.
+        const rawDateStr = dateStr.split("_")[0];
+        const dateObj = new Date(rawDateStr.replace(/-/g, "/"));
         const jsDay = dateObj.getDay(); // 0 = Domingo, 1 = Lunes, ...
+        if (isNaN(jsDay)) return;
         const dayIdx = jsDay === 0 ? 6 : jsDay - 1; // 0 = Lunes ... 6 = Domingo
+        if (!dayStats[dayIdx]) return;
 
         const attendanceForDay = state.attendance[dateStr] || {};
         let dayPresents = 0;
