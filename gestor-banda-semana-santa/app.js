@@ -426,6 +426,20 @@ function initApp() {
     state.firebasePasswordHash = storedFbHash || "";
     state.pastLockEnabled = localStorage.getItem("yacente_past_lock_enabled") === "true";
 
+    // Intento de auto-recuperación de la configuración de la nube desde la caché si localStorage fue limpiado por el navegador
+    if (!state.firebaseConfig && window.caches) {
+        caches.open('fcm-config').then(cache => cache.match('/config.json'))
+            .then(res => res ? res.json() : null)
+            .then(configObj => {
+                if (configObj && configObj.apiKey && configObj.projectId) {
+                    state.firebaseConfig = configObj;
+                    localStorage.setItem("yacente_firebase_config", JSON.stringify(configObj));
+                    console.log("Configuración de Firebase auto-recuperada desde caché");
+                    initFirebase();
+                }
+            }).catch(e => console.error("Error al auto-recuperar config Firebase:", e));
+    }
+
     if (storedMusicians && storedAttendance) {
         state.musicians = JSON.parse(storedMusicians);
         state.attendance = JSON.parse(storedAttendance);
@@ -466,18 +480,15 @@ function initApp() {
     // Renderizar interfaz inicial
     const isAuthenticated = getAuthToken();
     const activeRole = getAuthRole();
-    if (isAuthenticated && activeRole === "component" && !isAuthenticatedMusicianAllowed()) {
-        // El músico ya tenía sesión guardada en este dispositivo, pero a la dirección le falta
-        // rellenar su "Nombre Completo": se le expulsa a la pantalla de bloqueo con aviso.
+    if (isAuthenticated && activeRole === "component" && !isCloudActive() && !isAuthenticatedMusicianAllowed()) {
+        // Solo expulsamos inmediatamente en modo local estricto si falta el nombre completo.
+        // Si hay nube activa, se mantiene la sesión abierta y startCloudSync() validará al descargar los datos reales de Firestore.
         sessionStorage.removeItem("yacente_authenticated");
         sessionStorage.removeItem("yacente_role");
         sessionStorage.removeItem("yacente_musician_id");
         localStorage.removeItem("yacente_authenticated");
         localStorage.removeItem("yacente_role");
         localStorage.removeItem("yacente_musician_id");
-        // Diferido: más abajo, initFirebase() vuelve a llamar a showLockScreen() (que oculta
-        // el mensaje de error) al detectar que ya no hay token de sesión. Se aplica después de
-        // que el resto de initApp() (incluida esa llamada síncrona) termine.
         setTimeout(() => {
             showLockScreen();
             const errorMsg = document.getElementById("lock-error-msg");
@@ -913,6 +924,26 @@ function startCloudSync() {
             invalidateMusicianStatsCache();
             renderPlantillaTable();
             populateLoginMusicians();
+
+            // Validar acceso del músico autenticado tras sincronizar la plantilla desde Firestore
+            const activeRole = getAuthRole();
+            if (activeRole === "component" && !isAuthenticatedMusicianAllowed()) {
+                sessionStorage.removeItem("yacente_authenticated");
+                sessionStorage.removeItem("yacente_role");
+                sessionStorage.removeItem("yacente_musician_id");
+                localStorage.removeItem("yacente_authenticated");
+                localStorage.removeItem("yacente_role");
+                localStorage.removeItem("yacente_musician_id");
+                showLockScreen();
+                const errorMsg = document.getElementById("lock-error-msg");
+                if (errorMsg) {
+                    errorMsg.classList.remove("hidden");
+                    errorMsg.innerText = "Facilita los datos solicitados a la dirección para poder acceder a tu cuenta";
+                }
+                showToast("Acceso restringido: consulta con la dirección de la banda", "warning");
+                return;
+            }
+
             if (document.getElementById("section-pasar-lista").classList.contains("active")) {
                 renderAttendance();
             }
@@ -5211,7 +5242,7 @@ function renderGroupedList(container, itemsList) {
                     <td style="text-align: right; padding: 6px 12px; border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.8rem;">Presente</td>
                 `;
             } else if (r.justified) {
-                const justifText = r.justification || 'Sin justificación';
+                const justifText = r.reason || 'Sin justificación';
                 const truncatedJustif = justifText.length > 50 ? justifText.substring(0, 50) + '...' : justifText;
                 tr.innerHTML = `
                     <td style="padding: 6px 12px; border-bottom: 1px solid var(--border-color);">
