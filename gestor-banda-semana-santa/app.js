@@ -13493,8 +13493,10 @@ function computeMusicianBaseMedalsData(musicianId) {
     }
 
     // 7. El clavo, Hasta en la sopa, God (Cálculo de asistencia perfecta mensual/consecutiva)
+    // Solo cuentan los ensayos ya concluidos: un preaviso de asistencia futura no es
+    // asistencia real hasta que el director pasa lista y el ensayo termina.
     const rehearsalDates = Object.keys(state.attendance)
-        .filter(d => state.attendance[d] && state.attendance[d][musicianId] && state.sessionTypes[d] && state.sessionTypes[d].type === "ensayo")
+        .filter(d => state.attendance[d] && state.attendance[d][musicianId] && state.sessionTypes[d] && state.sessionTypes[d].type === "ensayo" && isSessionConcluded(d))
         .sort();
         
     let clavoUnlocked = false;
