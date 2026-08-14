@@ -6018,8 +6018,8 @@ function renderPlantillaTable() {
                 <td class="col-pin">
                     <div style="display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">
                         ${musician.pin ? `
-                            <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="PIN configurado. Pulsa para borrar/restablecer PIN">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lock-svg" style="color: var(--text-muted); display: block;">
+                            <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="${musician.pinLocked ? 'PIN BLOQUEADO por demasiados intentos fallidos. Pulsa para desbloquear/restablecer' : 'PIN configurado. Pulsa para borrar/restablecer PIN'}">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lock-svg" style="color: ${musician.pinLocked ? 'var(--color-absent)' : 'var(--text-muted)'}; display: block;">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
@@ -6082,11 +6082,13 @@ function renderPlantillaTable() {
                     e.stopPropagation();
                     if (confirm(`¿Estás seguro de que quieres restablecer el PIN de ${musician.name}? Volverá a registrarse con el siguiente PIN que introduzca.`)) {
                         musician.pin = "";
+                        musician.pinFailedAttempts = 0;
+                        musician.pinLocked = false;
                         saveStateToLocalStorage();
-                        
+
                         if (isCloudActive()) {
                             const db = firebase.firestore();
-                            db.collection("musicians").doc(musician.id).update({ pin: "" })
+                            db.collection("musicians").doc(musician.id).update({ pin: "", pinFailedAttempts: 0, pinLocked: false })
                                 .then(() => {
                                     showToast(`PIN de ${musician.name} borrado con éxito`, "success");
                                     renderPlantillaTable();
@@ -9666,6 +9668,13 @@ function setupFirebaseListeners() {
                 return;
             }
 
+            if (musician.pinLocked) {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Tu contraseña se ha bloqueado por demasiados intentos fallidos. Ponte en contacto con la dirección para restablecerla.";
+                showToast("PIN bloqueado por demasiados intentos. Contacta con la dirección.", "error");
+                return;
+            }
+
             const performAuth = () => {
                 sessionStorage.setItem("yacente_authenticated", "true");
                 sessionStorage.setItem("yacente_role", "component");
@@ -9712,11 +9721,25 @@ function setupFirebaseListeners() {
             } else {
                 // Validación de PIN
                 if (musician.pin === enteredPin) {
+                    if (musician.pinFailedAttempts) {
+                        musician.pinFailedAttempts = 0;
+                        dbSaveMusician(musician);
+                    }
                     performAuth();
                 } else {
-                    errorMsg.classList.remove("hidden");
-                    errorMsg.innerText = "PIN incorrecto. Si lo has olvidado, consulta con la Directiva.";
-                    showToast("El PIN introducido es incorrecto", "error");
+                    musician.pinFailedAttempts = (musician.pinFailedAttempts || 0) + 1;
+                    if (musician.pinFailedAttempts >= 5) {
+                        musician.pinLocked = true;
+                        dbSaveMusician(musician);
+                        errorMsg.classList.remove("hidden");
+                        errorMsg.innerText = "Tu contraseña se ha bloqueado por demasiados intentos fallidos. Ponte en contacto con la dirección para restablecerla.";
+                        showToast("PIN bloqueado por demasiados intentos. Contacta con la dirección.", "error");
+                    } else {
+                        dbSaveMusician(musician);
+                        errorMsg.classList.remove("hidden");
+                        errorMsg.innerText = "PIN incorrecto. Si lo has olvidado, consulta con la Directiva.";
+                        showToast("El PIN introducido es incorrecto", "error");
+                    }
                 }
             }
         }
