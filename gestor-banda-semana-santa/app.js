@@ -661,7 +661,7 @@ function saveStateToLocalStorage() {
     }
 }
 
-// Hashing simple para la contraseña de directiva
+// Hash débil antiguo (solo se mantiene para poder migrar contraseñas ya guardadas con este esquema)
 function hashString(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -670,6 +670,24 @@ function hashString(str) {
         hash = hash & hash;
     }
     return hash.toString(36);
+}
+
+// Hash criptográfico real (SHA-256) para la contraseña de directiva
+async function hashPassword(str) {
+    const data = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Verifica una contraseña frente al hash guardado. Soporta hashes antiguos (hashString):
+// si coincide con el esquema antiguo, se acepta y se devuelve el nuevo hash SHA-256
+// para que el llamador lo guarde, migrando la cuenta de forma transparente.
+async function verifyPassword(enteredPassword, storedHash) {
+    if (!storedHash) return { valid: false, upgradedHash: null };
+    const newHash = await hashPassword(enteredPassword);
+    if (newHash === storedHash) return { valid: true, upgradedHash: null };
+    if (hashString(enteredPassword) === storedHash) return { valid: true, upgradedHash: newHash };
+    return { valid: false, upgradedHash: null };
 }
 
 // Comprobación de estado de la nube
@@ -3203,7 +3221,6 @@ function setupEventListeners() {
                 return;
             }
             
-            const oldHash = hashString(oldPass);
             let targetHash = state.firebasePasswordHash || localStorage.getItem("yacente_firebase_hash") || "";
 
             // Si la nube está activa, obtener la contraseña real de la directiva guardada en Firestore
@@ -3220,22 +3237,22 @@ function setupEventListeners() {
                     console.error("Error al verificar contraseña actual en Firestore:", err);
                 }
             }
-            
-            // Validar contraseña actual
+
+            // Validar contraseña actual ("admin" solo sirve si nunca se ha configurado ninguna contraseña)
             let isValid = false;
             if (targetHash) {
-                isValid = (oldHash === targetHash);
+                isValid = (await verifyPassword(oldPass, targetHash)).valid;
             } else {
                 isValid = (oldPass === "admin");
             }
-            
+
             if (!isValid) {
                 showToast("La contraseña actual es incorrecta", "error");
                 return;
             }
-            
+
             // Guardar nueva contraseña
-            const newHash = hashString(newPass);
+            const newHash = await hashPassword(newPass);
             state.firebasePasswordHash = newHash;
             localStorage.setItem("yacente_firebase_hash", newHash);
             
@@ -9426,9 +9443,9 @@ function setupFirebaseListeners() {
             
             // Verificar primero si ya existe un documento de seguridad en Firestore
             db.collection("config").doc("security").get()
-                .then(secDoc => {
+                .then(async secDoc => {
                     const hasCloudSecurity = secDoc.exists && secDoc.data() && secDoc.data().passwordHash;
-                    
+
                     if (hasCloudSecurity) {
                         const existingHash = secDoc.data().passwordHash;
                         state.firebasePasswordHash = existingHash;
@@ -9439,10 +9456,15 @@ function setupFirebaseListeners() {
                             const togglePastLock = document.getElementById("toggle-past-lock");
                             if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
                         }
-                        
+
                         if (password.length > 0) {
-                            const enteredHash = hashString(password);
-                            if (enteredHash === existingHash || password === "admin") {
+                            const { valid, upgradedHash } = await verifyPassword(password, existingHash);
+                            if (valid) {
+                                if (upgradedHash) {
+                                    state.firebasePasswordHash = upgradedHash;
+                                    localStorage.setItem("yacente_firebase_hash", upgradedHash);
+                                    db.collection("config").doc("security").set({ passwordHash: upgradedHash }, { merge: true }).catch(() => {});
+                                }
                                 sessionStorage.setItem("yacente_authenticated", "true");
                                 sessionStorage.setItem("yacente_role", "admin");
                                 localStorage.setItem("yacente_authenticated", "true");
@@ -9457,7 +9479,7 @@ function setupFirebaseListeners() {
                     } else {
                         // Es la primera vez que se configura esta base de datos
                         if (password.length > 0) {
-                            state.firebasePasswordHash = hashString(password);
+                            state.firebasePasswordHash = await hashPassword(password);
                             sessionStorage.setItem("yacente_authenticated", "true");
                             sessionStorage.setItem("yacente_role", "admin");
                             localStorage.setItem("yacente_authenticated", "true");
@@ -9548,18 +9570,39 @@ function setupFirebaseListeners() {
     }
 
     // Desbloquear pantalla (Lock Screen Form)
-    document.getElementById("form-lock-screen").addEventListener("submit", (e) => {
+    document.getElementById("form-lock-screen").addEventListener("submit", async (e) => {
         e.preventDefault();
-        
+
         if (activeTab === "admin") {
             // LOGIN DE ADMINISTRACIÓN
             const enteredPassword = passwordInput.value.trim();
-            const enteredHash = hashString(enteredPassword);
-            
+
+            const grantAdminAccess = (toastMsg, offline) => {
+                sessionStorage.setItem("yacente_authenticated", "true");
+                sessionStorage.setItem("yacente_role", "admin");
+                localStorage.setItem("yacente_authenticated", "true");
+                localStorage.setItem("yacente_role", "admin");
+                document.body.classList.remove("component-portal");
+
+                // Ocultar PWA Bottom Navigation
+                const mobNav = document.getElementById("component-mobile-nav");
+                if (mobNav) mobNav.classList.add("hidden");
+
+                hideLockScreen();
+                if (!offline) startCloudSync();
+                renderActiveSection("section-pasar-lista");
+                showToast(toastMsg, "success");
+            };
+            const denyAdminAccess = () => {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Contraseña incorrecta";
+                showToast("Contraseña de directiva incorrecta", "error");
+            };
+
             if (isCloudActive()) {
                 const db = firebase.firestore();
                 db.collection("config").doc("security").get()
-                    .then(doc => {
+                    .then(async doc => {
                         let validHash = state.firebasePasswordHash; // fallback local
                         if (doc.exists && doc.data()) {
                             if (doc.data().passwordHash) {
@@ -9574,71 +9617,52 @@ function setupFirebaseListeners() {
                                 if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
                             }
                         }
-                        
-                        if (enteredHash === validHash || (!validHash && enteredPassword === "admin")) {
-                            sessionStorage.setItem("yacente_authenticated", "true");
-                            sessionStorage.setItem("yacente_role", "admin");
-                            localStorage.setItem("yacente_authenticated", "true");
-                            localStorage.setItem("yacente_role", "admin");
-                            document.body.classList.remove("component-portal");
-                            
-                            // Ocultar PWA Bottom Navigation
-                            const mobNav = document.getElementById("component-mobile-nav");
-                            if (mobNav) mobNav.classList.add("hidden");
-                            
-                            hideLockScreen();
-                            startCloudSync();
-                            renderActiveSection("section-pasar-lista");
-                            showToast("Panel desbloqueado correctamente", "success");
+
+                        // "admin" solo funciona si esta base de datos nunca ha tenido contraseña configurada
+                        if (!validHash && enteredPassword === "admin") {
+                            grantAdminAccess("Panel desbloqueado correctamente", false);
+                            return;
+                        }
+                        const { valid, upgradedHash } = await verifyPassword(enteredPassword, validHash);
+                        if (valid) {
+                            if (upgradedHash) {
+                                state.firebasePasswordHash = upgradedHash;
+                                localStorage.setItem("yacente_firebase_hash", upgradedHash);
+                                db.collection("config").doc("security").set({ passwordHash: upgradedHash }, { merge: true }).catch(() => {});
+                            }
+                            grantAdminAccess("Panel desbloqueado correctamente", false);
                         } else {
-                            errorMsg.classList.remove("hidden");
-                            errorMsg.innerText = "Contraseña incorrecta";
-                            showToast("Contraseña de directiva incorrecta", "error");
+                            denyAdminAccess();
                         }
                     })
-                    .catch(err => {
+                    .catch(async err => {
                         console.error("Error de conexión al validar contraseña:", err);
-                        if (enteredHash === state.firebasePasswordHash || enteredPassword === "admin") {
-                            sessionStorage.setItem("yacente_authenticated", "true");
-                            sessionStorage.setItem("yacente_role", "admin");
-                            localStorage.setItem("yacente_authenticated", "true");
-                            localStorage.setItem("yacente_role", "admin");
-                            document.body.classList.remove("component-portal");
-                            
-                            // Ocultar PWA Bottom Navigation
-                            const mobNav = document.getElementById("component-mobile-nav");
-                            if (mobNav) mobNav.classList.add("hidden");
-                            
-                            hideLockScreen();
-                            startCloudSync();
-                            renderActiveSection("section-pasar-lista");
-                            showToast("Panel desbloqueado en modo offline", "success");
+                        const validHash = state.firebasePasswordHash;
+                        if (!validHash && enteredPassword === "admin") {
+                            grantAdminAccess("Panel desbloqueado en modo offline", true);
+                            return;
+                        }
+                        const { valid } = await verifyPassword(enteredPassword, validHash);
+                        if (valid) {
+                            grantAdminAccess("Panel desbloqueado en modo offline", true);
                         } else {
-                            errorMsg.classList.remove("hidden");
-                            errorMsg.innerText = "Contraseña incorrecta";
-                            showToast("Contraseña de directiva incorrecta", "error");
+                            denyAdminAccess();
                         }
                     });
             } else {
-                // Modo local sin config en la nube
-                if (enteredHash === state.firebasePasswordHash || enteredPassword === "admin") {
-                    sessionStorage.setItem("yacente_authenticated", "true");
-                    sessionStorage.setItem("yacente_role", "admin");
-                    localStorage.setItem("yacente_authenticated", "true");
-                    localStorage.setItem("yacente_role", "admin");
-                    document.body.classList.remove("component-portal");
-                    
-                    // Ocultar PWA Bottom Navigation
-                    const mobNav = document.getElementById("component-mobile-nav");
-                    if (mobNav) mobNav.classList.add("hidden");
-                    
-                    hideLockScreen();
-                    renderActiveSection("section-pasar-lista");
-                    showToast("Panel local desbloqueado", "success");
+                // Modo local sin config en la nube ("admin" solo si nunca se ha configurado contraseña local)
+                const validHash = state.firebasePasswordHash;
+                if (!validHash && enteredPassword === "admin") {
+                    grantAdminAccess("Panel local desbloqueado", true);
                 } else {
-                    errorMsg.classList.remove("hidden");
-                    errorMsg.innerText = "Contraseña incorrecta (Usa 'admin' en modo local)";
-                    showToast("Contraseña incorrecta", "error");
+                    const { valid } = await verifyPassword(enteredPassword, validHash);
+                    if (valid) {
+                        grantAdminAccess("Panel local desbloqueado", true);
+                    } else {
+                        errorMsg.classList.remove("hidden");
+                        errorMsg.innerText = validHash ? "Contraseña incorrecta" : "Contraseña incorrecta (usa 'admin' la primera vez para configurar una nueva)";
+                        showToast("Contraseña incorrecta", "error");
+                    }
                 }
             }
         } else {
