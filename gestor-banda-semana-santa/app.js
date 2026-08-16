@@ -430,12 +430,12 @@ function initApp() {
     if (!state.firebaseConfig && window.caches) {
         caches.open('fcm-config').then(cache => cache.match('/config.json'))
             .then(res => res ? res.json() : null)
-            .then(configObj => {
+            .then(async configObj => {
                 if (configObj && configObj.apiKey && configObj.projectId) {
                     state.firebaseConfig = configObj;
                     localStorage.setItem("yacente_firebase_config", JSON.stringify(configObj));
                     console.log("Configuración de Firebase auto-recuperada desde caché");
-                    initFirebase();
+                    await initFirebase();
                 }
             }).catch(e => console.error("Error al auto-recuperar config Firebase:", e));
     }
@@ -793,7 +793,19 @@ function saveDeletedNotificationId(musicianId, notifId) {
 
 
 // Inicializa Firebase
-function initFirebase() {
+// Garantiza una sesión anónima de Firebase Auth antes de tocar Firestore.
+// Necesario para que las reglas de seguridad puedan exigir request.auth != null
+// (sin esto, cualquiera con el apiKey podría acceder a Firestore sin pasar por la app).
+async function ensureFirebaseAuth() {
+    if (firebase.auth().currentUser) return;
+    try {
+        await firebase.auth().signInAnonymously();
+    } catch (err) {
+        console.error("Error al autenticar de forma anónima con Firebase:", err);
+    }
+}
+
+async function initFirebase() {
     if (!isCloudActive()) {
         updateFirebaseStatusUI(false);
         if (!getAuthToken()) {
@@ -809,7 +821,9 @@ function initFirebase() {
                 console.warn("Firebase persistence error:", err.code);
             });
         }
-        
+
+        await ensureFirebaseAuth();
+
         // Guardar configuración en la caché para el Service Worker (FCM)
         if (window.caches && state.firebaseConfig) {
             caches.open('fcm-config').then(cache => {
@@ -9408,7 +9422,7 @@ function setupFirebaseListeners() {
     document.getElementById("btn-cancel-firebase-modal").addEventListener("click", closeFirebaseModal);
     
     // Guardar credenciales de Firebase (Activar Nube)
-    document.getElementById("form-firebase-config").addEventListener("submit", (e) => {
+    document.getElementById("form-firebase-config").addEventListener("submit", async (e) => {
         e.preventDefault();
         const configJson = document.getElementById("firebase-config-json").value.trim();
         const password = document.getElementById("firebase-admin-password").value.trim();
@@ -9437,8 +9451,8 @@ function setupFirebaseListeners() {
             showToast("Configuración guardada. Conectando a la nube...", "success");
             
             // Inicializar Firebase
-            initFirebase();
-            
+            await initFirebase();
+
             const db = firebase.firestore();
             
             // Verificar primero si ya existe un documento de seguridad en Firestore
