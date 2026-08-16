@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v514";
+const CACHE_NAME = "yacente-v515";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -68,8 +68,6 @@ self.addEventListener("activate", (event) => {
             );
         })
     );
-    // Tomar control de todas las páginas abiertas
-    self.clients.claim();
 });
 
 // Fetch: estrategia Network First con fallback a caché
