@@ -1064,6 +1064,14 @@ function startCloudSync() {
                     }
 
                     dispatchSessionNotification(sessionKey, sessionData, false, change.type === "modified");
+                } else if (change.type === "removed") {
+                    // change.doc.data() en un "removed" devuelve el último estado conocido antes de
+                    // borrarse, así que sirve tal cual para saber a quién avisar y qué decía el ensayo.
+                    const sessionData = change.doc.data();
+                    const sessionKey = change.doc.id;
+                    if (sessionData && sessionData.type === "ensayo") {
+                        dispatchSessionNotification(sessionKey, sessionData, false, false, true);
+                    }
                 }
             });
         }
@@ -18207,13 +18215,15 @@ function formatNotificationTimestamp(dateInput) {
     }
 }
 
-function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, isUpdate = false) {
+function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, isUpdate = false, isDeleted = false) {
     if (!sessionData) return;
 
     const rawDate = sessionKey.split("_")[0];
     const formattedDate = formatDateShortSpanish(rawDate);
     let title;
-    if (isUpdate) {
+    if (isDeleted) {
+        title = sessionData.type === "actuacion" ? "Actuación Eliminada" : "Ensayo Eliminado";
+    } else if (isUpdate) {
         title = sessionData.type === "actuacion" ? "Actuación Actualizada" : "Ensayo Actualizado";
     } else {
         title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
@@ -18228,10 +18238,12 @@ function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, 
         body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
     }
 
-    const notifId = `session_${sessionKey}_${sessionData.type}`;
-    // En una actualización se usa la fecha actual (no la de creación original) para que la
-    // notificación resurja como reciente en vez de quedar enterrada u ordenada por su antigüedad.
-    const creationDate = isUpdate ? new Date().toISOString() : (sessionData.createdAt || sessionData.date || new Date().toISOString());
+    // El borrado usa un id distinto al de creación/actualización para que aparezca como un aviso
+    // nuevo aparte, en vez de sobrescribir (y hacer desaparecer) el aviso original de "Ensayo Creado".
+    const notifId = isDeleted ? `session_${sessionKey}_${sessionData.type}_deleted` : `session_${sessionKey}_${sessionData.type}`;
+    // En una actualización o un borrado se usa la fecha actual (no la de creación original) para que
+    // la notificación resurja como reciente en vez de quedar enterrada u ordenada por su antigüedad.
+    const creationDate = (isUpdate || isDeleted) ? new Date().toISOString() : (sessionData.createdAt || sessionData.date || new Date().toISOString());
 
     const musicians = state.musicians || [];
     musicians.forEach(m => {
@@ -18250,9 +18262,9 @@ function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, 
                 title: title,
                 body: body,
                 date: creationDate,
-                // Una actualización real (lugar/hora) debe volver a aparecer como no leída, aunque
-                // el músico ya hubiera visto el aviso original de creación.
-                seen: isUpdate ? false : (existingIdx !== -1 ? (notifs[existingIdx].seen || false) : false),
+                // Una actualización real (lugar/hora) o un borrado deben volver a aparecer como no
+                // leídos, aunque el músico ya hubiera visto el aviso original de creación.
+                seen: (isUpdate || isDeleted) ? false : (existingIdx !== -1 ? (notifs[existingIdx].seen || false) : false),
                 type: sessionData.type
             };
 

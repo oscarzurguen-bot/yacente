@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=515">
+    <link rel="stylesheet" href="style.css?v=516">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -2709,7 +2709,9 @@
                             <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                             <select id="rehearsal-start-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
                                 <option value="00" selected>00</option>
+                                <option value="15">15</option>
                                 <option value="30">30</option>
+                                <option value="45">45</option>
                             </select>
                         </div>
                     </div>
@@ -2739,7 +2741,9 @@
                             <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                             <select id="rehearsal-end-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
                                 <option value="00" selected>00</option>
+                                <option value="15">15</option>
                                 <option value="30">30</option>
+                                <option value="45">45</option>
                             </select>
                         </div>
                     </div>
@@ -3167,7 +3171,9 @@
                                 <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                                 <select id="quick-session-start-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
                                     <option value="00" selected>00</option>
+                                    <option value="15">15</option>
                                     <option value="30">30</option>
+                                    <option value="45">45</option>
                                 </select>
                             </div>
                         </div>
@@ -3197,7 +3203,9 @@
                                 <span style="font-weight: bold; color: var(--text-secondary);">:</span>
                                 <select id="quick-session-end-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
                                     <option value="00" selected>00</option>
+                                    <option value="15">15</option>
                                     <option value="30">30</option>
+                                    <option value="45">45</option>
                                 </select>
                             </div>
                         </div>
@@ -4250,13 +4258,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=515"></script>
+    <script src="app.js?v=516"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=515
+        // Purga de caché antigua y registro del Service Worker v=516
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v515") {
+                    if (key !== "yacente-v516") {
                         caches.delete(key);
                     }
                 });
@@ -4275,9 +4283,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=515")
+                navigator.serviceWorker.register("sw.js?v=516")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v515 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v516 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
