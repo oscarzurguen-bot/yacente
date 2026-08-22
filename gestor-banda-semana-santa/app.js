@@ -474,8 +474,14 @@ function initApp() {
     state.currentDate = today;
     document.getElementById("attendance-date").value = today;
 
-    // Inicializar asistencia
-    initializeAttendanceForDate(today);
+    // Inicializar asistencia solo para dirección: este stub local rellena "Pasar Lista" con la
+    // plantilla al vuelo para que la dirección pueda pasar lista de hoy sin crear antes un
+    // ensayo formal. Para músicos no sirve para nada, y si su dispositivo pierde la conexión a
+    // la nube, este stub vacío de "hoy" queda huérfano en su caché local y termina apareciendo
+    // como un "Ensayo" fantasma en su pantalla de Eventos. Ver también renderComponentEventos().
+    if (getAuthRole() !== "component") {
+        initializeAttendanceForDate(today);
+    }
 
     // Renderizar interfaz inicial
     const isAuthenticated = getAuthToken();
@@ -15237,17 +15243,19 @@ function renderComponentEventos() {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    // Obtener todas las fechas únicas de sessionTypes y attendance
-    const allUniqueDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes),
-        ...Object.keys(state.attendance)
-    ]));
+    // Solo sessionTypes es la fuente fiable de eventos reales: un ensayo/actuación siempre
+    // crea su entrada en sessionTypes al mismo tiempo que en attendance (ver creación de
+    // ensayos), pero attendance puede tener una entrada vacía "huérfana" para hoy generada
+    // localmente por initializeAttendanceForDate() en dispositivos sin sincronización con la
+    // nube activa. Si se incluyera attendance aquí, esa entrada huérfana se mostraría como un
+    // "Ensayo General" fantasma que no existe para nadie más.
+    const allUniqueDates = Object.keys(state.sessionTypes);
 
     // Obtener todas las fechas de hoy y futuras en las que el músico está convocado
     const allFutureDates = allUniqueDates.filter(date => {
         if (date < todayStr) return false;
-        
-        const session = state.sessionTypes[date] || { type: "ensayo", subtype: "general", name: "Ensayo" };
+
+        const session = state.sessionTypes[date];
         const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
         if (isSpecialRehearsal && !session.convocatedVoices.includes(musician.instrument)) {
             return false;

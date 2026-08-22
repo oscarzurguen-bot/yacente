@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v516";
+const CACHE_NAME = "yacente-v518";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -43,11 +43,24 @@ const ASSETS_TO_CACHE = [
 ];
 
 // Instalar: cachear recursos estáticos
+// Nota: cache.addAll() es todo-o-nada -- si UN solo recurso falla (p.ej. un fallo puntual de
+// red al pedir uno de los scripts de Firebase en un CDN externo), toda la instalación del SW
+// se rechaza y el navegador descarta la nueva versión sin avisar. En un móvil con conexión
+// inestable esto deja el service worker atascado en la versión antigua indefinidamente (o, si
+// coincide con una purga de caché antigua ya en marcha, sin ninguna versión utilizable), lo que
+// se percibe como que la app se queda colgada en el logo y no carga. Cacheamos cada recurso por
+// separado para que el fallo de uno no tumbe la instalación entera.
 self.addEventListener("install", (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             console.log("[SW] Cacheando recursos estáticos...");
-            return cache.addAll(ASSETS_TO_CACHE);
+            return Promise.all(
+                ASSETS_TO_CACHE.map((url) =>
+                    cache.add(url).catch((err) => {
+                        console.warn("[SW] No se pudo cachear (se omite):", url, err);
+                    })
+                )
+            );
         })
     );
     // Activar inmediatamente sin esperar a que se cierren las pestañas
