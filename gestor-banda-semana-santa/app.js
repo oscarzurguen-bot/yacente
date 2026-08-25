@@ -4398,7 +4398,14 @@ function renderAttendance() {
 
                 const inputReason = cardDiv.querySelector(".input-reason");
                 inputReason.addEventListener("input", (e) => {
-                    updateMusicianReason(musician.id, e.target.value);
+                    // Solo actualiza el estado local mientras se escribe, sin guardar en Firestore
+                    // en cada tecla: guardar en cada pulsación reactivaba el listener en tiempo
+                    // real de "attendance", que vuelve a pintar toda la lista (container.innerHTML
+                    // = "") y así destruye y recrea este mismo input, haciéndole perder el foco a
+                    // cada letra. El guardado real ocurre al salir del campo (blur) o pulsar Enter.
+                    const date = state.currentDate;
+                    ensureAttendanceRecord(date, musician.id);
+                    state.attendance[date][musician.id].reason = e.target.value;
                 });
 
                 inputReason.addEventListener("blur", (e) => {
