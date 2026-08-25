@@ -112,12 +112,18 @@ let state = {
     currentDate: "",
     marchas: [],
     playedMarchas: {},
+    actuacionRepertoire: {},
+    marchaSeasonRemovals: {},
+    notificationsClearedAt: null,
     marchasViewMode: "list",
     calendarGoals: {},
     weeklyGoals: {},
     formacionConcierto: [],
     formacionDesfile: [],
     directorConcierto: null,
+    repertoireLinks: { youtube: "", spotify: "" },
+    suggestions: [],
+    rehearsalLocations: [],
     currentPreavisoDate: "",
     compCalendarYear: undefined,
     compCalendarMonth: undefined,
@@ -127,10 +133,153 @@ let state = {
         const y = today.getFullYear();
         const m = today.getMonth() + 1;
         return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
-    })()
+    })(),
+    statsHeatmapSelectedSeason: null
 };
 
 let preavisoSelectedStatus = null;
+
+// ==========================================================================
+// HELPERS DE TEMPORADA (Septiembre de un año -> Agosto del siguiente)
+// ==========================================================================
+function getSeasonLabelForDate(dateStr) {
+    const parts = (dateStr || "").split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(y) || isNaN(m)) return null;
+    return m >= 9 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+}
+
+function getCurrentSeasonLabel() {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+    return getSeasonLabelForDate(todayStr);
+}
+
+function getSeasonBounds(seasonLabel) {
+    const parts = (seasonLabel || "").split("-");
+    const year1 = parseInt(parts[0], 10);
+    const year2 = parseInt(parts[1], 10);
+    return { year1, year2 };
+}
+
+function isDateInSeason(dateStr, seasonLabel) {
+    if (!seasonLabel || seasonLabel === "all") return true;
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    if (isNaN(year1) || isNaN(year2)) return true;
+    const parts = (dateStr || "").split("-");
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    return (y === year1 && m >= 9) || (y === year2 && m < 9);
+}
+
+function getSeasonMonthsArray(seasonLabel) {
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    return [
+        { label: "Sep", monthNum: 9, year: String(year1) },
+        { label: "Oct", monthNum: 10, year: String(year1) },
+        { label: "Nov", monthNum: 11, year: String(year1) },
+        { label: "Dic", monthNum: 12, year: String(year1) },
+        { label: "Ene", monthNum: 1, year: String(year2) },
+        { label: "Feb", monthNum: 2, year: String(year2) },
+        { label: "Mar", monthNum: 3, year: String(year2) },
+        { label: "Abr", monthNum: 4, year: String(year2) },
+        { label: "May", monthNum: 5, year: String(year2) },
+        { label: "Jun", monthNum: 6, year: String(year2) },
+        { label: "Jul", monthNum: 7, year: String(year2) },
+        { label: "Ago", monthNum: 8, year: String(year2) }
+    ];
+}
+
+// Devuelve las etiquetas de temporada ("YYYY-YYYY") presentes en un conjunto de fechas, más recientes primero.
+// Incluye siempre la temporada actual para que el selector nunca aparezca vacío.
+function getAvailableSeasons(dateKeys) {
+    const seasons = new Set();
+    (dateKeys || []).forEach(dateKey => {
+        const rawDate = (dateKey || "").split("_")[0];
+        const label = getSeasonLabelForDate(rawDate);
+        if (label) seasons.add(label);
+    });
+    seasons.add(getCurrentSeasonLabel());
+    return Array.from(seasons).sort().reverse();
+}
+
+// Rellena un <select> con las temporadas disponibles. Si allowAll es true añade una opción "Todas las temporadas".
+function populateSeasonSelect(selectEl, dateKeys, allowAll, selectedValue) {
+    if (!selectEl) return;
+    const seasons = getAvailableSeasons(dateKeys);
+    let optionsHtml = allowAll ? `<option value="all">Todas</option>` : "";
+    optionsHtml += seasons.map(s => `<option value="${s}">${s}</option>`).join("");
+    if (selectEl.innerHTML !== optionsHtml) {
+        selectEl.innerHTML = optionsHtml;
+    }
+    const validValues = allowAll ? ["all", ...seasons] : seasons;
+    if (selectedValue && validValues.includes(selectedValue)) {
+        selectEl.value = selectedValue;
+    } else {
+        selectEl.value = allowAll ? "all" : (seasons.includes(getCurrentSeasonLabel()) ? getCurrentSeasonLabel() : seasons[0]);
+    }
+}
+
+// Temporadas para la página de Repertorio: incluye todas las temporadas con ensayos/actuaciones
+// programados (pasados o futuros), la temporada actual, y siempre una temporada más allá de la
+// última que tenga algo programado (para poder preparar el repertorio de la próxima temporada).
+function getRepertoireSeasonOptions() {
+    const seasons = new Set();
+    Object.keys(state.sessionTypes || {}).forEach(dateKey => {
+        const rawDate = (dateKey || "").split("_")[0];
+        const label = getSeasonLabelForDate(rawDate);
+        if (label) seasons.add(label);
+    });
+    seasons.add(getCurrentSeasonLabel());
+
+    const sorted = Array.from(seasons).sort();
+    const lastSeason = sorted[sorted.length - 1];
+    const { year1 } = getSeasonBounds(lastSeason);
+    seasons.add(`${year1 + 1}-${year1 + 2}`);
+
+    return Array.from(seasons).sort().reverse();
+}
+
+// Rellena el selector de temporada de la página de Repertorio. Nunca incluye "Todas": siempre
+// debe haber una temporada concreta seleccionada.
+function populateRepertoireSeasonSelect(selectEl, selectedValue) {
+    if (!selectEl) return;
+    const seasons = getRepertoireSeasonOptions();
+    const optionsHtml = seasons.map(s => `<option value="${s}">${s}</option>`).join("");
+    if (selectEl.innerHTML !== optionsHtml) {
+        selectEl.innerHTML = optionsHtml;
+    }
+    if (selectedValue && seasons.includes(selectedValue)) {
+        selectEl.value = selectedValue;
+    } else {
+        selectEl.value = seasons.includes(getCurrentSeasonLabel()) ? getCurrentSeasonLabel() : seasons[0];
+    }
+}
+
+// Una marcha pertenece a una temporada si no fue creada en exclusiva para otra temporada distinta,
+// y no ha sido retirada específicamente de esta temporada.
+function isMarchaInSeason(marcha, season) {
+    if (!marcha) return false;
+    if (marcha.addedInSeason && marcha.addedInSeason !== season) return false;
+    const removed = (state.marchaSeasonRemovals && state.marchaSeasonRemovals[season]) || [];
+    return !removed.includes(marcha.id);
+}
+
+function getMarchasForSeason(season) {
+    return (state.marchas || []).filter(m => isMarchaInSeason(m, season));
+}
+
+// Retira una marcha del repertorio de una temporada concreta sin afectar a las demás temporadas
+// ni borrar la marcha ni su historial de ensayos/actuaciones.
+function removeMarchaFromSeason(marchaId, season) {
+    if (!state.marchaSeasonRemovals) state.marchaSeasonRemovals = {};
+    if (!state.marchaSeasonRemovals[season]) state.marchaSeasonRemovals[season] = [];
+    if (!state.marchaSeasonRemovals[season].includes(marchaId)) {
+        state.marchaSeasonRemovals[season].push(marchaId);
+    }
+    dbSaveMarchaSeasonRemovals(state.marchaSeasonRemovals);
+}
 
 const PROGRESS_CIRCUMFERENCE = 2 * Math.PI * 21; // ~131.95
 
@@ -142,6 +291,16 @@ function getAuthRole() {
 }
 function getAuthMusicianId() {
     return sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
+}
+
+// Un músico solo puede acceder a su versión de la app si la dirección le ha rellenado el
+// "Nombre Completo" en Plantilla. Se usa tanto al iniciar sesión como al restaurar una sesión
+// guardada en el dispositivo.
+function isAuthenticatedMusicianAllowed() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return false;
+    const musician = (state.musicians || []).find(m => String(m.id) === String(musicianId));
+    return !!(musician && musician.fullName && musician.fullName.trim());
 }
 
 // ==========================================================================
@@ -223,6 +382,36 @@ function initApp() {
     const storedWeeklyGoals = localStorage.getItem("harmonia_weekly_goals");
     state.weeklyGoals = storedWeeklyGoals ? JSON.parse(storedWeeklyGoals) : {};
 
+    const storedActuacionRepertoire = localStorage.getItem("harmonia_actuacion_repertoire");
+    state.actuacionRepertoire = storedActuacionRepertoire ? JSON.parse(storedActuacionRepertoire) : {};
+
+    const storedSuggestions = localStorage.getItem("harmonia_suggestions");
+    state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
+
+    const storedRepertoireLinks = localStorage.getItem("harmonia_repertoire_links");
+    state.repertoireLinks = storedRepertoireLinks ? JSON.parse(storedRepertoireLinks) : { youtube: "", spotify: "" };
+
+    const storedMarchaSeasonRemovals = localStorage.getItem("harmonia_marcha_season_removals");
+    state.marchaSeasonRemovals = storedMarchaSeasonRemovals ? JSON.parse(storedMarchaSeasonRemovals) : {};
+
+    state.notificationsClearedAt = localStorage.getItem("harmonia_notifications_cleared_at") || null;
+
+    const storedRehearsalLocations = localStorage.getItem("harmonia_rehearsal_locations");
+    if (storedRehearsalLocations) {
+        try {
+            state.rehearsalLocations = JSON.parse(storedRehearsalLocations);
+        } catch(e) {
+            state.rehearsalLocations = null;
+        }
+    }
+    if (!state.rehearsalLocations || !Array.isArray(state.rehearsalLocations) || state.rehearsalLocations.length === 0) {
+        state.rehearsalLocations = [
+            { id: "loc_parking", name: "Parking", address: "Parking de la Sede" },
+            { id: "loc_arrabal", name: "Arrabal", address: "Arrabal" },
+            { id: "loc_sanblas", name: "San Blas", address: "San Blas" }
+        ];
+    }
+
     // Cargar formaciones del simulador
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
     const storedDesfile = localStorage.getItem("yacente_formacion_desfile");
@@ -236,6 +425,20 @@ function initApp() {
     state.firebaseConfig = storedFbConfig ? JSON.parse(storedFbConfig) : null;
     state.firebasePasswordHash = storedFbHash || "";
     state.pastLockEnabled = localStorage.getItem("yacente_past_lock_enabled") === "true";
+
+    // Intento de auto-recuperación de la configuración de la nube desde la caché si localStorage fue limpiado por el navegador
+    if (!state.firebaseConfig && window.caches) {
+        caches.open('fcm-config').then(cache => cache.match('/config.json'))
+            .then(res => res ? res.json() : null)
+            .then(async configObj => {
+                if (configObj && configObj.apiKey && configObj.projectId) {
+                    state.firebaseConfig = configObj;
+                    localStorage.setItem("yacente_firebase_config", JSON.stringify(configObj));
+                    console.log("Configuración de Firebase auto-recuperada desde caché");
+                    await initFirebase();
+                }
+            }).catch(e => console.error("Error al auto-recuperar config Firebase:", e));
+    }
 
     if (storedMusicians && storedAttendance) {
         state.musicians = JSON.parse(storedMusicians);
@@ -271,13 +474,36 @@ function initApp() {
     state.currentDate = today;
     document.getElementById("attendance-date").value = today;
 
-    // Inicializar asistencia
-    initializeAttendanceForDate(today);
+    // Inicializar asistencia solo para dirección: este stub local rellena "Pasar Lista" con la
+    // plantilla al vuelo para que la dirección pueda pasar lista de hoy sin crear antes un
+    // ensayo formal. Para músicos no sirve para nada, y si su dispositivo pierde la conexión a
+    // la nube, este stub vacío de "hoy" queda huérfano en su caché local y termina apareciendo
+    // como un "Ensayo" fantasma en su pantalla de Eventos. Ver también renderComponentEventos().
+    if (getAuthRole() !== "component") {
+        initializeAttendanceForDate(today);
+    }
 
     // Renderizar interfaz inicial
     const isAuthenticated = getAuthToken();
     const activeRole = getAuthRole();
-    if (isAuthenticated) {
+    if (isAuthenticated && activeRole === "component" && !isCloudActive() && !isAuthenticatedMusicianAllowed()) {
+        // Solo expulsamos inmediatamente en modo local estricto si falta el nombre completo.
+        // Si hay nube activa, se mantiene la sesión abierta y startCloudSync() validará al descargar los datos reales de Firestore.
+        sessionStorage.removeItem("yacente_authenticated");
+        sessionStorage.removeItem("yacente_role");
+        sessionStorage.removeItem("yacente_musician_id");
+        localStorage.removeItem("yacente_authenticated");
+        localStorage.removeItem("yacente_role");
+        localStorage.removeItem("yacente_musician_id");
+        setTimeout(() => {
+            showLockScreen();
+            const errorMsg = document.getElementById("lock-error-msg");
+            if (errorMsg) {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Facilita los datos solicitados a la dirección para poder acceder a tu cuenta";
+            }
+        }, 0);
+    } else if (isAuthenticated) {
         hideLockScreen();
         if (activeRole === "component") {
             document.body.classList.add("component-portal");
@@ -291,15 +517,23 @@ function initApp() {
     } else {
         showLockScreen();
     }
-    populateLoginMusicians();
-    renderAttendance();
-    renderPlantillaTable();
-    renderEnsayosList();
-    renderActuacionesList();
-    renderStatistics();
-    renderMarchasList();
-    renderRehearsalMarchasWidget();
-    
+    // Si cualquiera de estos renders falla (p.ej. un dato inesperado en una sesión), no debe
+    // impedir que se conecte la nube más abajo: eso dejaría la app entera inutilizable.
+    try {
+        populateLoginMusicians();
+        renderAttendance();
+        renderPlantillaTable();
+        renderEnsayosList();
+        renderActuacionesList();
+        renderStatistics();
+        renderMarchasList();
+        renderRehearsalMarchasWidget();
+        updateSuggestionsBadge();
+        renderRepertoireLinksUI();
+    } catch (err) {
+        console.error("Error al renderizar la interfaz inicial:", err);
+    }
+
     // Conectar a Firebase si está configurado
     initFirebase();
 }
@@ -395,48 +629,8 @@ function updateSessionBadge() {
 function updateAttendanceSessionSelector() {
     const select = document.getElementById("attendance-session-select");
     if (!select) return;
-    
-    // Obtener la fecha base sin sufijos
-    const rawDate = state.currentDate.split("_")[0];
-    
-    // Encontrar todas las sesiones creadas para esta fecha
-    const sessionKeys = Object.keys(state.sessionTypes).filter(key => key.startsWith(rawDate));
-    
-    if (sessionKeys.length <= 1) {
-        select.classList.add("hidden");
-        return;
-    }
-    
-    select.innerHTML = "";
-    sessionKeys.forEach(key => {
-        const sessionInfo = state.sessionTypes[key];
-        const option = document.createElement("option");
-        option.value = key;
-        
-        let label = "General";
-        if (sessionInfo) {
-            if (sessionInfo.type === "actuacion") {
-                label = `⭐ Act: ${sessionInfo.name || 'Sin nombre'}`;
-            } else if (sessionInfo.type === "ensayo") {
-                const sub = sessionInfo.subtype;
-                if (sub === "trompetas1") label = "👥 Trompetas 1ª";
-                else if (sub === "bajos") label = "👥 Bajos";
-                else if (sub === "trompetas2y3") label = "👥 Trompetas 2ª y 3ª";
-                else if (sub === "cornetas") label = "👥 Cornetas";
-                else if (sub === "percusion") label = "👥 Percusión";
-                else if (sub === "voces") label = `👥 Voces (${sessionInfo.convocatedVoices.length})`;
-                else if (sub === "primeras") label = "👥 Primeras";
-            }
-        }
-        
-        option.innerText = label;
-        if (key === state.currentDate) {
-            option.selected = true;
-        }
-        select.appendChild(option);
-    });
-    
-    select.classList.remove("hidden");
+    select.classList.add("hidden");
+    select.style.display = "none";
 }
 
 function isSectionRehearsal(sessionInfo) {
@@ -451,9 +645,19 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
     localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas || []));
     localStorage.setItem("harmonia_played_marchas", JSON.stringify(state.playedMarchas || {}));
+    localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire || {}));
+    localStorage.setItem("harmonia_marcha_season_removals", JSON.stringify(state.marchaSeasonRemovals || {}));
+    if (state.notificationsClearedAt) {
+        localStorage.setItem("harmonia_notifications_cleared_at", state.notificationsClearedAt);
+    } else {
+        localStorage.removeItem("harmonia_notifications_cleared_at");
+    }
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
-    
+    localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
+    localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks || { youtube: "", spotify: "" }));
+    localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
+
     if (state.firebaseConfig) {
         localStorage.setItem("yacente_firebase_config", JSON.stringify(state.firebaseConfig));
         localStorage.setItem("yacente_firebase_hash", state.firebasePasswordHash);
@@ -463,7 +667,7 @@ function saveStateToLocalStorage() {
     }
 }
 
-// Hashing simple para la contraseña de directiva
+// Hash débil antiguo (solo se mantiene para poder migrar contraseñas ya guardadas con este esquema)
 function hashString(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -472,6 +676,24 @@ function hashString(str) {
         hash = hash & hash;
     }
     return hash.toString(36);
+}
+
+// Hash criptográfico real (SHA-256) para la contraseña de directiva
+async function hashPassword(str) {
+    const data = new TextEncoder().encode(str);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Verifica una contraseña frente al hash guardado. Soporta hashes antiguos (hashString):
+// si coincide con el esquema antiguo, se acepta y se devuelve el nuevo hash SHA-256
+// para que el llamador lo guarde, migrando la cuenta de forma transparente.
+async function verifyPassword(enteredPassword, storedHash) {
+    if (!storedHash) return { valid: false, upgradedHash: null };
+    const newHash = await hashPassword(enteredPassword);
+    if (newHash === storedHash) return { valid: true, upgradedHash: null };
+    if (hashString(enteredPassword) === storedHash) return { valid: true, upgradedHash: newHash };
+    return { valid: false, upgradedHash: null };
 }
 
 // Comprobación de estado de la nube
@@ -491,17 +713,60 @@ function isPastLockBlocked(dateStr) {
     return targetDate < todayStr;
 }
 
+function isSessionConcluded(dateKey, sessionInfo = null) {
+    if (!dateKey) return false;
+    const rawDate = dateKey.split("_")[0];
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+    if (rawDate < todayStr) return true; // Fechas anteriores a hoy ya han concluido
+    if (rawDate > todayStr) return false; // Fechas futuras no han concluido
+
+    // Es el día de hoy: comprobar si la hora de fin ha transcurrido
+    const session = sessionInfo || (state && state.sessionTypes ? state.sessionTypes[dateKey] : null);
+    if (!session || !session.time) return false; // Sin hora -> contabiliza desde el día siguiente
+
+    const timeStr = String(session.time).trim();
+    if (!timeStr.includes("-")) return false; // Sin hora fin especificada -> contabiliza desde el día siguiente
+
+    const parts = timeStr.split("-");
+    const endTimePart = parts[1] ? parts[1].trim() : "";
+    if (!endTimePart) return false;
+
+    const timeParts = endTimePart.split(":");
+    if (timeParts.length < 2) return false;
+
+    let endH = parseInt(timeParts[0], 10);
+    const endM = parseInt(timeParts[1], 10) || 0;
+
+    if (isNaN(endH)) return false;
+    if (endH === 0 || endH === 24) {
+        endH = 24; // 24:00 al final de la jornada
+    }
+
+    const currentTotalMin = dNow.getHours() * 60 + dNow.getMinutes();
+    const endTotalMin = endH * 60 + endM;
+
+    return currentTotalMin >= endTotalMin;
+}
+
 let unsubMusicians = null;
 let unsubAttendance = null;
 let unsubSessionTypes = null;
 let unsubMarchas = null;
 let unsubPlayedMarchas = null;
+let unsubActuacionRepertoire = null;
 let unsubWeeklyGoals = null;
 let unsubMusicianMarchaStatuses = null;
 let unsubFormacionConcierto = null;
 let unsubFormacionDesfile = null;
 let unsubAnnouncements = null;
 let unsubDeletedNotifs = null;
+let unsubSuggestions = null;
+let unsubRepertoireLinks = null;
+let unsubRehearsalLocations = null;
+let unsubMarchaSeasonRemovals = null;
+let unsubNotificationsClearedAt = null;
 
 function getDeletedNotificationIds(musicianId) {
     if (!musicianId) return [];
@@ -534,7 +799,19 @@ function saveDeletedNotificationId(musicianId, notifId) {
 
 
 // Inicializa Firebase
-function initFirebase() {
+// Garantiza una sesión anónima de Firebase Auth antes de tocar Firestore.
+// Necesario para que las reglas de seguridad puedan exigir request.auth != null
+// (sin esto, cualquiera con el apiKey podría acceder a Firestore sin pasar por la app).
+async function ensureFirebaseAuth() {
+    if (firebase.auth().currentUser) return;
+    try {
+        await firebase.auth().signInAnonymously();
+    } catch (err) {
+        console.error("Error al autenticar de forma anónima con Firebase:", err);
+    }
+}
+
+async function initFirebase() {
     if (!isCloudActive()) {
         updateFirebaseStatusUI(false);
         if (!getAuthToken()) {
@@ -550,7 +827,9 @@ function initFirebase() {
                 console.warn("Firebase persistence error:", err.code);
             });
         }
-        
+
+        await ensureFirebaseAuth();
+
         // Guardar configuración en la caché para el Service Worker (FCM)
         if (window.caches && state.firebaseConfig) {
             caches.open('fcm-config').then(cache => {
@@ -680,8 +959,29 @@ function startCloudSync() {
         if (snapshot.size > 0) {
             state.musicians = musicians;
             localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+            invalidateMusicianStatsCache();
             renderPlantillaTable();
             populateLoginMusicians();
+
+            // Validar acceso del músico autenticado tras sincronizar la plantilla desde Firestore
+            const activeRole = getAuthRole();
+            if (activeRole === "component" && !isAuthenticatedMusicianAllowed()) {
+                sessionStorage.removeItem("yacente_authenticated");
+                sessionStorage.removeItem("yacente_role");
+                sessionStorage.removeItem("yacente_musician_id");
+                localStorage.removeItem("yacente_authenticated");
+                localStorage.removeItem("yacente_role");
+                localStorage.removeItem("yacente_musician_id");
+                showLockScreen();
+                const errorMsg = document.getElementById("lock-error-msg");
+                if (errorMsg) {
+                    errorMsg.classList.remove("hidden");
+                    errorMsg.innerText = "Facilita los datos solicitados a la dirección para poder acceder a tu cuenta";
+                }
+                showToast("Acceso restringido: consulta con la dirección de la banda", "warning");
+                return;
+            }
+
             if (document.getElementById("section-pasar-lista").classList.contains("active")) {
                 renderAttendance();
             }
@@ -706,6 +1006,7 @@ function startCloudSync() {
             state.attendance[doc.id] = doc.data();
         });
         localStorage.setItem("harmonia_attendance", JSON.stringify(state.attendance));
+        invalidateMusicianStatsCache();
         if (document.getElementById("section-pasar-lista").classList.contains("active")) {
             renderAttendance();
         }
@@ -729,62 +1030,61 @@ function startCloudSync() {
     });
 
     // Escucha de metadatos de sesión
-    let isInitialSessionTypesLoad = true;
+    // NOTA: isInitialSessionTypesLoad se basa en un flag PERSISTIDO (no en una variable en memoria),
+    // porque este listener se vuelve a crear cada vez que se recarga la app o se reconecta la nube
+    // (p.ej. al cerrar y reabrir la app en el móvil). Si dependiera solo de una variable local, cada
+    // reconexión trataría su primer snapshot como "carga inicial" y suprimiría en silencio la
+    // notificación de cualquier sesión creada justo en ese momento, aunque fuera realmente nueva.
+    // El flag se guarda por músico (no global) para que un dispositivo compartido entre varios
+    // músicos no trate el historial completo de sesiones como "nuevo" al cambiar de usuario.
+    const sessionSyncFlagKey = "yacente_session_sync_done_" + (getAuthMusicianId() || "admin");
+    let isInitialSessionTypesLoad = localStorage.getItem(sessionSyncFlagKey) !== "true";
     unsubSessionTypes = db.collection("sessionTypes").onSnapshot(snapshot => {
         const changes = snapshot.docChanges();
-        
+        const previousSessionTypes = state.sessionTypes; // para comparar campos antes de sobrescribir
+
         state.sessionTypes = {}; // Limpiar caché local para evitar datos huérfanos/demo
         snapshot.forEach(doc => {
             state.sessionTypes[doc.id] = doc.data();
         });
         localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
-        
+        invalidateMusicianStatsCache();
+
         // Dispatch notifications if this is not the initial load and role is component
-        if (!isInitialSessionTypesLoad && getAuthRole() === "component") {
-            const musicianId = getAuthMusicianId();
-            if (musicianId) {
-                changes.forEach(change => {
-                    if (change.type === "added") {
-                        const sessionData = change.doc.data();
-                        const sessionDate = change.doc.id;
-                        
-                        if (isMusicianConvocated(musicianId, sessionData)) {
-                            const title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
-                            const formattedDate = formatDateShortSpanish(sessionDate);
-                            let body = "";
-                            if (sessionData.type === "ensayo") {
-                                const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
-                                const locationVal = sessionData.location || "Parking";
-                                const timeStr = sessionData.time ? ` ${sessionData.time}` : "";
-                                body = `${subtypeText}${timeStr} - ${formattedDate} (${locationVal})`;
-                            } else {
-                                body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
-                            }
-                            
-                            // Save to local storage notifications list
-                            const notifId = `${sessionDate}-${sessionData.type}`;
-                            const deletedIds = getDeletedNotificationIds(musicianId);
-                            if (!deletedIds.includes(notifId)) {
-                                const notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-                                if (!notifs.some(n => n.id === notifId)) {
-                                    notifs.unshift({
-                                        id: notifId,
-                                        title: title,
-                                        body: body,
-                                        date: new Date().toISOString(),
-                                        seen: false
-                                    });
-                                    localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
-                                    updateNotificationsBadge();
-                                    sendBrowserNotification(title, body);
-                                }
-                            }
-                        }
+        if (!isInitialSessionTypesLoad) {
+            changes.forEach(change => {
+                if (change.type === "added" || change.type === "modified") {
+                    const sessionData = change.doc.data();
+                    const sessionKey = change.doc.id;
+
+                    if (change.type === "modified" && sessionData.type === "ensayo") {
+                        // En la edición de un ensayo solo se avisa a los músicos si cambia el lugar,
+                        // la hora o el día (este último ya se detecta como "added" al cambiar de
+                        // clave). El responsable es información solo para la directiva y no debe
+                        // generar aviso.
+                        const oldData = previousSessionTypes ? previousSessionTypes[sessionKey] : null;
+                        if (!oldData) return;
+                        const locationChanged = (oldData.location || "") !== (sessionData.location || "");
+                        const timeChanged = (oldData.time || "") !== (sessionData.time || "");
+                        if (!locationChanged && !timeChanged) return;
                     }
-                });
-            }
+
+                    dispatchSessionNotification(sessionKey, sessionData, false, change.type === "modified");
+                } else if (change.type === "removed") {
+                    // change.doc.data() en un "removed" devuelve el último estado conocido antes de
+                    // borrarse, así que sirve tal cual para saber a quién avisar y qué decía el ensayo.
+                    const sessionData = change.doc.data();
+                    const sessionKey = change.doc.id;
+                    if (sessionData && sessionData.type === "ensayo") {
+                        dispatchSessionNotification(sessionKey, sessionData, false, false, true);
+                    }
+                }
+            });
         }
-        
+
+        if (isInitialSessionTypesLoad) {
+            localStorage.setItem(sessionSyncFlagKey, "true");
+        }
         isInitialSessionTypesLoad = false;
         
         if (document.getElementById("section-ensayos").classList.contains("active")) {
@@ -817,6 +1117,7 @@ function startCloudSync() {
         });
         state.marchas = marchas;
         localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas));
+        invalidateMusicianStatsCache();
         if (document.getElementById("section-marchas").classList.contains("active")) {
             renderMarchasList();
         }
@@ -843,6 +1144,23 @@ function startCloudSync() {
         console.error("Error sync marchas ensayadas:", err);
     });
 
+    // Escucha de repertorios ordenados de actuaciones
+    unsubActuacionRepertoire = db.collection("actuacionRepertoire").onSnapshot(snapshot => {
+        state.actuacionRepertoire = {};
+        snapshot.forEach(doc => {
+            state.actuacionRepertoire[doc.id] = doc.data().marchas || [];
+        });
+        localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire));
+        if (document.getElementById("modal-actuacion-detail").classList.contains("active") && state.activeDetailDate) {
+            renderActuacionDetailRepertoire(state.activeDetailDate);
+        }
+        if (document.getElementById("modal-actuacion-repertoire").classList.contains("active")) {
+            renderActuacionRepertoireModal();
+        }
+    }, err => {
+        console.error("Error sync repertorio de actuación:", err);
+    });
+
     // Escucha de objetivos semanales por año
     unsubWeeklyGoals = db.collection("weeklyGoals").onSnapshot(snapshot => {
         state.weeklyGoals = {}; // Limpiar caché local
@@ -864,6 +1182,7 @@ function startCloudSync() {
             state.musicianMarchaStatuses[doc.id] = doc.data().status;
         });
         localStorage.setItem("harmonia_musician_marcha_statuses", JSON.stringify(state.musicianMarchaStatuses));
+        invalidateMusicianStatsCache();
         if (document.getElementById("section-componente-repertorio").classList.contains("active")) {
             renderComponentRepertorio();
         }
@@ -940,12 +1259,64 @@ function startCloudSync() {
         console.error("Error sync formación desfile:", err);
     });
 
+    // Escucha de enlaces de playlists del repertorio completo
+    unsubRepertoireLinks = db.collection("config").doc("repertoire_links").onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            state.repertoireLinks = { youtube: data.youtube || "", spotify: data.spotify || "" };
+            localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks));
+            renderRepertoireLinksUI();
+        }
+    }, err => {
+        console.error("Error sync enlaces de repertorio:", err);
+    });
+
+    // Escucha de retiradas de marchas del repertorio por temporada
+    unsubMarchaSeasonRemovals = db.collection("config").doc("marcha_season_removals").onSnapshot(doc => {
+        state.marchaSeasonRemovals = doc.exists ? (doc.data() || {}) : {};
+        localStorage.setItem("harmonia_marcha_season_removals", JSON.stringify(state.marchaSeasonRemovals));
+        if (document.getElementById("section-marchas").classList.contains("active")) {
+            renderMarchasList();
+        }
+    }, err => {
+        console.error("Error sync retiradas de repertorio por temporada:", err);
+    });
+
+    // Escucha de la fecha de "vaciado" de notificaciones (botón de Ajustes): cualquier
+    // notificación con fecha anterior o igual a esta marca se considera obsoleta y se filtra,
+    // en cualquier dispositivo, sin necesidad de tocar el caché local de cada músico uno a uno.
+    unsubNotificationsClearedAt = db.collection("config").doc("notifications_reset").onSnapshot(doc => {
+        state.notificationsClearedAt = doc.exists && doc.data() ? (doc.data().clearedAt || null) : null;
+        if (state.notificationsClearedAt) {
+            localStorage.setItem("harmonia_notifications_cleared_at", state.notificationsClearedAt);
+        } else {
+            localStorage.removeItem("harmonia_notifications_cleared_at");
+        }
+        updateNotificationsBadge();
+        if (document.body.classList.contains("component-portal")) {
+            renderComponentNotificationsList();
+        }
+    }, err => {
+        console.error("Error sync vaciado de notificaciones:", err);
+    });
+
     // Escucha de comunicados de la directiva
     unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
+        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
         snapshot.docChanges().forEach(change => {
+            const data = change.doc.data();
+            const docId = change.doc.id;
+
+            // Purga automática: eliminar comunicados caducados (+7 días) de Firestore
+            const notifTime = data.date ? new Date(data.date).getTime() : 0;
+            if (notifTime && !isNaN(notifTime) && (now - notifTime > ONE_WEEK_MS)) {
+                db.collection("announcements").doc(docId).delete().catch(err => console.error("Error al purgar comunicado caducado en Firestore:", err));
+                return;
+            }
+
             if (change.type === "added") {
-                const data = change.doc.data();
-                const docId = change.doc.id;
                 const musicianId = getAuthMusicianId();
                 if (!musicianId) return;
 
@@ -958,7 +1329,9 @@ function startCloudSync() {
 
                 if (data.targetSection === "all" || (instrument && data.targetSection === instrument)) {
                     const key = "yacente_notifications_" + musicianId;
-                    const notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    let notifs = JSON.parse(localStorage.getItem(key) || "[]");
+                    notifs = purgeExpiredNotifications(notifs);
+
                     const exists = notifs.some(n => n.id === targetId);
                     if (!exists) {
                         const newItem = {
@@ -1009,6 +1382,41 @@ function startCloudSync() {
             }
         }, err => console.error("Error sync deleted notifs:", err));
     }
+
+    // Escucha del buzón de sugerencias (directiva)
+    unsubSuggestions = db.collection("suggestions").orderBy("date", "desc").limit(200).onSnapshot(snapshot => {
+        const list = [];
+        snapshot.forEach(doc => {
+            list.push({ ...doc.data(), docId: doc.id });
+        });
+        state.suggestions = list;
+        updateSuggestionsBadge();
+
+        const suggestionsSection = document.getElementById("section-otros-sugerencias");
+        if (suggestionsSection && suggestionsSection.classList.contains("active")) {
+            renderAdminSuggestionsList();
+        }
+
+        const mySuggestionsSection = document.getElementById("section-componente-sugerencias");
+        if (mySuggestionsSection && mySuggestionsSection.classList.contains("active")) {
+            renderComponentSugerenciasPage();
+            renderMySuggestionHistory();
+        }
+    }, err => {
+        console.error("Error sync sugerencias:", err);
+    });
+
+    // Escucha de lugares de ensayo (sincronización en tiempo real para directores y músicos)
+    unsubRehearsalLocations = db.collection("settings").doc("rehearsalLocations").onSnapshot(doc => {
+        if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
+            state.rehearsalLocations = doc.data().list;
+            saveStateToLocalStorage();
+            renderRehearsalLocationOptions();
+            renderAdminLugaresEnsayoList();
+        }
+    }, err => {
+        console.error("Error sync lugares de ensayo:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -1018,12 +1426,18 @@ function stopCloudSync() {
     if (unsubSessionTypes) { unsubSessionTypes(); unsubSessionTypes = null; }
     if (unsubMarchas) { unsubMarchas(); unsubMarchas = null; }
     if (unsubPlayedMarchas) { unsubPlayedMarchas(); unsubPlayedMarchas = null; }
+    if (unsubActuacionRepertoire) { unsubActuacionRepertoire(); unsubActuacionRepertoire = null; }
     if (unsubWeeklyGoals) { unsubWeeklyGoals(); unsubWeeklyGoals = null; }
     if (unsubMusicianMarchaStatuses) { unsubMusicianMarchaStatuses(); unsubMusicianMarchaStatuses = null; }
     if (unsubFormacionConcierto) { unsubFormacionConcierto(); unsubFormacionConcierto = null; }
     if (unsubFormacionDesfile) { unsubFormacionDesfile(); unsubFormacionDesfile = null; }
     if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
     if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
+    if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
+    if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
+    if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
+    if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
+    if (unsubNotificationsClearedAt) { unsubNotificationsClearedAt(); unsubNotificationsClearedAt = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1065,7 +1479,13 @@ function syncLocalToCloud() {
         const ref = db.collection("playedMarchas").doc(date);
         batch.set(ref, { marchas: state.playedMarchas[date] });
     });
-    
+
+    // Subir repertorios ordenados de actuaciones
+    Object.keys(state.actuacionRepertoire || {}).forEach(date => {
+        const ref = db.collection("actuacionRepertoire").doc(date);
+        batch.set(ref, { marchas: state.actuacionRepertoire[date] });
+    });
+
     // Subir configuraciones del simulador
     const refConcierto = db.collection("config").doc("formacion_concierto");
     batch.set(refConcierto, {
@@ -1077,7 +1497,11 @@ function syncLocalToCloud() {
     batch.set(refDesfile, {
         mapStr: JSON.stringify(state.formacionDesfile)
     });
-    
+
+    // Subir retiradas de repertorio por temporada
+    const refMarchaSeasonRemovals = db.collection("config").doc("marcha_season_removals");
+    batch.set(refMarchaSeasonRemovals, state.marchaSeasonRemovals || {});
+
     batch.commit()
         .then(() => {
             showToast("Datos locales subidos a la nube con éxito", "success");
@@ -1111,12 +1535,14 @@ function disconnectFirebase() {
     const storedSessionTypes = localStorage.getItem("harmonia_session_types");
     const storedMarchas = localStorage.getItem("harmonia_marchas");
     const storedPlayedMarchas = localStorage.getItem("harmonia_played_marchas");
-    
+    const storedActuacionRepertoire = localStorage.getItem("harmonia_actuacion_repertoire");
+
     state.musicians = storedMusicians ? JSON.parse(storedMusicians) : [];
     state.attendance = storedAttendance ? JSON.parse(storedAttendance) : {};
     state.sessionTypes = storedSessionTypes ? JSON.parse(storedSessionTypes) : {};
     state.marchas = storedMarchas ? JSON.parse(storedMarchas) : [];
     state.playedMarchas = storedPlayedMarchas ? JSON.parse(storedPlayedMarchas) : {};
+    state.actuacionRepertoire = storedActuacionRepertoire ? JSON.parse(storedActuacionRepertoire) : {};
     
     // Recargar formaciones de simulador locales
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
@@ -1191,34 +1617,329 @@ function dbSaveSessionType(date, sessionTypeObj) {
 
 function dbDeleteSession(date) {
     if (isPastLockBlocked(date)) return;
+
+    // Al borrar una sesión (o al renombrar su clave al cambiar fecha/tipo) hay que arrastrar
+    // también sus marchas ensayadas/repertorio: si no, quedan huérfanas y siguen contando en
+    // estadísticas / apareciendo en el historial de una marcha aunque el ensayo ya no exista.
+    delete state.playedMarchas[date];
+    delete state.actuacionRepertoire[date];
+
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("attendance").doc(date).delete()
             .catch(err => console.error("Error al borrar asistencia de sesión en nube:", err));
         db.collection("sessionTypes").doc(date).delete()
             .catch(err => console.error("Error al borrar tipo de sesión en nube:", err));
+        db.collection("playedMarchas").doc(date).delete()
+            .catch(err => console.error("Error al borrar marchas ensayadas en nube:", err));
+        db.collection("actuacionRepertoire").doc(date).delete()
+            .catch(err => console.error("Error al borrar repertorio de actuación en nube:", err));
     } else {
         saveStateToLocalStorage();
+    }
+}
+
+// Purga entradas de playedMarchas/actuacionRepertoire cuya sesión ya no existe en sessionTypes.
+// Antes de que dbDeleteSession limpiara también estos dos campos, borrar un ensayo/actuación
+// dejaba su registro de marchas huérfano (contando en estadísticas y en el historial de una
+// marcha aunque el evento ya no existiera). Esto sanea datos ya huérfanos de esa época.
+function cleanupOrphanedMarchasRecords() {
+    // Si hay nube configurada pero firebase.initializeApp() todavía no se ha ejecutado (p.ej.
+    // durante el arranque, initApp() renderiza antes de llamar a initFirebase()), no tocamos
+    // nada esta pasada: borrar solo en local se revertiría en cuanto llegue el primer snapshot
+    // de Firestore con los huérfanos todavía presentes. Se reintentará en el próximo render.
+    if (isCloudActive() && !(typeof firebase !== "undefined" && firebase.apps && firebase.apps.length > 0)) {
+        return false;
+    }
+
+    let changed = false;
+
+    Object.keys(state.playedMarchas || {}).forEach(date => {
+        if (!state.sessionTypes[date]) {
+            delete state.playedMarchas[date];
+            changed = true;
+            if (isCloudActive()) {
+                firebase.firestore().collection("playedMarchas").doc(date).delete()
+                    .catch(err => console.error("Error al purgar marchas ensayadas huérfanas en nube:", err));
+            }
+        }
+    });
+
+    Object.keys(state.actuacionRepertoire || {}).forEach(date => {
+        if (!state.sessionTypes[date]) {
+            delete state.actuacionRepertoire[date];
+            changed = true;
+            if (isCloudActive()) {
+                firebase.firestore().collection("actuacionRepertoire").doc(date).delete()
+                    .catch(err => console.error("Error al purgar repertorio de actuación huérfano en nube:", err));
+            }
+        }
+    });
+
+    if (changed && !isCloudActive()) {
+        saveStateToLocalStorage();
+    }
+    return changed;
+}
+
+function dbDeleteSuggestionByAdmin(suggestion) {
+    if (suggestion.deletedByMusician) {
+        return dbHardDeleteSuggestion(suggestion);
+    }
+    if (isCloudActive() && suggestion.docId) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").doc(suggestion.docId).update({ deletedByAdmin: true })
+            .then(() => {
+                suggestion.deletedByAdmin = true;
+            })
+            .catch(err => {
+                console.error("Error al marcar sugerencia como eliminada por admin en nube:", err);
+                throw err;
+            });
+    } else {
+        suggestion.deletedByAdmin = true;
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function dbDeleteSuggestionByMusician(suggestion) {
+    if (suggestion.deletedByDirector || suggestion.deletedByAdmin) {
+        return dbHardDeleteSuggestion(suggestion);
+    }
+    if (isCloudActive() && suggestion.docId) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").doc(suggestion.docId).update({ deletedByMusician: true })
+            .then(() => {
+                suggestion.deletedByMusician = true;
+            })
+            .catch(err => {
+                console.error("Error al marcar sugerencia como eliminada por músico en nube:", err);
+                throw err;
+            });
+    } else {
+        suggestion.deletedByMusician = true;
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function dbHardDeleteSuggestion(suggestion) {
+    if (isCloudActive() && suggestion.docId) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").doc(suggestion.docId).delete()
+            .then(() => {
+                state.suggestions = (state.suggestions || []).filter(s => s.id !== suggestion.id && s.docId !== suggestion.docId);
+            })
+            .catch(err => {
+                console.error("Error al eliminar sugerencia en nube:", err);
+                throw err;
+            });
+    } else {
+        state.suggestions = (state.suggestions || []).filter(s => s.id !== suggestion.id);
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function dbDeleteSuggestion(suggestion, role = "admin") {
+    if (role === "musician") {
+        return dbDeleteSuggestionByMusician(suggestion);
+    }
+    return dbDeleteSuggestionByAdmin(suggestion);
+}
+
+function dbMarkAllSuggestionsRead() {
+    const unread = (state.suggestions || []).filter(s => !s.read && !s.deletedByAdmin);
+    if (unread.length === 0) return Promise.resolve();
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        const batch = db.batch();
+        unread.forEach(s => {
+            if (s.docId) batch.update(db.collection("suggestions").doc(s.docId), { read: true });
+        });
+        return batch.commit().catch(err => console.error("Error al marcar sugerencias como leídas:", err));
+    } else {
+        unread.forEach(s => { s.read = true; });
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function updateSuggestionsBadge() {
+    const unreadCount = (state.suggestions || []).filter(s => !s.read && !s.deletedByAdmin).length;
+    document.querySelectorAll(".suggestions-unread-badge").forEach(badge => {
+        if (unreadCount > 0) {
+            badge.innerText = unreadCount > 99 ? "99+" : String(unreadCount);
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
+    });
+}
+
+function dbSaveSuggestion(suggestion) {
+    if (suggestion && suggestion.authorId && suggestion.date) {
+        localStorage.setItem("yacente_last_suggestion_date_" + suggestion.authorId, suggestion.date);
+    }
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        return db.collection("suggestions").add(suggestion)
+            .catch(err => {
+                console.error("Error al guardar sugerencia en nube:", err);
+                throw err;
+            });
+    } else {
+        state.suggestions = state.suggestions || [];
+        state.suggestions.unshift(suggestion);
+        saveStateToLocalStorage();
+        return Promise.resolve();
+    }
+}
+
+function dbSaveRepertoireLinks(links) {
+    state.repertoireLinks = links;
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("config").doc("repertoire_links").set(links)
+            .catch(err => console.error("Error al guardar enlaces de repertorio en nube:", err));
+    }
+    renderRepertoireLinksUI();
+}
+
+function dbSaveMarchaSeasonRemovals(removals) {
+    state.marchaSeasonRemovals = removals;
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("config").doc("marcha_season_removals").set(removals)
+            .catch(err => console.error("Error al guardar retiradas de repertorio por temporada en nube:", err));
+    }
+}
+
+function dbSaveNotificationsClearedAt(clearedAt) {
+    state.notificationsClearedAt = clearedAt;
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("config").doc("notifications_reset").set({ clearedAt })
+            .catch(err => console.error("Error al guardar vaciado de notificaciones en nube:", err));
+    }
+}
+
+// Vacía el buzón de notificaciones de TODOS los músicos: borra los comunicados guardados en la
+// nube (para que ningún dispositivo nuevo los vuelva a recibir) y marca una fecha de corte que
+// oculta cualquier notificación anterior (comunicados ya cacheados localmente y avisos de
+// ensayos/actuaciones de prueba), sin afectar a asistencia, repertorio ni al resto de datos.
+function clearAllMusicianNotifications() {
+    const clearedAt = new Date().toISOString();
+    dbSaveNotificationsClearedAt(clearedAt);
+    updateNotificationsBadge();
+    if (document.body.classList.contains("component-portal")) {
+        renderComponentNotificationsList();
+    }
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("announcements").get()
+            .then(snapshot => {
+                if (snapshot.empty) return;
+                const batch = db.batch();
+                snapshot.forEach(doc => batch.delete(doc.ref));
+                return batch.commit();
+            })
+            .then(() => showToast("Notificaciones vaciadas para todos los músicos", "success"))
+            .catch(err => {
+                console.error("Error al vaciar comunicados en nube:", err);
+                showToast("Se vació la marca de corte, pero hubo un error borrando comunicados en la nube", "warning");
+            });
+    } else {
+        showToast("Notificaciones vaciadas (modo local)", "success");
+    }
+}
+
+function renderRepertoireLinksUI() {
+    const links = state.repertoireLinks || { youtube: "", spotify: "" };
+    const youtubeUrl = (links.youtube || "").trim();
+    const spotifyUrl = (links.spotify || "").trim();
+
+    // Vista de director (section-marchas)
+    const adminYoutubeLink = document.getElementById("admin-repertoire-youtube-link");
+    const adminYoutubeLabel = document.getElementById("admin-repertoire-youtube-label");
+    const adminSpotifyLink = document.getElementById("admin-repertoire-spotify-link");
+    const adminSpotifyLabel = document.getElementById("admin-repertoire-spotify-label");
+
+    if (adminYoutubeLink && adminYoutubeLabel) {
+        if (youtubeUrl) {
+            adminYoutubeLink.href = youtubeUrl;
+            adminYoutubeLabel.innerText = "Playlist YouTube (repertorio completo)";
+            adminYoutubeLink.style.opacity = "1";
+        } else {
+            adminYoutubeLink.href = "#";
+            adminYoutubeLabel.innerText = "Sin playlist de YouTube configurada";
+            adminYoutubeLink.style.opacity = "0.6";
+        }
+    }
+    if (adminSpotifyLink && adminSpotifyLabel) {
+        if (spotifyUrl) {
+            adminSpotifyLink.href = spotifyUrl;
+            adminSpotifyLabel.innerText = "Playlist Spotify (repertorio completo)";
+            adminSpotifyLink.style.opacity = "1";
+        } else {
+            adminSpotifyLink.href = "#";
+            adminSpotifyLabel.innerText = "Sin playlist de Spotify configurada";
+            adminSpotifyLink.style.opacity = "0.6";
+        }
+    }
+
+    // Vista de músico (section-componente-repertorio)
+    const compContainer = document.getElementById("repertoire-playlists-comp-container");
+    const compYoutubeLink = document.getElementById("comp-repertoire-youtube-link");
+    const compSpotifyLink = document.getElementById("comp-repertoire-spotify-link");
+
+    if (compContainer && compYoutubeLink && compSpotifyLink) {
+        if (youtubeUrl || spotifyUrl) {
+            compContainer.classList.remove("hidden");
+        } else {
+            compContainer.classList.add("hidden");
+        }
+
+        if (youtubeUrl) {
+            compYoutubeLink.href = youtubeUrl;
+            compYoutubeLink.classList.remove("hidden");
+        } else {
+            compYoutubeLink.classList.add("hidden");
+        }
+        if (spotifyUrl) {
+            compSpotifyLink.href = spotifyUrl;
+            compSpotifyLink.classList.remove("hidden");
+        } else {
+            compSpotifyLink.classList.add("hidden");
+        }
     }
 }
 
 function dbSaveMarcha(marcha) {
+    saveStateToLocalStorage();
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("marchas").doc(marcha.id).set(marcha)
             .catch(err => console.error("Error al guardar marcha en nube:", err));
-    } else {
-        saveStateToLocalStorage();
     }
 }
 
 function dbDeleteMarcha(id) {
+    if (state.pastLockEnabled) {
+        showToast("Bloqueo de pasado activado, no se pueden eliminar marchas del repertorio.", "warning");
+        return;
+    }
+    saveStateToLocalStorage();
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("marchas").doc(id).delete()
             .catch(err => console.error("Error al borrar marcha en nube:", err));
-    } else {
-        saveStateToLocalStorage();
     }
 }
 
@@ -1232,30 +1953,75 @@ function dbSavePlayedMarchas(date, marchasArray) {
     }
 }
 
+function dbSaveActuacionRepertoire(date, marchaIdsArray) {
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("actuacionRepertoire").doc(date).set({ marchas: marchaIdsArray })
+            .catch(err => console.error("Error al guardar repertorio de actuación en nube:", err));
+    } else {
+        saveStateToLocalStorage();
+    }
+}
 
+
+
+// Helper to format start and end time hour/min dropdowns into a string "19:30 - 21:00" or single time
+function getFormattedTimeFromInputs(startHourId, startMinId, endHourId, endMinId) {
+    const startH = document.getElementById(startHourId) ? document.getElementById(startHourId).value : "";
+    const startM = document.getElementById(startMinId) ? document.getElementById(startMinId).value : "00";
+    const endH = document.getElementById(endHourId) ? document.getElementById(endHourId).value : "";
+    const endM = document.getElementById(endMinId) ? document.getElementById(endMinId).value : "00";
+
+    const startTime = startH ? `${startH}:${startM}` : "";
+    const endTime = endH ? `${endH}:${endM}` : "";
+
+    if (startTime && endTime) return `${startTime} - ${endTime}`;
+    if (startTime) return startTime;
+    if (endTime) return endTime;
+    return "";
+}
+
+function setTimeInputsFromValue(startHourId, startMinId, endHourId, endMinId, timeVal) {
+    const startH = document.getElementById(startHourId);
+    const startM = document.getElementById(startMinId);
+    const endH = document.getElementById(endHourId);
+    const endM = document.getElementById(endMinId);
+    if (!startH || !startM || !endH || !endM) return;
+
+    const str = timeVal || "";
+    const parseSingle = (s) => {
+        if (!s) return { h: "", m: "00" };
+        const parts = s.trim().split(":");
+        if (parts.length < 2) return { h: "", m: "00" };
+        let h = parts[0].padStart(2, "0");
+        if (h === "00") h = "24";
+        else if (parseInt(h, 10) < 8) h = "08";
+        const mNum = parseInt(parts[1], 10) || 0;
+        const m = (mNum >= 15 && mNum < 45) ? "30" : "00";
+        return { h, m };
+    };
+
+    if (str.includes("-")) {
+        const parts = str.split("-");
+        const s = parseSingle(parts[0]);
+        const e = parseSingle(parts[1]);
+        startH.value = s.h;
+        startM.value = s.m;
+        endH.value = e.h;
+        endM.value = e.m;
+    } else {
+        const s = parseSingle(str);
+        startH.value = s.h;
+        startM.value = s.m;
+        endH.value = "";
+        endM.value = "00";
+    }
+}
 
 // ==========================================================================
 // CONTROLADORES DE EVENTOS
 // ==========================================================================
 function setupEventListeners() {
-    // Botón de restablecimiento local en la pantalla de bloqueo
-    const btnLockResetLocal = document.getElementById("btn-lock-reset-local");
-    if (btnLockResetLocal) {
-        btnLockResetLocal.addEventListener("click", () => {
-            if (confirm("¿Deseas desactivar la conexión a la nube y volver al modo local? No perderás tus datos guardados en este dispositivo.")) {
-                localStorage.removeItem("yacente_firebase_config");
-                localStorage.removeItem("yacente_firebase_hash");
-                sessionStorage.removeItem("yacente_authenticated");
-                sessionStorage.removeItem("yacente_role");
-                sessionStorage.removeItem("yacente_musician_id");
-                localStorage.removeItem("yacente_authenticated");
-                localStorage.removeItem("yacente_role");
-                localStorage.removeItem("yacente_musician_id");
-                window.location.reload();
-            }
-        });
-    }
-
     // Botones de Cerrar Sesión de Administración
     const btnLogoutSidebarAdmin = document.getElementById("btn-logout-sidebar-admin");
     if (btnLogoutSidebarAdmin) {
@@ -1294,47 +2060,6 @@ function setupEventListeners() {
     });
     // Navegación táctil por deslizamiento (Swipe Gestures) para el portal de músicos
     setupComponentSwipeNavigation();
-
-    // Formulario de cambio de PIN en Ficha
-    const formChangePin = document.getElementById("form-change-pin");
-    if (formChangePin) {
-        formChangePin.addEventListener("submit", (e) => {
-            e.preventDefault();
-            const musicianId = getAuthMusicianId();
-            const newPin = document.getElementById("change-pin-new").value.trim();
-            
-            if (newPin.length !== 4 || isNaN(newPin)) {
-                showToast("El PIN debe tener exactamente 4 dígitos numéricos", "warning");
-                return;
-            }
-            
-            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
-            if (!musician) return;
-            
-            musician.pin = newPin;
-            saveStateToLocalStorage();
-            
-            if (isCloudActive()) {
-                const db = firebase.firestore();
-                db.collection("musicians").doc(musicianId).update({ pin: newPin })
-                    .then(() => {
-                        showToast("PIN actualizado con éxito en la nube", "success");
-                        document.getElementById("change-pin-new").value = "";
-                        renderComponentFicha();
-                    })
-                    .catch(err => {
-                        console.error("Error al actualizar PIN:", err);
-                        showToast("PIN actualizado localmente (offline)", "success");
-                        document.getElementById("change-pin-new").value = "";
-                        renderComponentFicha();
-                    });
-            } else {
-                showToast("PIN actualizado localmente", "success");
-                document.getElementById("change-pin-new").value = "";
-                renderComponentFicha();
-            }
-        });
-    }
 
     // Filtros del historial de asistencia
     const filterHistoryType = document.getElementById("filter-history-type");
@@ -1390,6 +2115,39 @@ function setupEventListeners() {
         });
     }
 
+    // Navegación de Acceso Rápido a los paneles de Estadísticas
+    document.addEventListener("click", (e) => {
+        const quickBtn = e.target.closest(".btn-stats-quick-link");
+        if (quickBtn) {
+            const targetId = quickBtn.getAttribute("data-target");
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                if (targetEl.classList.contains("collapsed")) {
+                    targetEl.classList.remove("collapsed");
+                }
+                targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+    });
+
+    // Botón flotante 'Volver arriba' para la vista de estadísticas
+    const backToTopBtn = document.getElementById("btn-back-to-top");
+    if (backToTopBtn) {
+        window.addEventListener("scroll", () => {
+            const statsSection = document.getElementById("section-estadisticas");
+            const isStatsActive = statsSection && statsSection.classList.contains("active");
+            if (isStatsActive && window.scrollY > 250) {
+                backToTopBtn.classList.remove("hidden");
+            } else {
+                backToTopBtn.classList.add("hidden");
+            }
+        });
+
+        backToTopBtn.addEventListener("click", () => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+    }
+
     // Helper functions para menú desplegable lateral móvil (Drawer)
     window.openMobileSidebar = function() {
         const sidebar = document.querySelector(".sidebar");
@@ -1415,7 +2173,6 @@ function setupEventListeners() {
     };
 
     const btnToggleMobileSidebar = document.getElementById("btn-toggle-mobile-sidebar");
-    const btnOpenMoreMenu = document.getElementById("btn-open-more-menu");
     const sidebarBackdrop = document.getElementById("sidebar-backdrop");
 
     if (btnToggleMobileSidebar) {
@@ -1423,14 +2180,6 @@ function setupEventListeners() {
             e.preventDefault();
             e.stopPropagation();
             window.toggleMobileSidebar();
-        });
-    }
-
-    if (btnOpenMoreMenu) {
-        btnOpenMoreMenu.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            window.openMobileSidebar();
         });
     }
 
@@ -1474,17 +2223,20 @@ function setupEventListeners() {
         }
     });
 
-    // Control de múltiples sesiones en el mismo día
-    document.getElementById("attendance-session-select").addEventListener("change", (e) => {
-        const selectedSessionKey = e.target.value;
-        if (selectedSessionKey) {
-            state.currentDate = selectedSessionKey;
-            initializeAttendanceForDate(selectedSessionKey);
-            renderAttendance();
-            renderRehearsalMarchasWidget();
-            updateSessionBadge();
-        }
-    });
+    // Control de múltiples sesiones en el mismo día (si existiera elemento)
+    const attendanceSessionSelect = document.getElementById("attendance-session-select");
+    if (attendanceSessionSelect) {
+        attendanceSessionSelect.addEventListener("change", (e) => {
+            const selectedSessionKey = e.target.value;
+            if (selectedSessionKey) {
+                state.currentDate = selectedSessionKey;
+                initializeAttendanceForDate(selectedSessionKey);
+                renderAttendance();
+                renderRehearsalMarchasWidget();
+                updateSessionBadge();
+            }
+        });
+    }
 
     // Cambio de Tema Claro/Oscuro
     document.getElementById("theme-switch").addEventListener("change", (e) => {
@@ -1507,31 +2259,55 @@ function setupEventListeners() {
     });
 
     // Buscador en Plantilla
-    document.getElementById("search-plantilla").addEventListener("input", () => {
-        renderPlantillaTable();
-    });
+    const searchPlantillaInput = document.getElementById("search-plantilla");
+    if (searchPlantillaInput) {
+        searchPlantillaInput.addEventListener("input", () => {
+            renderPlantillaTable();
+        });
+    }
 
     // Buscador en Estadísticas (Músicos individuales)
-    document.getElementById("search-stats-musician").addEventListener("input", () => {
-        renderComponentsCircularStats();
-    });
+    const searchStatsMusicianInput = document.getElementById("search-stats-musician");
+    if (searchStatsMusicianInput) {
+        searchStatsMusicianInput.addEventListener("input", () => {
+            renderComponentsCircularStats();
+        });
+    }
 
     // Filtros de Período en Estadísticas
-    document.getElementById("filter-year").addEventListener("change", () => {
-        renderStatistics();
-    });
-    document.getElementById("filter-month").addEventListener("change", () => {
-        renderStatistics();
-    });
-    document.getElementById("filter-type").addEventListener("change", () => {
-        renderStatistics();
-    });
+    const filterYearSelect = document.getElementById("filter-year");
+    if (filterYearSelect) {
+        filterYearSelect.addEventListener("change", () => {
+            renderStatistics();
+        });
+    }
+    const filterMonthSelect = document.getElementById("filter-month");
+    if (filterMonthSelect) {
+        filterMonthSelect.addEventListener("change", () => {
+            renderStatistics();
+        });
+    }
+    const filterTypeSelect = document.getElementById("filter-type");
+    if (filterTypeSelect) {
+        filterTypeSelect.addEventListener("change", () => {
+            renderStatistics();
+        });
+    }
 
     const btnToggleEnsayadas = document.getElementById("btn-toggle-all-marchas-ensayadas");
     if (btnToggleEnsayadas) {
         btnToggleEnsayadas.addEventListener("click", (e) => {
             e.stopPropagation();
             showAllMarchasEnsayadas = !showAllMarchasEnsayadas;
+            renderStatistics();
+        });
+    }
+
+    const btnToggleActuacion = document.getElementById("btn-toggle-all-marchas-actuacion");
+    if (btnToggleActuacion) {
+        btnToggleActuacion.addEventListener("click", (e) => {
+            e.stopPropagation();
+            showAllMarchasActuacion = !showAllMarchasActuacion;
             renderStatistics();
         });
     }
@@ -1545,49 +2321,52 @@ function setupEventListeners() {
         });
     }
 
-    // Alternancia en Visión General (Estadísticas)
+    // Alternancia en Visión General (Estadísticas): Temporada / Meses / Ensayos
     const btnOvYears = document.getElementById("btn-stats-ov-years");
     const btnOvMonths = document.getElementById("btn-stats-ov-months");
+    const btnOvSessions = document.getElementById("btn-stats-ov-sessions");
     const ovYearSelect = document.getElementById("stats-ov-year-select");
 
-    if (btnOvYears && btnOvMonths) {
-        btnOvYears.addEventListener("click", () => {
-            state.statsOvMode = "years";
-            btnOvYears.classList.remove("btn-secondary");
-            btnOvYears.classList.add("btn-primary");
-            btnOvYears.style.background = "";
-            btnOvYears.style.color = "";
-            
-            btnOvMonths.classList.remove("btn-primary");
-            btnOvMonths.classList.add("btn-secondary");
-            btnOvMonths.style.background = "transparent";
-            btnOvMonths.style.color = "var(--text-secondary)";
-            
-            document.getElementById("stats-ov-month-filter-container").classList.add("hidden");
-            renderGeneralOverviewChart();
+    const ovModeButtons = [
+        { btn: btnOvYears, mode: "years" },
+        { btn: btnOvMonths, mode: "months" },
+        { btn: btnOvSessions, mode: "sessions" }
+    ];
+
+    const setActiveOvMode = (mode) => {
+        state.statsOvMode = mode;
+        ovModeButtons.forEach(({ btn, mode: btnMode }) => {
+            if (!btn) return;
+            const isActive = btnMode === mode;
+            btn.classList.toggle("btn-primary", isActive);
+            btn.classList.toggle("btn-secondary", !isActive);
+            btn.style.background = isActive ? "" : "transparent";
+            btn.style.color = isActive ? "" : "var(--text-secondary)";
         });
-        
-        btnOvMonths.addEventListener("click", () => {
-            state.statsOvMode = "months";
-            btnOvMonths.classList.remove("btn-secondary");
-            btnOvMonths.classList.add("btn-primary");
-            btnOvMonths.style.background = "";
-            btnOvMonths.style.color = "";
-            
-            btnOvYears.classList.remove("btn-primary");
-            btnOvYears.classList.add("btn-secondary");
-            btnOvYears.style.background = "transparent";
-            btnOvYears.style.color = "var(--text-secondary)";
-            
-            document.getElementById("stats-ov-month-filter-container").classList.remove("hidden");
-            renderGeneralOverviewChart();
-        });
-    }
+
+        const filterContainer = document.getElementById("stats-ov-month-filter-container");
+        if (filterContainer) filterContainer.classList.toggle("hidden", mode === "years");
+
+        renderGeneralOverviewChart();
+    };
+
+    ovModeButtons.forEach(({ btn, mode }) => {
+        if (btn) btn.addEventListener("click", () => setActiveOvMode(mode));
+    });
 
     if (ovYearSelect) {
         ovYearSelect.addEventListener("change", (e) => {
             state.statsOvSelectedSeason = e.target.value;
             renderGeneralOverviewChart();
+        });
+    }
+
+    // Selector de temporada del calendar heatmap (Estadísticas Avanzadas)
+    const heatmapYearSelect = document.getElementById("advanced-stats-heatmap-year-select");
+    if (heatmapYearSelect) {
+        heatmapYearSelect.addEventListener("change", (e) => {
+            state.statsHeatmapSelectedSeason = e.target.value;
+            renderStatsCalendarHeatmap();
         });
     }
 
@@ -1821,6 +2600,8 @@ function setupEventListeners() {
     document.getElementById("btn-add-musician").addEventListener("click", () => {
         document.getElementById("form-musician").reset();
         document.getElementById("musician-id").value = "";
+        const checkBaja = document.getElementById("musician-is-baja");
+        if (checkBaja) checkBaja.checked = false;
         document.getElementById("modal-title").innerText = "Añadir Nuevo Músico";
         modalMusician.classList.add("active");
     });
@@ -1852,6 +2633,52 @@ function setupEventListeners() {
         });
     }
 
+    // Event listeners para el modal de insignias
+    const insigniasModal = document.getElementById("modal-insignias-info");
+    const closeInsigniasBtn = document.getElementById("btn-close-insignias-modal");
+    const okInsigniasBtn = document.getElementById("btn-insignias-modal-ok");
+
+    if (closeInsigniasBtn) {
+        closeInsigniasBtn.addEventListener("click", () => {
+            if (insigniasModal) insigniasModal.classList.remove("active");
+        });
+    }
+    if (okInsigniasBtn) {
+        okInsigniasBtn.addEventListener("click", () => {
+            if (insigniasModal) insigniasModal.classList.remove("active");
+        });
+    }
+    if (insigniasModal) {
+        insigniasModal.addEventListener("click", (e) => {
+            if (e.target === insigniasModal) {
+                insigniasModal.classList.remove("active");
+            }
+        });
+    }
+
+    // Event listeners para el modal de detalle de insignia individual
+    const singleInsigniaModal = document.getElementById("modal-single-insignia-detail");
+    const closeSingleInsigniaBtn = document.getElementById("btn-close-insignia-detail-modal");
+    const okSingleInsigniaBtn = document.getElementById("btn-insignia-detail-modal-ok");
+
+    if (closeSingleInsigniaBtn) {
+        closeSingleInsigniaBtn.addEventListener("click", () => {
+            if (singleInsigniaModal) singleInsigniaModal.classList.remove("active");
+        });
+    }
+    if (okSingleInsigniaBtn) {
+        okSingleInsigniaBtn.addEventListener("click", () => {
+            if (singleInsigniaModal) singleInsigniaModal.classList.remove("active");
+        });
+    }
+    if (singleInsigniaModal) {
+        singleInsigniaModal.addEventListener("click", (e) => {
+            if (e.target === singleInsigniaModal) {
+                singleInsigniaModal.classList.remove("active");
+            }
+        });
+    }
+
     // Modal de previsualización de foto de perfil
     const closePhotoPreview = () => {
         const modal = document.getElementById("modal-photo-preview");
@@ -1866,6 +2693,27 @@ function setupEventListeners() {
         modalPhoto.addEventListener("click", (e) => {
             if (e.target === modalPhoto) closePhotoPreview();
         });
+    }
+
+    // Modal de detalle de un compañero (Top 25 Asistencia)
+    const closePeerDetail = () => {
+        const modal = document.getElementById("modal-peer-detail");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnClosePeerDetail = document.getElementById("btn-close-peer-detail");
+    const modalPeerDetail = document.getElementById("modal-peer-detail");
+    if (btnClosePeerDetail) btnClosePeerDetail.addEventListener("click", closePeerDetail);
+    if (modalPeerDetail) {
+        modalPeerDetail.addEventListener("click", (e) => {
+            if (e.target === modalPeerDetail) closePeerDetail();
+        });
+        const peerDetailCard = modalPeerDetail.querySelector(".modal-card");
+        if (peerDetailCard) {
+            peerDetailCard.addEventListener("click", (e) => {
+                if (e.target.closest("#btn-close-peer-detail")) return;
+                spawnFloatingHearts(peerDetailCard, e.clientX, e.clientY);
+            });
+        }
     }
 
     // Modal de detalle de ensayo para músicos
@@ -1888,30 +2736,71 @@ function setupEventListeners() {
         e.preventDefault();
         const id = document.getElementById("musician-id").value;
         const name = document.getElementById("musician-name").value.trim();
+        const fullName = document.getElementById("musician-fullname").value.trim();
         const instrument = document.getElementById("musician-instrument").value;
         const role = document.getElementById("musician-role").value.trim();
+        const isBajaChecked = document.getElementById("musician-is-baja") ? document.getElementById("musician-is-baja").checked : false;
         
         if (!name || !instrument) return;
+
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
         if (id) {
             const index = state.musicians.findIndex(m => m.id === id);
             if (index !== -1) {
-                state.musicians[index] = { 
-                    ...state.musicians[index], 
-                    name, 
-                    instrument, 
-                    role
+                const existing = state.musicians[index];
+                const wasBaja = !!existing.isBaja;
+                let leaves = Array.isArray(existing.leaves) ? [...existing.leaves] : [];
+
+                if (isBajaChecked && !wasBaja) {
+                    leaves.push({
+                        id: "leave-" + Date.now(),
+                        startDate: todayStr,
+                        endDate: null
+                    });
+                } else if (!isBajaChecked && wasBaja) {
+                    const activeIdx = leaves.findIndex(l => !l.endDate);
+                    if (activeIdx !== -1) {
+                        leaves[activeIdx] = {
+                            ...leaves[activeIdx],
+                            endDate: todayStr
+                        };
+                    }
+                }
+
+                state.musicians[index] = {
+                    ...existing,
+                    name,
+                    fullName,
+                    instrument,
+                    role,
+                    isBaja: isBajaChecked,
+                    leaves: leaves
                 };
                 dbSaveMusician(state.musicians[index]);
+                renderPlantillaTable();
+                renderStatistics();
                 showToast("Músico actualizado", "success");
             }
         } else {
             const newId = "mus-" + Date.now();
-            const newMusician = { 
-                id: newId, 
-                name, 
-                instrument, 
-                role, 
+            let leaves = [];
+            if (isBajaChecked) {
+                leaves.push({
+                    id: "leave-" + Date.now(),
+                    startDate: todayStr,
+                    endDate: null
+                });
+            }
+            const newMusician = {
+                id: newId,
+                name,
+                fullName,
+                instrument,
+                role,
+                isBaja: isBajaChecked,
+                leaves: leaves,
                 pin: "", 
                 badgeWeather: false,
                 badgeSangreNueva: false,
@@ -1927,6 +2816,8 @@ function setupEventListeners() {
             };
             state.musicians.push(newMusician);
             dbSaveMusician(newMusician);
+            renderPlantillaTable();
+            renderStatistics();
             
             const sessionInfo = state.sessionTypes[state.currentDate];
             const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
@@ -1952,19 +2843,21 @@ function setupEventListeners() {
     });
 
     // ==========================================
-    // MODAL DE CREAR ENSAYO
+    // MODAL DE CREAR / EDITAR ENSAYO
     // ==========================================
     const modalRehearsal = document.getElementById("modal-rehearsal");
     
     document.getElementById("btn-add-rehearsal").addEventListener("click", () => {
+        renderRehearsalLocationOptions();
+        if (document.getElementById("rehearsal-editing-key")) document.getElementById("rehearsal-editing-key").value = "";
+        if (document.getElementById("modal-rehearsal-title")) document.getElementById("modal-rehearsal-title").innerText = "Nuevo Ensayo";
+        if (document.getElementById("btn-submit-rehearsal-modal")) document.getElementById("btn-submit-rehearsal-modal").innerText = "Crear Ensayo";
+
         document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("rehearsal-type-input").value = "general";
-        if (document.getElementById("rehearsal-location-input")) {
-            document.getElementById("rehearsal-location-input").value = "Parking";
-        }
-        if (document.getElementById("rehearsal-time-input")) {
-            document.getElementById("rehearsal-time-input").value = "";
-        }
+        if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = "";
+        updateResponsableQuickButtonsState();
+        setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", "");
         modalRehearsal.classList.add("active");
     });
 
@@ -1972,25 +2865,23 @@ function setupEventListeners() {
     document.getElementById("btn-close-rehearsal-modal").addEventListener("click", closeModalRehearsal);
     document.getElementById("btn-cancel-rehearsal-modal").addEventListener("click", closeModalRehearsal);
 
+    document.querySelectorAll(".rehearsal-responsable-quick-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            toggleResponsableQuickName(btn.dataset.value);
+        });
+    });
+
+    const responsableInputEl = document.getElementById("rehearsal-responsable-input");
+    if (responsableInputEl) {
+        responsableInputEl.addEventListener("input", updateResponsableQuickButtonsState);
+    }
+
     document.getElementById("form-rehearsal").addEventListener("submit", (e) => {
         e.preventDefault();
+        const editingKey = document.getElementById("rehearsal-editing-key") ? document.getElementById("rehearsal-editing-key").value : "";
         const selectedDate = document.getElementById("rehearsal-date-input").value;
         const subtype = document.getElementById("rehearsal-type-input").value;
         if (!selectedDate) return;
-
-        let sessionKey = selectedDate;
-        if (state.sessionTypes[sessionKey]) {
-            const existing = state.sessionTypes[sessionKey];
-            if (existing.type === "ensayo" && existing.subtype === subtype) {
-                showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
-                return;
-            }
-            sessionKey = `${selectedDate}_${subtype}`;
-            if (state.sessionTypes[sessionKey]) {
-                showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
-                return;
-            }
-        }
 
         let convocatedVoices = [];
         if (subtype === "trompetas1") {
@@ -2004,58 +2895,147 @@ function setupEventListeners() {
         } else if (subtype === "percusion") {
             convocatedVoices = ["Tambores", "Bombos", "Platos"];
         } else if (subtype === "primeras") {
-            convocatedVoices = ["Trompetas 1ª", "Cornetas"]; // Fallback histórico
+            convocatedVoices = ["Trompetas 1ª", "Cornetas"];
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
-        const timeVal = document.getElementById("rehearsal-time-input") ? document.getElementById("rehearsal-time-input").value.trim() : "";
-        state.sessionTypes[sessionKey] = { 
-            type: "ensayo", 
-            subtype: subtype, 
-            name: "", 
-            convocatedVoices: convocatedVoices,
-            location: locationVal,
-            time: timeVal
-        };
-        initializeAttendanceForDate(sessionKey, convocatedVoices);
-        
-        dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
-        if (isCloudActive()) {
-            const db = firebase.firestore();
-            db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+        const responsableVal = document.getElementById("rehearsal-responsable-input") ? document.getElementById("rehearsal-responsable-input").value.trim() : "";
+        const timeVal = getFormattedTimeFromInputs("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input");
 
-        } else {
-            saveStateToLocalStorage();
+        let targetKey = selectedDate;
+        if (subtype !== "general") {
+            targetKey = `${selectedDate}_${subtype}`;
         }
-        
-        closeModalRehearsal();
-        renderEnsayosList();
-        renderStatistics();
-        
-        state.currentDate = sessionKey;
-        document.getElementById("attendance-date").value = selectedDate;
-        
-        document.querySelectorAll(".nav-item").forEach(nav => {
-            if(nav.getAttribute("data-target") === "section-pasar-lista") {
-                nav.classList.add("active");
+
+        if (editingKey) {
+            // Modo Edición
+            if (editingKey !== targetKey) {
+                if (state.sessionTypes[targetKey]) {
+                    showToast("Ya existe un ensayo registrado para esta fecha y tipo", "error");
+                    return;
+                }
+                const oldSession = state.sessionTypes[editingKey] || {};
+                state.sessionTypes[targetKey] = {
+                    ...oldSession,
+                    type: "ensayo",
+                    subtype: subtype,
+                    convocatedVoices: convocatedVoices,
+                    location: locationVal,
+                    responsable: responsableVal,
+                    time: timeVal
+                };
+                if (state.attendance[editingKey]) {
+                    state.attendance[targetKey] = state.attendance[editingKey];
+                    delete state.attendance[editingKey];
+                }
+                if (state.playedMarchas[editingKey]) {
+                    state.playedMarchas[targetKey] = state.playedMarchas[editingKey];
+                    dbSavePlayedMarchas(targetKey, state.playedMarchas[targetKey]);
+                }
+                delete state.sessionTypes[editingKey];
+                dbDeleteSession(editingKey); // limpia también playedMarchas[editingKey], ya migrado arriba
             } else {
-                nav.classList.remove("active");
+                state.sessionTypes[targetKey] = {
+                    ...state.sessionTypes[targetKey],
+                    type: "ensayo",
+                    subtype: subtype,
+                    convocatedVoices: convocatedVoices,
+                    location: locationVal,
+                    responsable: responsableVal,
+                    time: timeVal
+                };
             }
-        });
-        
-        renderActiveSection("section-pasar-lista");
-        renderAttendance();
-        showToast(`Ensayo creado. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+
+            dbSaveSessionType(targetKey, state.sessionTypes[targetKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                if (state.attendance[targetKey]) {
+                    db.collection("attendance").doc(targetKey).set(state.attendance[targetKey]);
+                }
+            } else {
+                saveStateToLocalStorage();
+            }
+
+            closeModalRehearsal();
+            renderEnsayosList();
+            renderStatistics();
+            renderCalendar();
+            showToast(`Ensayo del ${formatDateSpanish(selectedDate)} actualizado con éxito`, "success");
+        } else {
+            // Modo Creación
+            let sessionKey = selectedDate;
+            if (state.sessionTypes[sessionKey]) {
+                const existing = state.sessionTypes[sessionKey];
+                if (existing.type === "ensayo" && existing.subtype === subtype) {
+                    showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
+                    return;
+                }
+                sessionKey = `${selectedDate}_${subtype}`;
+                if (state.sessionTypes[sessionKey]) {
+                    showToast("Ya existe un ensayo de este tipo registrado para esta fecha", "error");
+                    return;
+                }
+            }
+
+            const createdAtIso = new Date().toISOString();
+            state.sessionTypes[sessionKey] = {
+                type: "ensayo",
+                subtype: subtype,
+                name: "",
+                convocatedVoices: convocatedVoices,
+                location: locationVal,
+                responsable: responsableVal,
+                time: timeVal,
+                createdAt: createdAtIso
+            };
+            initializeAttendanceForDate(sessionKey, convocatedVoices);
+            
+            dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
+            dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            } else {
+                saveStateToLocalStorage();
+            }
+            
+            closeModalRehearsal();
+            renderEnsayosList();
+            renderStatistics();
+            renderCalendar();
+            
+            state.currentDate = sessionKey;
+            document.getElementById("attendance-date").value = selectedDate;
+            
+            document.querySelectorAll(".nav-item").forEach(nav => {
+                if(nav.getAttribute("data-target") === "section-pasar-lista") {
+                    nav.classList.add("active");
+                } else {
+                    nav.classList.remove("active");
+                }
+            });
+            
+            renderActiveSection("section-pasar-lista");
+            renderAttendance();
+            showToast(`Ensayo creado. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+        }
     });
 
     // ==========================================
-    // MODAL DE CREAR ACTUACIÓN
+    // MODAL DE CREAR / EDITAR ACTUACIÓN
     // ==========================================
     const modalActuacion = document.getElementById("modal-actuacion");
     
     document.getElementById("btn-add-actuacion").addEventListener("click", () => {
+        if (document.getElementById("actuacion-editing-key")) document.getElementById("actuacion-editing-key").value = "";
+        if (document.getElementById("modal-actuacion-title")) document.getElementById("modal-actuacion-title").innerText = "Nueva Actuación";
+        if (document.getElementById("btn-submit-actuacion-modal")) document.getElementById("btn-submit-actuacion-modal").innerText = "Crear Actuación";
+
         document.getElementById("actuacion-date-input").value = new Date().toISOString().split("T")[0];
         document.getElementById("actuacion-name-input").value = "";
+        if (document.getElementById("actuacion-location-input")) {
+            document.getElementById("actuacion-location-input").value = "";
+        }
         if (document.getElementById("actuacion-trip-input")) {
             document.getElementById("actuacion-trip-input").checked = false;
         }
@@ -2068,50 +3048,119 @@ function setupEventListeners() {
 
     document.getElementById("form-actuacion").addEventListener("submit", (e) => {
         e.preventDefault();
+        const editingKey = document.getElementById("actuacion-editing-key") ? document.getElementById("actuacion-editing-key").value : "";
         const selectedDate = document.getElementById("actuacion-date-input").value;
         const actuacionName = document.getElementById("actuacion-name-input").value.trim();
         if (!selectedDate || !actuacionName) return;
 
-        let sessionKey = selectedDate;
-        if (state.sessionTypes[sessionKey]) {
-            sessionKey = `${selectedDate}_actuacion`;
-            if (state.sessionTypes[sessionKey]) {
-                showToast("Ya existe una actuación registrada para esta fecha", "error");
-                return;
-            }
-        }
-
-        initializeAttendanceForDate(sessionKey);
         const isTrip = document.getElementById("actuacion-trip-input") ? document.getElementById("actuacion-trip-input").checked : false;
-        state.sessionTypes[sessionKey] = { type: "actuacion", name: actuacionName, isTrip: isTrip };
-        
-        dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
-        if (isCloudActive()) {
-            const db = firebase.firestore();
-            db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+        const locationVal = document.getElementById("actuacion-location-input") ? document.getElementById("actuacion-location-input").value.trim() : "";
 
-        } else {
-            saveStateToLocalStorage();
-        }
-        
-        closeModalActuacion();
-        renderActuacionesList();
-        renderStatistics();
-        
-        state.currentDate = sessionKey;
-        document.getElementById("attendance-date").value = selectedDate;
-        
-        document.querySelectorAll(".nav-item").forEach(nav => {
-            if(nav.getAttribute("data-target") === "section-pasar-lista") {
-                nav.classList.add("active");
+        if (editingKey) {
+            // Modo Edición
+            let targetKey = editingKey;
+            if (editingKey !== selectedDate && editingKey !== `${selectedDate}_actuacion`) {
+                targetKey = selectedDate;
+                if (state.sessionTypes[targetKey]) {
+                    targetKey = `${selectedDate}_actuacion`;
+                    if (state.sessionTypes[targetKey]) {
+                        showToast("Ya existe una actuación registrada para esta fecha", "error");
+                        return;
+                    }
+                }
+                const oldSession = state.sessionTypes[editingKey] || {};
+                state.sessionTypes[targetKey] = {
+                    ...oldSession,
+                    type: "actuacion",
+                    name: actuacionName,
+                    isTrip: isTrip,
+                    location: locationVal
+                };
+                if (state.attendance[editingKey]) {
+                    state.attendance[targetKey] = state.attendance[editingKey];
+                    delete state.attendance[editingKey];
+                }
+                if (state.actuacionRepertoire[editingKey]) {
+                    state.actuacionRepertoire[targetKey] = state.actuacionRepertoire[editingKey];
+                    dbSaveActuacionRepertoire(targetKey, state.actuacionRepertoire[targetKey]);
+                }
+                delete state.sessionTypes[editingKey];
+                dbDeleteSession(editingKey); // limpia también actuacionRepertoire[editingKey], ya migrado arriba
             } else {
-                nav.classList.remove("active");
+                state.sessionTypes[targetKey] = {
+                    ...state.sessionTypes[targetKey],
+                    type: "actuacion",
+                    name: actuacionName,
+                    isTrip: isTrip,
+                    location: locationVal
+                };
             }
-        });
-        
-        renderActiveSection("section-pasar-lista");
-        renderAttendance();
-        showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+
+            dbSaveSessionType(targetKey, state.sessionTypes[targetKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                if (state.attendance[targetKey]) {
+                    db.collection("attendance").doc(targetKey).set(state.attendance[targetKey]);
+                }
+            } else {
+                saveStateToLocalStorage();
+            }
+
+            closeModalActuacion();
+            renderActuacionesList();
+            renderStatistics();
+            renderCalendar();
+            showToast(`Actuación "${actuacionName}" actualizada con éxito`, "success");
+        } else {
+            // Modo Creación
+            let sessionKey = selectedDate;
+            if (state.sessionTypes[sessionKey]) {
+                sessionKey = `${selectedDate}_actuacion`;
+                if (state.sessionTypes[sessionKey]) {
+                    showToast("Ya existe una actuación registrada para esta fecha", "error");
+                    return;
+                }
+            }
+
+            initializeAttendanceForDate(sessionKey);
+            const createdAtIso = new Date().toISOString();
+            state.sessionTypes[sessionKey] = { 
+                type: "actuacion", 
+                name: actuacionName, 
+                isTrip: isTrip,
+                location: locationVal,
+                createdAt: createdAtIso
+            };
+            
+            dbSaveSessionType(sessionKey, state.sessionTypes[sessionKey]);
+            dispatchSessionNotification(sessionKey, state.sessionTypes[sessionKey]);
+            if (isCloudActive()) {
+                const db = firebase.firestore();
+                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            } else {
+                saveStateToLocalStorage();
+            }
+            
+            closeModalActuacion();
+            renderActuacionesList();
+            renderStatistics();
+            renderCalendar();
+            
+            state.currentDate = sessionKey;
+            document.getElementById("attendance-date").value = selectedDate;
+            
+            document.querySelectorAll(".nav-item").forEach(nav => {
+                if(nav.getAttribute("data-target") === "section-pasar-lista") {
+                    nav.classList.add("active");
+                } else {
+                    nav.classList.remove("active");
+                }
+            });
+            
+            renderActiveSection("section-pasar-lista");
+            renderAttendance();
+            showToast(`Actuación "${actuacionName}" creada. Ya puedes pasar lista para el ${formatDateSpanish(selectedDate)}`, "success");
+        }
     });
 
 
@@ -2155,8 +3204,6 @@ function setupEventListeners() {
         };
         reader.readAsText(file);
     });
-
-
 
     // Cambiar contraseña de administración (Modal)
     const modalChangeAdminPass = document.getElementById("modal-change-admin-password");
@@ -2202,7 +3249,6 @@ function setupEventListeners() {
                 return;
             }
             
-            const oldHash = hashString(oldPass);
             let targetHash = state.firebasePasswordHash || localStorage.getItem("yacente_firebase_hash") || "";
 
             // Si la nube está activa, obtener la contraseña real de la directiva guardada en Firestore
@@ -2219,22 +3265,22 @@ function setupEventListeners() {
                     console.error("Error al verificar contraseña actual en Firestore:", err);
                 }
             }
-            
-            // Validar contraseña actual
+
+            // Validar contraseña actual ("admin" solo sirve si nunca se ha configurado ninguna contraseña)
             let isValid = false;
             if (targetHash) {
-                isValid = (oldHash === targetHash);
+                isValid = (await verifyPassword(oldPass, targetHash)).valid;
             } else {
                 isValid = (oldPass === "admin");
             }
-            
+
             if (!isValid) {
                 showToast("La contraseña actual es incorrecta", "error");
                 return;
             }
-            
+
             // Guardar nueva contraseña
-            const newHash = hashString(newPass);
+            const newHash = await hashPassword(newPass);
             state.firebasePasswordHash = newHash;
             localStorage.setItem("yacente_firebase_hash", newHash);
             
@@ -2332,20 +3378,6 @@ function setupEventListeners() {
     // ==========================================
     // REPERTORIO Y MARCHAS
     // ==========================================
-    const modalMarcha = document.getElementById("modal-marcha");
-    document.getElementById("btn-add-marcha").addEventListener("click", () => {
-        document.getElementById("modal-marcha-title").innerText = "Añadir Nueva Marcha";
-        document.getElementById("marcha-id").value = "";
-        document.getElementById("marcha-title-input").value = "";
-        document.getElementById("marcha-status-input").value = "green";
-        document.getElementById("marcha-difficulty-input").value = "1";
-        modalMarcha.classList.add("active");
-    });
-
-    const closeModalMarcha = () => modalMarcha.classList.remove("active");
-    document.getElementById("btn-close-marcha-modal").addEventListener("click", closeModalMarcha);
-    document.getElementById("btn-cancel-marcha-modal").addEventListener("click", closeModalMarcha);
-
     document.getElementById("btn-close-marcha-history-modal").addEventListener("click", () => {
         document.getElementById("modal-marcha-history").classList.remove("active");
     });
@@ -2355,46 +3387,22 @@ function setupEventListeners() {
         }
     });
 
-    document.getElementById("form-marcha").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const id = document.getElementById("marcha-id").value;
-        const title = document.getElementById("marcha-title-input").value.trim();
-        const status = document.getElementById("marcha-status-input").value;
-        const difficulty = parseInt(document.getElementById("marcha-difficulty-input").value) || 1;
-
-        if (!title) return;
-
-        if (id) {
-            // Edit existing marcha
-            const index = state.marchas.findIndex(m => m.id === id);
-            if (index !== -1) {
-                state.marchas[index].title = title;
-                state.marchas[index].status = status;
-                state.marchas[index].difficulty = difficulty;
-                dbSaveMarcha(state.marchas[index]);
-                showToast("Marcha actualizada", "success");
-            }
-        } else {
-            // Create new marcha
-            const newMarcha = {
-                id: "mar-" + Date.now(),
-                title,
-                status,
-                difficulty
-            };
-            state.marchas.push(newMarcha);
-            dbSaveMarcha(newMarcha);
-            showToast("Marcha añadida al repertorio", "success");
-        }
-
-        closeModalMarcha();
-        renderMarchasList();
-        renderRehearsalMarchasWidget();
-    });
-
     document.getElementById("search-marcha").addEventListener("input", () => {
         renderMarchasList();
     });
+
+    const marchasFilterYearEl = document.getElementById("marchas-filter-year");
+    if (marchasFilterYearEl) {
+        marchasFilterYearEl.addEventListener("change", () => renderMarchasList());
+    }
+
+    const btnDownloadRepertoireSeasonPdf = document.getElementById("btn-download-repertorio-season-pdf");
+    if (btnDownloadRepertoireSeasonPdf) {
+        btnDownloadRepertoireSeasonPdf.addEventListener("click", () => {
+            const season = document.getElementById("marchas-filter-year") ? document.getElementById("marchas-filter-year").value : "";
+            downloadRepertoireSeasonPDF(season);
+        });
+    }
 
     document.getElementById("btn-view-list").addEventListener("click", () => {
         state.marchasViewMode = "list";
@@ -2514,15 +3522,15 @@ function setupEventListeners() {
         
         // Reset defaults
         document.getElementById("quick-session-actuacion-name").value = "";
-        if (document.getElementById("quick-session-time")) {
-            document.getElementById("quick-session-time").value = "";
-        }
-        
+        if (document.getElementById("quick-session-trip-input")) document.getElementById("quick-session-trip-input").checked = false;
+        setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
+
         const sessionInfo = state.sessionTypes[date];
         if (sessionInfo) {
             if (sessionInfo.type === "actuacion") {
                 document.getElementById("quick-session-type").value = "actuacion";
                 document.getElementById("quick-session-actuacion-name").value = sessionInfo.name || "";
+                if (document.getElementById("quick-session-trip-input")) document.getElementById("quick-session-trip-input").checked = !!sessionInfo.isTrip;
             } else if (sessionInfo.type === "ensayo") {
                 const sub = sessionInfo.subtype;
                 if (sub === "trompetas1") {
@@ -2543,9 +3551,7 @@ function setupEventListeners() {
                 if (document.getElementById("quick-session-location")) {
                     document.getElementById("quick-session-location").value = sessionInfo.location || "Parking";
                 }
-                if (document.getElementById("quick-session-time")) {
-                    document.getElementById("quick-session-time").value = sessionInfo.time || "";
-                }
+                setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", sessionInfo.time || "");
             }
         } else {
             // Default when not created
@@ -2553,6 +3559,7 @@ function setupEventListeners() {
             if (document.getElementById("quick-session-location")) {
                 document.getElementById("quick-session-location").value = "Parking";
             }
+            setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
         }
         
         // Trigger visibility update
@@ -2597,7 +3604,7 @@ function setupEventListeners() {
         
         if (type.startsWith("ensayo-")) {
             const locationVal = document.getElementById("quick-session-location") ? document.getElementById("quick-session-location").value : "Parking";
-            const timeVal = document.getElementById("quick-session-time") ? document.getElementById("quick-session-time").value.trim() : "";
+            const timeVal = getFormattedTimeFromInputs("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min");
             
             if (type === "ensayo-general") {
                 newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal, time: timeVal };
@@ -2626,7 +3633,8 @@ function setupEventListeners() {
                 showToast("Por favor, introduce el nombre de la actuación", "error");
                 return;
             }
-            newSession = { type: "actuacion", name: actuacionName };
+            const isTrip = document.getElementById("quick-session-trip-input") ? document.getElementById("quick-session-trip-input").checked : false;
+            newSession = { type: "actuacion", name: actuacionName, isTrip: isTrip };
         }
         
         // Determine the actual session key to use
@@ -2644,7 +3652,8 @@ function setupEventListeners() {
             state.currentDate = sessionKey;
         }
 
-        // Save to state
+        // Save to state with createdAt timestamp
+        newSession.createdAt = new Date().toISOString();
         state.sessionTypes[sessionKey] = newSession;
         
         // Initialize attendance records for the new configuration
@@ -2652,10 +3661,12 @@ function setupEventListeners() {
         
         // Save to Database and Local Storage
         dbSaveSessionType(sessionKey, newSession);
+        dispatchSessionNotification(sessionKey, newSession);
         if (isCloudActive()) {
             const db = firebase.firestore();
-            db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-
+            if (state.attendance[sessionKey]) {
+                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
+            }
         } else {
             saveStateToLocalStorage();
         }
@@ -2819,6 +3830,14 @@ function setupMarchasDragAndDrop() {
     setupMultiEventSelectModalEvents();
     setupProfilePhotoEvents();
     setupAnnouncementEvents();
+    setupMusicianDrawerAndSettingsEvents();
+    setupSuggestionsMailboxEvents();
+    setupLugaresEnsayoEvents();
+    setupAdvancedStatsEvents();
+    setupMarchaAudioLinksModalEvents();
+    setupMarchaModalEvents();
+    setupRepertoireLinksModalEvents();
+    setupActuacionRepertoireModalEvents();
 
     // Notificaciones de Músicos (Modal Flotante)
     const btnNotifBell = document.getElementById("btn-comp-notifications-bell");
@@ -2878,7 +3897,9 @@ function setupComponentSwipeNavigation() {
         "section-componente-ficha",
         "section-componente-eventos",
         "section-componente-historial",
-        "section-componente-repertorio"
+        "section-componente-repertorio",
+        "section-componente-sugerencias",
+        "section-componente-ajustes"
     ];
 
     mainContent.addEventListener("touchstart", (e) => {
@@ -2951,7 +3972,9 @@ function renderActiveSection(sectionId, forcedDirection) {
         "section-componente-ficha",
         "section-componente-eventos",
         "section-componente-historial",
-        "section-componente-repertorio"
+        "section-componente-repertorio",
+        "section-componente-sugerencias",
+        "section-componente-ajustes"
     ];
 
     let direction = forcedDirection;
@@ -3056,10 +4079,10 @@ function renderActiveSection(sectionId, forcedDirection) {
             renderStatistics();
             break;
         case "section-marchas":
-            pageTitle.innerText = `Repertorio (${state.marchas ? state.marchas.length : 0})`;
             pageSubtitle.innerText = "Estado de trabajo y estadísticas de marchas procesionales";
             dateContainer.classList.add("hidden");
             renderMarchasList();
+            renderRepertoireLinksUI();
             break;
         case "section-ajustes":
             pageTitle.innerText = "Ajustes";
@@ -3092,6 +4115,46 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Mi nivel de dominio de las marchas";
             dateContainer.classList.add("hidden");
             renderComponentRepertorio();
+            renderRepertoireLinksUI();
+            break;
+        case "section-componente-sugerencias":
+            pageTitle.innerText = "Sugerencias";
+            pageSubtitle.innerText = "Haz llegar tus propuestas a la directiva";
+            dateContainer.classList.add("hidden");
+            renderComponentSugerenciasPage();
+            renderMySuggestionHistory();
+            break;
+        case "section-componente-ajustes":
+            pageTitle.innerText = "Ajustes";
+            pageSubtitle.innerText = "Seguridad y gestión de la cuenta";
+            dateContainer.classList.add("hidden");
+            break;
+        case "section-otros":
+            pageTitle.innerText = "Otros";
+            pageSubtitle.innerText = "Funciones adicionales";
+            dateContainer.classList.add("hidden");
+            break;
+        case "section-otros-sugerencias":
+            pageTitle.innerText = "Buzón de Sugerencias";
+            pageSubtitle.innerText = "Propuestas enviadas por los músicos";
+            dateContainer.classList.add("hidden");
+            renderAdminSuggestionsList();
+            dbMarkAllSuggestionsRead().then(() => updateSuggestionsBadge());
+            break;
+        case "section-otros-lugares-ensayo":
+            pageTitle.innerText = "Lugares de Ensayo";
+            pageSubtitle.innerText = "Gestión de ubicaciones y enlace a Google Maps";
+            dateContainer.classList.add("hidden");
+            renderAdminLugaresEnsayoList();
+            break;
+        case "section-otros-estadisticas-avanzadas":
+            pageTitle.innerText = "Estadísticas Avanzadas";
+            pageSubtitle.innerText = "Gráficos detallados de la banda";
+            dateContainer.classList.add("hidden");
+            renderStatsSectionTreemap();
+            renderStatsAttendanceSunburst();
+            renderStatsCalendarHeatmap();
+            renderAdvancedStatsBumpChart();
             break;
         case "section-componente-notificaciones":
             pageTitle.innerText = "Centro de Notificaciones";
@@ -3168,15 +4231,17 @@ function renderAttendance() {
         sectionDiv.className = "instrument-section";
         sectionDiv.id = `section-instrument-${sectionName.replace(/\s+/g, '-')}`;
 
+        const activeMusiciansInSection = musiciansInSection.filter(m => !isMusicianOnLeaveOnDate(m, date));
+
         let presents = 0;
-        musiciansInSection.forEach(m => {
+        activeMusiciansInSection.forEach(m => {
             if (state.attendance[date] && state.attendance[date][m.id] && state.attendance[date][m.id].status === "present") {
                 presents++;
             }
         });
-        const sectionRatio = Math.round((presents / musiciansInSection.length) * 100) || 0;
+        const sectionRatio = activeMusiciansInSection.length > 0 ? Math.round((presents / activeMusiciansInSection.length) * 100) : 0;
 
-        const allPresent = presents === musiciansInSection.length && musiciansInSection.length > 0;
+        const allPresent = activeMusiciansInSection.length > 0 && presents === activeMusiciansInSection.length;
 
         const headerDiv = document.createElement("div");
         headerDiv.className = "instrument-header";
@@ -3223,13 +4288,17 @@ function renderAttendance() {
         listDiv.className = "musicians-list";
 
         musiciansInSection.forEach(musician => {
+            const isOnLeave = isMusicianOnLeaveOnDate(musician, date);
             const dateAtt = state.attendance[date] || {};
             const attState = dateAtt[musician.id] || { status: "absent", justified: false, reason: "" };
             const cardDiv = document.createElement("div");
             cardDiv.className = `musician-card`;
             cardDiv.id = `card-${musician.id}`;
             
-            if (attState.status === "present") {
+            if (isOnLeave) {
+                cardDiv.classList.add("is-baja");
+                cardDiv.style.cssText = "background: rgba(128, 128, 128, 0.08); border: 1px solid rgba(160, 160, 160, 0.3); opacity: 0.75; filter: grayscale(0.85);";
+            } else if (attState.status === "present") {
                 cardDiv.classList.add("is-present");
             } else {
                 cardDiv.classList.add("is-absent");
@@ -3242,32 +4311,44 @@ function renderAttendance() {
             const avatarMarkup = musician.photo
                 ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
                 : initials;
+
+            const bajaBadgeMarkup = isOnLeave ? `<span style="font-size: 0.68rem; background: rgba(128, 128, 128, 0.25); color: #a0a0a0; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(160, 160, 160, 0.4); font-weight: 700; text-transform: uppercase; margin-left: 6px; vertical-align: middle;">Baja</span>` : '';
+
+            const actionsMarkup = isOnLeave ? `
+                <div class="attendance-actions" style="pointer-events: none;">
+                    <span style="font-size: 0.78rem; font-weight: 700; color: #a0a0a0; background: rgba(128, 128, 128, 0.15); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(160, 160, 160, 0.3); display: inline-flex; align-items: center; gap: 4px;">
+                        🚫 Baja Temporal
+                    </span>
+                </div>
+            ` : `
+                <div class="attendance-actions">
+                    <button class="toggle-btn btn-present" data-id="${musician.id}">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Presente
+                    </button>
+                    <button class="toggle-btn btn-absent" data-id="${musician.id}">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        Ausente
+                    </button>
+                </div>
+            `;
             
             cardDiv.innerHTML = `
                 <div class="musician-card-top">
                     <div class="musician-avatar">${avatarMarkup}</div>
                     <div class="musician-details">
-                        <span class="musician-name">${musician.name}</span>
+                        <span class="musician-name">${musician.name} ${bajaBadgeMarkup}</span>
                         <span class="musician-role">${musician.role || 'Músico de fila'}</span>
                     </div>
-                    <div class="attendance-actions">
-                        <button class="toggle-btn btn-present" data-id="${musician.id}">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            Presente
-                        </button>
-                        <button class="toggle-btn btn-absent" data-id="${musician.id}">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                            Ausente
-                        </button>
-                    </div>
+                    ${actionsMarkup}
                 </div>
                 
-                <div class="absence-details-container ${attState.status === 'present' ? 'hidden' : ''} ${attState.status === 'absent' && attState.justified && attState.reason && attState.reason.trim() !== '' ? 'show-summary' : 'show-form'}">
+                <div class="absence-details-container ${isOnLeave || attState.status === 'present' ? 'hidden' : ''} ${attState.status === 'absent' && attState.justified && attState.reason && attState.reason.trim() !== '' ? 'show-summary' : 'show-form'}">
                     <!-- Vista Formulario -->
                     <div class="absence-form-view">
                         <label class="justified-checkbox-row">
@@ -3302,59 +4383,79 @@ function renderAttendance() {
                 </div>
             `;
 
-            cardDiv.querySelector(".btn-present").addEventListener("click", () => {
-                updateMusicianAttendance(musician.id, "present");
-            });
+            if (!isOnLeave) {
+                cardDiv.querySelector(".btn-present").addEventListener("click", () => {
+                    updateMusicianAttendance(musician.id, "present");
+                });
 
-            cardDiv.querySelector(".btn-absent").addEventListener("click", () => {
-                updateMusicianAttendance(musician.id, "absent");
-            });
+                cardDiv.querySelector(".btn-absent").addEventListener("click", () => {
+                    updateMusicianAttendance(musician.id, "absent");
+                });
 
-            cardDiv.querySelector(".chk-justified").addEventListener("change", (e) => {
-                updateMusicianJustification(musician.id, e.target.checked);
-            });
+                cardDiv.querySelector(".chk-justified").addEventListener("change", (e) => {
+                    updateMusicianJustification(musician.id, e.target.checked);
+                });
 
-            const inputReason = cardDiv.querySelector(".input-reason");
-            inputReason.addEventListener("input", (e) => {
-                updateMusicianReason(musician.id, e.target.value);
-            });
+                const inputReason = cardDiv.querySelector(".input-reason");
+                inputReason.addEventListener("input", (e) => {
+                    // Solo actualiza el estado local mientras se escribe, sin guardar en Firestore
+                    // en cada tecla: guardar en cada pulsación reactivaba el listener en tiempo
+                    // real de "attendance", que vuelve a pintar toda la lista (container.innerHTML
+                    // = "") y así destruye y recrea este mismo input, haciéndole perder el foco a
+                    // cada letra. El guardado real ocurre al salir del campo (blur) o pulsar Enter.
+                    const date = state.currentDate;
+                    ensureAttendanceRecord(date, musician.id);
+                    state.attendance[date][musician.id].reason = e.target.value;
+                });
 
-            inputReason.addEventListener("blur", (e) => {
-                const val = e.target.value.trim();
-                updateMusicianReason(musician.id, val);
-                if (val !== "") {
-                    showAbsenceSummary(cardDiv, val);
-                }
-            });
-
-            inputReason.addEventListener("keyup", (e) => {
-                if (e.key === "Enter") {
+                inputReason.addEventListener("blur", (e) => {
                     const val = e.target.value.trim();
                     updateMusicianReason(musician.id, val);
                     if (val !== "") {
                         showAbsenceSummary(cardDiv, val);
-                        inputReason.blur();
                     }
-                }
-            });
-
-            cardDiv.querySelectorAll(".quick-reason-pill").forEach(pill => {
-                pill.addEventListener("click", () => {
-                    const value = pill.getAttribute("data-value");
-                    inputReason.value = value;
-                    cardDiv.querySelectorAll(".quick-reason-pill").forEach(p => p.classList.remove("active"));
-                    pill.classList.add("active");
-                    updateMusicianReason(musician.id, value);
-                    showAbsenceSummary(cardDiv, value);
                 });
-            });
 
-            cardDiv.querySelector(".btn-edit-reason").addEventListener("click", () => {
-                const container = cardDiv.querySelector(".absence-details-container");
-                container.classList.remove("show-summary");
-                container.classList.add("show-form");
-                inputReason.focus();
-            });
+                inputReason.addEventListener("keyup", (e) => {
+                    if (e.key === "Enter") {
+                        const val = e.target.value.trim();
+                        updateMusicianReason(musician.id, val);
+                        if (val !== "") {
+                            showAbsenceSummary(cardDiv, val);
+                            inputReason.blur();
+                        }
+                    }
+                });
+
+                cardDiv.querySelectorAll(".quick-reason-pill").forEach(pill => {
+                    // Si el input de motivo tiene el foco (p.ej. el usuario ha escrito algo a
+                    // mano y luego pulsa una píldora), el navegador dispara "blur" en el input
+                    // ANTES del "click" de la píldora. El handler de blur guardaba entonces lo
+                    // que hubiera a medio escribir y cerraba el formulario, así que el motivo
+                    // final se quedaba cortado por ese texto parcial y la píldora parecía no
+                    // hacer nada (su click llegaba después, sobre un formulario ya cerrado).
+                    // Evitamos el blur previniendo el mousedown, para que el input conserve el
+                    // foco hasta que el propio click de la píldora decida qué hacer.
+                    pill.addEventListener("mousedown", (e) => {
+                        e.preventDefault();
+                    });
+                    pill.addEventListener("click", () => {
+                        const value = pill.getAttribute("data-value");
+                        inputReason.value = value;
+                        cardDiv.querySelectorAll(".quick-reason-pill").forEach(p => p.classList.remove("active"));
+                        pill.classList.add("active");
+                        updateMusicianReason(musician.id, value);
+                        showAbsenceSummary(cardDiv, value);
+                    });
+                });
+
+                cardDiv.querySelector(".btn-edit-reason").addEventListener("click", () => {
+                    const container = cardDiv.querySelector(".absence-details-container");
+                    container.classList.remove("show-summary");
+                    container.classList.add("show-form");
+                    inputReason.focus();
+                });
+            }
 
             listDiv.appendChild(cardDiv);
         });
@@ -3400,6 +4501,7 @@ function toggleVoiceAttendance(musiciansInSection, sectionName, shouldMarkPresen
     const newStatus = shouldMarkPresent ? "present" : "absent";
 
     musiciansInSection.forEach(m => {
+        if (isMusicianOnLeaveOnDate(m, date)) return; // Excluir de marcar masivo
         state.attendance[date][m.id] = {
             status: newStatus,
             justified: false,
@@ -3486,6 +4588,104 @@ function updateMusicianAttendance(id, status) {
     updateSectionHeaderRatio(id);
 }
 
+function goToPasarLista(dateKey) {
+    const rawDate = dateKey.split("_")[0];
+    state.currentDate = dateKey;
+    if (document.getElementById("attendance-date")) {
+        document.getElementById("attendance-date").value = rawDate;
+    }
+    initializeAttendanceForDate(dateKey);
+    document.querySelectorAll(".nav-item").forEach(nav => {
+        if (nav.getAttribute("data-target") === "section-pasar-lista") {
+            nav.classList.add("active");
+        } else {
+            nav.classList.remove("active");
+        }
+    });
+    renderActiveSection("section-pasar-lista");
+    renderAttendance();
+}
+
+function openEditRehearsalModal(dateKey) {
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+    if (!sessionInfo) return;
+
+    renderRehearsalLocationOptions();
+
+    const rawDate = dateKey.split("_")[0];
+    const keyInput = document.getElementById("rehearsal-editing-key");
+    const titleEl = document.getElementById("modal-rehearsal-title");
+    const submitBtn = document.getElementById("btn-submit-rehearsal-modal");
+
+    if (keyInput) keyInput.value = dateKey;
+    if (titleEl) titleEl.innerText = "Editar Ensayo";
+    if (submitBtn) submitBtn.innerText = "Guardar Cambios";
+
+    if (document.getElementById("rehearsal-date-input")) document.getElementById("rehearsal-date-input").value = rawDate;
+    if (document.getElementById("rehearsal-type-input")) document.getElementById("rehearsal-type-input").value = sessionInfo.subtype || "general";
+    if (document.getElementById("rehearsal-location-input")) document.getElementById("rehearsal-location-input").value = sessionInfo.location || "Parking";
+    if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = sessionInfo.responsable || "";
+    updateResponsableQuickButtonsState();
+    setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", sessionInfo.time || "");
+
+    const modal = document.getElementById("modal-rehearsal");
+    if (modal) modal.classList.add("active");
+}
+
+// Los responsables se guardan como un único texto separado por comas (p.ej. "Iván, Oscar")
+// para poder cubrir el caso habitual (una persona) sin migrar el modelo de datos, y a la vez
+// permitir varios responsables en casos puntuales.
+function getResponsableNamesFromInput() {
+    const input = document.getElementById("rehearsal-responsable-input");
+    if (!input) return [];
+    return input.value.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function updateResponsableQuickButtonsState() {
+    const names = getResponsableNamesFromInput().map(n => n.toLowerCase());
+    document.querySelectorAll(".rehearsal-responsable-quick-btn").forEach(btn => {
+        const isActive = names.includes(btn.dataset.value.toLowerCase());
+        btn.classList.toggle("btn-primary", isActive);
+        btn.classList.toggle("btn-secondary", !isActive);
+    });
+}
+
+function toggleResponsableQuickName(name) {
+    const input = document.getElementById("rehearsal-responsable-input");
+    if (!input) return;
+    const names = getResponsableNamesFromInput();
+    const idx = names.findIndex(n => n.toLowerCase() === name.toLowerCase());
+    if (idx !== -1) {
+        names.splice(idx, 1);
+    } else {
+        names.push(name);
+    }
+    input.value = names.join(", ");
+    updateResponsableQuickButtonsState();
+}
+
+function openEditActuacionModal(dateKey) {
+    const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+    if (!sessionInfo) return;
+
+    const rawDate = dateKey.split("_")[0];
+    const keyInput = document.getElementById("actuacion-editing-key");
+    const titleEl = document.getElementById("modal-actuacion-title");
+    const submitBtn = document.getElementById("btn-submit-actuacion-modal");
+
+    if (keyInput) keyInput.value = dateKey;
+    if (titleEl) titleEl.innerText = "Editar Actuación";
+    if (submitBtn) submitBtn.innerText = "Guardar Cambios";
+
+    if (document.getElementById("actuacion-name-input")) document.getElementById("actuacion-name-input").value = sessionInfo.name || "";
+    if (document.getElementById("actuacion-date-input")) document.getElementById("actuacion-date-input").value = rawDate;
+    if (document.getElementById("actuacion-location-input")) document.getElementById("actuacion-location-input").value = sessionInfo.location || "";
+    if (document.getElementById("actuacion-trip-input")) document.getElementById("actuacion-trip-input").checked = !!sessionInfo.isTrip;
+
+    const modal = document.getElementById("modal-actuacion");
+    if (modal) modal.classList.add("active");
+}
+
 function updateMusicianJustification(id, isJustified) {
     const date = state.currentDate;
     if (isPastLockBlocked(date)) {
@@ -3550,15 +4750,16 @@ function updateSectionHeaderRatio(musicianId) {
     
     const date = state.currentDate;
     const musiciansInSection = state.musicians.filter(m => m.instrument === sectionName);
+    const activeMusicians = musiciansInSection.filter(m => !isMusicianOnLeaveOnDate(m, date));
     
     let presents = 0;
-    musiciansInSection.forEach(m => {
+    activeMusicians.forEach(m => {
         if (state.attendance[date] && state.attendance[date][m.id] && state.attendance[date][m.id].status === "present") {
             presents++;
         }
     });
     
-    const sectionRatio = Math.round((presents / musiciansInSection.length) * 100) || 0;
+    const sectionRatio = activeMusicians.length > 0 ? Math.round((presents / activeMusicians.length) * 100) : 0;
     sectionDiv.querySelector(".section-attendance-ratio").innerText = `${sectionRatio}% Asistencia`;
 }
 
@@ -3578,6 +4779,10 @@ function updateAttendanceStatsRibbon() {
     state.musicians.forEach(m => {
         // Si el ensayo es por voces y el músico no está convocado, omitimos
         if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+            return;
+        }
+        // Excluir músicos en baja temporal en esta fecha de las estadísticas del día
+        if (isMusicianOnLeaveOnDate(m, date)) {
             return;
         }
         total++;
@@ -3611,7 +4816,9 @@ function renderEnsayosList() {
     const emptyState = document.getElementById("ensayos-empty");
     tbody.innerHTML = "";
 
-    const filterYear = document.getElementById("rehearsals-filter-year").value;
+    const rehearsalsYearSelect = document.getElementById("rehearsals-filter-year");
+    populateSeasonSelect(rehearsalsYearSelect, Object.keys(state.attendance), true, rehearsalsYearSelect.value);
+    const filterYear = rehearsalsYearSelect.value;
     const filterMonth = document.getElementById("rehearsals-filter-month").value;
 
     const dates = Object.keys(state.attendance)
@@ -3620,9 +4827,9 @@ function renderEnsayosList() {
             if (sessionInfo && sessionInfo.type !== "ensayo") return false;
 
             const [yyyy, mm, dd] = date.split('-');
-            
-            // Year filter
-            if (filterYear !== "all" && yyyy !== filterYear) return false;
+
+            // Season filter
+            if (filterYear !== "all" && !isDateInSeason(date, filterYear)) return false;
             
             // Month filter
             if (filterMonth !== "all" && (parseInt(mm) - 1).toString() !== filterMonth) return false;
@@ -3645,7 +4852,7 @@ function renderEnsayosList() {
     let currentMonthStr = "";
 
     dates.forEach(date => {
-        const dayRecord = state.attendance[date];
+        const dayRecord = state.attendance[date] || {};
         const [yyyy, mm, dd] = date.split('-');
         const monthName = MESES[parseInt(mm) - 1];
 
@@ -3735,7 +4942,7 @@ function renderEnsayosList() {
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
         let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total}`;
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             const prev = getSessionPrevision(date);
             let badgeBg = "rgba(46, 204, 113, 0.15)";
             let badgeColor = "#2ecc71";
@@ -3803,20 +5010,7 @@ function renderEnsayosList() {
 
         tr.querySelector(".edit-rehearsal-btn").addEventListener("click", (e) => {
             e.stopPropagation();
-            const rawDate = date.split("_")[0];
-            state.currentDate = date;
-            document.getElementById("attendance-date").value = rawDate;
-            
-            initializeAttendanceForDate(date);
-            
-            document.querySelectorAll(".nav-item").forEach(nav => {
-                if (nav.getAttribute("data-target") === "section-pasar-lista") {
-                    nav.classList.add("active");
-                } else {
-                    nav.classList.remove("active");
-                }
-            });
-            renderActiveSection("section-pasar-lista");
+            openEditRehearsalModal(date);
         });
 
         tr.querySelector(".delete-rehearsal-btn").addEventListener("click", (e) => {
@@ -3864,8 +5058,8 @@ function getSessionPrevision(date) {
 
         const dayRecord = state.attendance[date];
         const r = dayRecord ? dayRecord[m.id] : null;
-        // Solo cuenta como preaviso de no asistencia si el músico ha hecho un preaviso explícito (ausencia justificada o con motivo)
-        const isExplicitPreavisoFalta = r && r.status === "absent" && (r.justified === true || (r.reason && r.reason.trim().length > 0));
+        // Solo cuenta como preaviso de no asistencia si el músico ha realizado un preaviso explícito indicando ausencia (preaviso === true, justificada o con motivo)
+        const isExplicitPreavisoFalta = r && r.status === "absent" && (r.preaviso === true || r.isPreaviso === true || r.justified === true || (r.reason && r.reason.trim().length > 0));
         if (isExplicitPreavisoFalta) {
             preavisoAbsences++;
             voicePrevision[voice].absent++;
@@ -3914,11 +5108,14 @@ function openRehearsalDetailModal(date) {
     document.getElementById("rehearsal-detail-title").innerText = `Ensayo del ${formatDateSpanish(date)}`;
     let subtypeText = "Ensayo General";
     if (isSpecialRehearsal) {
-        subtypeText = `Ensayo por Voces (Convocadas: ${convocated.join(", ")})`;
+        subtypeText = "Ensayo por Voces";
     }
     const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
     const timeVal = sessionInfo && sessionInfo.time ? ` | Hora: ${sessionInfo.time}` : "";
     document.getElementById("rehearsal-detail-subtitle").innerText = `${subtypeText} | Lugar: ${locationVal}${timeVal}`;
+
+    const responsableEl = document.getElementById("rehearsal-detail-responsable");
+    if (responsableEl) responsableEl.innerText = (sessionInfo && sessionInfo.responsable) ? sessionInfo.responsable : "Sin asignar";
 
     // Marchas
     const marchasContainer = document.getElementById("rehearsal-detail-marchas");
@@ -4010,7 +5207,7 @@ function openRehearsalDetailModal(date) {
         const dNow = new Date();
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
         
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             alertBanner.classList.remove("hidden");
             if (prevision.estimatedPct < 60) {
                 alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
@@ -4108,7 +5305,7 @@ function renderGroupedList(container, itemsList) {
                     <td style="text-align: right; padding: 6px 12px; border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.8rem;">Presente</td>
                 `;
             } else if (r.justified) {
-                const justifText = r.justification || 'Sin justificación';
+                const justifText = r.reason || 'Sin justificación';
                 const truncatedJustif = justifText.length > 50 ? justifText.substring(0, 50) + '...' : justifText;
                 tr.innerHTML = `
                     <td style="padding: 6px 12px; border-bottom: 1px solid var(--border-color);">
@@ -4140,7 +5337,9 @@ function renderActuacionesList() {
     const emptyState = document.getElementById("actuaciones-empty");
     tbody.innerHTML = "";
 
-    const filterYear = document.getElementById("actuaciones-filter-year").value;
+    const actuacionesYearSelect = document.getElementById("actuaciones-filter-year");
+    populateSeasonSelect(actuacionesYearSelect, Object.keys(state.attendance), true, actuacionesYearSelect.value);
+    const filterYear = actuacionesYearSelect.value;
     const filterMonth = document.getElementById("actuaciones-filter-month").value;
 
     const dates = Object.keys(state.attendance)
@@ -4149,9 +5348,9 @@ function renderActuacionesList() {
             if (!sessionInfo || sessionInfo.type !== "actuacion") return false;
 
             const [yyyy, mm, dd] = date.split('-');
-            
-            // Year filter
-            if (filterYear !== "all" && yyyy !== filterYear) return false;
+
+            // Season filter
+            if (filterYear !== "all" && !isDateInSeason(date, filterYear)) return false;
             
             // Month filter
             if (filterMonth !== "all" && (parseInt(mm) - 1).toString() !== filterMonth) return false;
@@ -4174,7 +5373,7 @@ function renderActuacionesList() {
     let currentMonthStr = "";
 
     dates.forEach(date => {
-        const dayRecord = state.attendance[date];
+        const dayRecord = state.attendance[date] || {};
         const [yyyy, mm, dd] = date.split('-');
         const monthName = MESES[parseInt(mm) - 1];
 
@@ -4232,7 +5431,7 @@ function renderActuacionesList() {
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
         let presentsCellHTML = `<span style="color: var(--color-present); font-weight: 600;">${present}</span> de ${total} músicos`;
-        if (rawDate >= todayStr) {
+        if (!isSessionConcluded(rawDate)) {
             const prev = getSessionPrevision(date);
             let badgeBg = "rgba(46, 204, 113, 0.15)";
             let badgeColor = "#2ecc71";
@@ -4294,20 +5493,7 @@ function renderActuacionesList() {
 
         tr.querySelector(".edit-actuacion-btn").addEventListener("click", (e) => {
             e.stopPropagation();
-            const rawDate = date.split("_")[0];
-            state.currentDate = date;
-            document.getElementById("attendance-date").value = rawDate;
-            
-            initializeAttendanceForDate(date);
-            
-            document.querySelectorAll(".nav-item").forEach(nav => {
-                if (nav.getAttribute("data-target") === "section-pasar-lista") {
-                    nav.classList.add("active");
-                } else {
-                    nav.classList.remove("active");
-                }
-            });
-            renderActiveSection("section-pasar-lista");
+            openEditActuacionModal(date);
         });
 
         tr.querySelector(".delete-actuacion-btn").addEventListener("click", (e) => {
@@ -4341,7 +5527,6 @@ function openActuacionDetailModal(date) {
     // Safety guards on global state objects
     const dayRecord = (state && state.attendance) ? state.attendance[date] : null;
     const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
-    const playedTodayIds = (state && state.playedMarchas && state.playedMarchas[date]) || [];
 
     const actuacionName = sessionInfo ? (sessionInfo.name || "Actuación") : "Actuación";
 
@@ -4349,24 +5534,8 @@ function openActuacionDetailModal(date) {
     document.getElementById("actuacion-detail-title").innerText = actuacionName;
     document.getElementById("actuacion-detail-subtitle").innerText = formatDateSpanish(date);
 
-    // Marchas
-    const marchasContainer = document.getElementById("actuacion-detail-marchas");
-    marchasContainer.innerHTML = "";
-    if (playedTodayIds.length === 0) {
-        marchasContainer.innerHTML = `<span class="text-muted" style="font-size: 0.85rem; font-style: italic;">Ninguna marcha registrada en esta actuación.</span>`;
-    } else {
-        playedTodayIds.forEach(mId => {
-            const marchasArray = (state && state.marchas) || [];
-            const m = marchasArray.find(item => item.id === mId);
-            const mTitle = m ? m.title : `Marcha (${mId})`;
-            const badge = document.createElement("span");
-            badge.className = "marcha-tag";
-            badge.style.fontSize = "0.75rem";
-            badge.style.padding = "4px 10px";
-            badge.innerText = mTitle;
-            marchasContainer.appendChild(badge);
-        });
-    }
+    // Repertorio
+    renderActuacionDetailRepertoire(date);
 
     // Attendance calculation
     let presentCount = 0;
@@ -4433,8 +5602,8 @@ function openActuacionDetailModal(date) {
         const rawDate = date.split("_")[0];
         const dNow = new Date();
         const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-        
-        if (rawDate >= todayStr) {
+
+        if (!isSessionConcluded(rawDate)) {
             alertBanner.classList.remove("hidden");
             if (prevision.estimatedPct < 60) {
                 alertBanner.style.backgroundColor = "rgba(231, 76, 60, 0.15)";
@@ -4475,6 +5644,316 @@ function openActuacionDetailModal(date) {
 
     // Open modal
     modal.classList.add("active");
+}
+
+// Actualiza el botón "Repertorio"/"Añadir repertorio" del modal de detalle de la actuación
+// según haya o no contenido. No se listan las marchas individualmente: para consultarlas
+// hay que abrir el panel de repertorio pulsando el botón.
+function renderActuacionDetailRepertoire(date) {
+    const repertoireIds = (state && state.actuacionRepertoire && state.actuacionRepertoire[date]) || [];
+
+    const btn = document.getElementById("btn-open-actuacion-repertoire");
+    const btnLabel = document.getElementById("btn-open-actuacion-repertoire-label");
+    if (btn && btnLabel) {
+        const hasRepertoire = repertoireIds.length > 0;
+        btnLabel.innerText = hasRepertoire ? "Repertorio" : "Añadir repertorio";
+        btn.style.background = hasRepertoire ? "rgba(212, 175, 55, 0.1)" : "rgba(255, 255, 255, 0.04)";
+        btn.style.borderColor = hasRepertoire ? "rgba(212, 175, 55, 0.3)" : "var(--border-color)";
+        btn.style.color = hasRepertoire ? "var(--color-gold)" : "var(--text-muted)";
+    }
+}
+
+// ==========================================================================
+// PANEL: REPERTORIO ORDENADO DE UNA ACTUACIÓN (setlist con arrastrar y soltar)
+// ==========================================================================
+let currentRepertoireDate = null;
+
+function openActuacionRepertoireModal(date) {
+    if (!date) return;
+    currentRepertoireDate = date;
+
+    const sessionInfo = (state && state.sessionTypes) ? state.sessionTypes[date] : null;
+    const actuacionName = sessionInfo ? (sessionInfo.name || "Actuación") : "Actuación";
+    document.getElementById("actuacion-repertoire-subtitle").innerText = `${actuacionName} — ${formatDateSpanish(date)}`;
+
+    const searchInput = document.getElementById("actuacion-repertoire-search");
+    if (searchInput) searchInput.value = "";
+
+    renderActuacionRepertoireModal();
+    document.getElementById("modal-actuacion-repertoire").classList.add("active");
+}
+
+function closeActuacionRepertoireModal() {
+    document.getElementById("modal-actuacion-repertoire").classList.remove("active");
+    if (currentRepertoireDate) {
+        renderActuacionDetailRepertoire(currentRepertoireDate);
+    }
+    currentRepertoireDate = null;
+}
+
+function renderActuacionRepertoireModal() {
+    if (!currentRepertoireDate) return;
+    renderActuacionRepertoireSearchList();
+    renderActuacionRepertoireOrderedList();
+}
+
+function getActuacionRepertoireList() {
+    if (!currentRepertoireDate) return [];
+    if (!state.actuacionRepertoire) state.actuacionRepertoire = {};
+    if (!state.actuacionRepertoire[currentRepertoireDate]) state.actuacionRepertoire[currentRepertoireDate] = [];
+    return state.actuacionRepertoire[currentRepertoireDate];
+}
+
+function saveActuacionRepertoireList() {
+    if (!currentRepertoireDate) return;
+    dbSaveActuacionRepertoire(currentRepertoireDate, getActuacionRepertoireList());
+}
+
+function renderActuacionRepertoireSearchList() {
+    const container = document.getElementById("actuacion-repertoire-search-list");
+    if (!container) return;
+
+    const searchInput = document.getElementById("actuacion-repertoire-search");
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    const currentList = getActuacionRepertoireList();
+
+    const available = (state.marchas || [])
+        .filter(m => !currentList.includes(m.id))
+        .filter(m => !query || m.title.toLowerCase().includes(query))
+        .sort((a, b) => a.title.localeCompare(b.title, 'es'));
+
+    container.innerHTML = "";
+    if (available.length === 0) {
+        const msg = (state.marchas || []).length === 0
+            ? "No hay marchas en el repertorio de la banda."
+            : "No quedan marchas que coincidan con la búsqueda.";
+        container.innerHTML = `<p class="text-muted" style="font-size: 0.82rem; padding: 8px 0;">${msg}</p>`;
+        return;
+    }
+
+    available.forEach(m => {
+        const card = document.createElement("div");
+        card.setAttribute("draggable", "true");
+        card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary); transition: opacity 0.15s;";
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(m.title)}</span>
+            </div>
+            <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+        `;
+
+        card.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", m.id);
+            e.dataTransfer.setData("source-type", "search");
+            card.style.opacity = "0.5";
+        });
+        card.addEventListener("dragend", () => { card.style.opacity = "1"; });
+
+        card.querySelector("button").addEventListener("click", () => {
+            addMarchaToActuacionRepertoire(m.id);
+        });
+
+        container.appendChild(card);
+    });
+}
+
+// Construye una fila compacta y arrastrable de la lista ordenada del repertorio.
+function buildRepertoireOrderRow(mId, idx, marchasArray) {
+    const m = marchasArray.find(item => item.id === mId);
+    const mTitle = m ? m.title : `Marcha (${mId})`;
+
+    let statusCircle = "";
+    let diffBadge = "";
+    if (m) {
+        let statusTitle = "Por trabajar";
+        let circleSymbol = "🔴";
+        if (m.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
+        else if (m.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
+        statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
+
+        const diffNum = m.difficulty || 1;
+        diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
+    }
+
+    const row = document.createElement("div");
+    row.setAttribute("draggable", "true");
+    row.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary);";
+    row.innerHTML = `
+        <span style="flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
+        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px;">${escapeHtml(mTitle)}</span>
+        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;">
+            ${statusCircle}
+            ${diffBadge}
+        </div>
+        <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    `;
+
+    row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", mId);
+        e.dataTransfer.setData("source-type", "list");
+        e.dataTransfer.setData("source-index", String(idx));
+        row.style.opacity = "0.5";
+    });
+    row.addEventListener("dragend", () => { row.style.opacity = "1"; });
+
+    row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = row.getBoundingClientRect();
+        const isAbove = (e.clientY - rect.top) < rect.height / 2;
+        row.style.borderTop = isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
+        row.style.borderBottom = !isAbove ? "2px solid var(--color-gold)" : "1px solid rgba(212, 175, 55, 0.2)";
+    });
+    row.addEventListener("dragleave", () => {
+        row.style.borderTop = "1px solid rgba(212, 175, 55, 0.2)";
+        row.style.borderBottom = "1px solid rgba(212, 175, 55, 0.2)";
+    });
+    row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = row.getBoundingClientRect();
+        const isAbove = (e.clientY - rect.top) < rect.height / 2;
+        handleActuacionRepertoireDrop(e, isAbove ? idx : idx + 1);
+    });
+
+    row.querySelector("button").addEventListener("click", () => {
+        removeMarchaFromActuacionRepertoire(idx);
+    });
+
+    return row;
+}
+
+// Reparte la lista ordenada en dos columnas visuales (col1 = primera mitad, col2 = segunda
+// mitad) que comparten un único scroll vertical, para que quepan repertorios largos (~35
+// marchas) sin que las tarjetas necesiten ser gigantes.
+function renderActuacionRepertoireOrderedList() {
+    const col1 = document.getElementById("actuacion-repertoire-ordered-list-col1");
+    const col2 = document.getElementById("actuacion-repertoire-ordered-list-col2");
+    if (!col1 || !col2) return;
+
+    const list = getActuacionRepertoireList();
+    const marchasArray = (state && state.marchas) || [];
+
+    col1.innerHTML = "";
+    col2.innerHTML = "";
+
+    if (list.length === 0) {
+        col1.innerHTML = `<p class="text-muted" style="font-size: 0.78rem; padding: 6px 0; text-align: center;">Arrastra marchas aquí, o pulsa "+" en el banco de marchas.</p>`;
+        return;
+    }
+
+    const half = Math.ceil(list.length / 2);
+    list.forEach((mId, idx) => {
+        const row = buildRepertoireOrderRow(mId, idx, marchasArray);
+        (idx < half ? col1 : col2).appendChild(row);
+    });
+}
+
+function handleActuacionRepertoireDrop(e, targetIndex) {
+    const marchaId = e.dataTransfer.getData("text/plain");
+    const sourceType = e.dataTransfer.getData("source-type");
+    if (!marchaId) return;
+
+    const list = getActuacionRepertoireList();
+
+    if (sourceType === "list") {
+        const sourceIndex = parseInt(e.dataTransfer.getData("source-index"), 10);
+        if (isNaN(sourceIndex)) return;
+        let insertAt = targetIndex;
+        list.splice(sourceIndex, 1);
+        if (sourceIndex < insertAt) insertAt--;
+        list.splice(insertAt, 0, marchaId);
+    } else {
+        if (list.includes(marchaId)) return;
+        const insertAt = Math.min(targetIndex, list.length);
+        list.splice(insertAt, 0, marchaId);
+    }
+
+    saveActuacionRepertoireList();
+    renderActuacionRepertoireModal();
+}
+
+function addMarchaToActuacionRepertoire(marchaId) {
+    const list = getActuacionRepertoireList();
+    if (list.includes(marchaId)) return;
+    list.push(marchaId);
+    saveActuacionRepertoireList();
+    renderActuacionRepertoireModal();
+}
+
+function removeMarchaFromActuacionRepertoire(index) {
+    const list = getActuacionRepertoireList();
+    list.splice(index, 1);
+    saveActuacionRepertoireList();
+    renderActuacionRepertoireModal();
+}
+
+function setupActuacionRepertoireModalEvents() {
+    const closeModal = () => closeActuacionRepertoireModal();
+
+    const btnClose = document.getElementById("btn-close-actuacion-repertoire");
+    const btnCloseFooter = document.getElementById("btn-close-actuacion-repertoire-footer");
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCloseFooter) btnCloseFooter.addEventListener("click", closeModal);
+
+    const btnOpen = document.getElementById("btn-open-actuacion-repertoire");
+    if (btnOpen) {
+        btnOpen.addEventListener("click", () => {
+            if (state.activeDetailDate) openActuacionRepertoireModal(state.activeDetailDate);
+        });
+    }
+
+    const searchInput = document.getElementById("actuacion-repertoire-search");
+    if (searchInput) {
+        searchInput.addEventListener("input", () => renderActuacionRepertoireSearchList());
+    }
+
+    // Drop en zona vacía de la columna 1 = insertar al final de la primera mitad;
+    // drop en zona vacía de la columna 2 = insertar al final absoluto de la lista.
+    const orderedCol1 = document.getElementById("actuacion-repertoire-ordered-list-col1");
+    if (orderedCol1) {
+        orderedCol1.addEventListener("dragover", (e) => { e.preventDefault(); });
+        orderedCol1.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const list = getActuacionRepertoireList();
+            handleActuacionRepertoireDrop(e, Math.ceil(list.length / 2));
+        });
+    }
+
+    const orderedCol2 = document.getElementById("actuacion-repertoire-ordered-list-col2");
+    if (orderedCol2) {
+        orderedCol2.addEventListener("dragover", (e) => { e.preventDefault(); });
+        orderedCol2.addEventListener("drop", (e) => {
+            e.preventDefault();
+            handleActuacionRepertoireDrop(e, getActuacionRepertoireList().length);
+        });
+    }
+}
+
+function isMusicianOnLeaveOnDate(musician, dateStr) {
+    if (!musician) return false;
+    if (musician.isBaja) return true;
+    if (musician.bajaPeriods && Array.isArray(musician.bajaPeriods)) {
+        return musician.bajaPeriods.some(p => {
+            const start = p.startDate || "";
+            const end = p.endDate || "9999-12-31";
+            return dateStr >= start && dateStr <= end;
+        });
+    }
+    return false;
+}
+
+function formatRoleShort(role) {
+    if (!role) return "Músico";
+    let r = role.trim();
+    if (r === "Ayud. Dirección" || r === "Ayudante Dirección" || r === "Ayudante de Dirección" || r === "A.Dirección") return "A.Dirección";
+    if (r === "Responsable Voz" || r === "Responsable de voz" || r === "Responsable de Voz" || r === "Resp. Voz" || r === "Resp. Voz de sección") return "Resp. Voz";
+    if (r === "Músico de fila" || r === "Músico de Fila") return "Músico";
+    return r;
 }
 
 // ==========================================================================
@@ -4554,10 +6033,10 @@ function renderPlantillaTable() {
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Nombre</th>
-                                <th>Rol</th>
-                                <th style="text-align: center; width: 100px;">Acceso PIN</th>
-                                <th style="width: 100px; text-align: center;">Acciones</th>
+                                <th class="col-name">Nombre</th>
+                                <th class="col-role">Rol</th>
+                                <th class="col-pin">Pin</th>
+                                <th class="col-actions">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4573,27 +6052,37 @@ function renderPlantillaTable() {
         musiciansInVoice.forEach(musician => {
             const initials = getInitials(musician.name);
             const avatarMarkup = musician.photo
-                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 50%; display: block; border: 1.5px solid var(--color-gold); box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);">`
-                : `<div style="width: 32px; height: 32px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
+                ? `<img src="${musician.photo}" alt="${musician.name}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 50%; display: block; border: 1.5px solid var(--color-gold); box-shadow: 0 0 6px rgba(212, 175, 55, 0.25);">`
+                : `<div style="width: 30px; height: 30px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0;">${initials}</div>`;
 
             const tr = document.createElement("tr");
+            tr.classList.add("plantilla-musician-row");
+            if (musician.isBaja) {
+                tr.classList.add("is-baja-row");
+                tr.style.cssText = "background: rgba(128, 128, 128, 0.08); opacity: 0.65; filter: grayscale(0.85);";
+            }
+
+            const bajaBadgeMarkup = musician.isBaja
+                ? `<span style="font-size: 0.68rem; background: rgba(128, 128, 128, 0.25); color: #a0a0a0; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(160, 160, 160, 0.4); font-weight: 700; text-transform: uppercase; margin-left: 6px; flex-shrink: 0;">Baja</span>`
+                : '';
+
             tr.innerHTML = `
-                <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
+                <td class="col-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
                         <div class="musician-avatar-clickable" data-id="${musician.id}" style="cursor: pointer; flex-shrink: 0; transition: transform 0.2s ease;" title="Ver foto en grande">
                             ${avatarMarkup}
                         </div>
-                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block;" title="${musician.name}">${musician.name}</div>
+                        <div class="musician-name-clickable" style="font-weight: 600; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; min-width: 0; display: inline-flex; align-items: center;" title="${musician.name}">${musician.name} ${bajaBadgeMarkup}</div>
                     </div>
                 </td>
-                <td style="white-space: nowrap;">
-                    <span class="text-muted" title="${musician.role || 'Músico de fila'}">${musician.role || 'Músico de fila'}</span>
+                <td class="col-role" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0;">
+                    <span class="text-muted" title="${musician.role || 'Músico'}" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; max-width: 100%;">${formatRoleShort(musician.role)}</span>
                 </td>
-                <td style="white-space: nowrap; text-align: center; width: 100px;">
+                <td class="col-pin">
                     <div style="display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">
                         ${musician.pin ? `
-                            <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="PIN configurado. Pulsa para borrar/restablecer PIN">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lock-svg" style="color: var(--text-muted); display: block;">
+                            <button class="btn-reset-pin-row-padlock" data-id="${musician.id}" title="${musician.pinLocked ? 'PIN BLOQUEADO por demasiados intentos fallidos. Pulsa para desbloquear/restablecer' : 'PIN configurado. Pulsa para borrar/restablecer PIN'}">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lock-svg" style="color: ${musician.pinLocked ? 'var(--color-absent)' : 'var(--text-muted)'}; display: block;">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
@@ -4608,16 +6097,16 @@ function renderPlantillaTable() {
                         `}
                     </div>
                 </td>
-                <td style="white-space: nowrap; width: 100px; text-align: center;">
-                    <div style="display: inline-flex; gap: 8px; justify-content: center; align-items: center; vertical-align: middle;">
+                <td class="col-actions">
+                    <div style="display: inline-flex; gap: 6px; justify-content: center; align-items: center; vertical-align: middle;">
                         <button class="btn-action edit-musician-btn" data-id="${musician.id}" title="Editar">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
                         <button class="btn-action delete delete-musician-btn" data-id="${musician.id}" title="Eliminar">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                             </svg>
@@ -4626,33 +6115,43 @@ function renderPlantillaTable() {
                 </td>
             `;
 
+            tr.addEventListener("click", () => {
+                openMusicianDetailStats(musician.id);
+            });
+
             tr.querySelector(".musician-avatar-clickable").addEventListener("click", (e) => {
                 e.stopPropagation();
                 openPhotoPreviewModal(musician.id);
             });
 
-            tr.querySelector(".musician-name-clickable").addEventListener("click", () => {
+            tr.querySelector(".musician-name-clickable").addEventListener("click", (e) => {
+                e.stopPropagation();
                 openMusicianDetailStats(musician.id);
             });
 
-            tr.querySelector(".edit-musician-btn").addEventListener("click", () => {
+            tr.querySelector(".edit-musician-btn").addEventListener("click", (e) => {
+                e.stopPropagation();
                 openEditMusicianModal(musician.id);
             });
 
-            tr.querySelector(".delete-musician-btn").addEventListener("click", () => {
+            tr.querySelector(".delete-musician-btn").addEventListener("click", (e) => {
+                e.stopPropagation();
                 deleteMusician(musician.id);
             });
 
             const resetPinBtn = tr.querySelector(".btn-reset-pin-row-padlock");
             if (resetPinBtn) {
-                resetPinBtn.addEventListener("click", () => {
+                resetPinBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
                     if (confirm(`¿Estás seguro de que quieres restablecer el PIN de ${musician.name}? Volverá a registrarse con el siguiente PIN que introduzca.`)) {
                         musician.pin = "";
+                        musician.pinFailedAttempts = 0;
+                        musician.pinLocked = false;
                         saveStateToLocalStorage();
-                        
+
                         if (isCloudActive()) {
                             const db = firebase.firestore();
-                            db.collection("musicians").doc(musician.id).update({ pin: "" })
+                            db.collection("musicians").doc(musician.id).update({ pin: "", pinFailedAttempts: 0, pinLocked: false })
                                 .then(() => {
                                     showToast(`PIN de ${musician.name} borrado con éxito`, "success");
                                     renderPlantillaTable();
@@ -4721,25 +6220,134 @@ function openPhotoPreviewModal(musicianId) {
     modal.classList.add("active");
 }
 
+// Lanza una pequeña ráfaga de corazones flotantes desde el punto de clic, dentro de "container"
+// (que debe tener position: relative/absolute). Cada corazón se autodestruye al terminar su animación.
+function spawnFloatingHearts(container, clientX, clientY) {
+    const rect = container.getBoundingClientRect();
+    const originX = clientX - rect.left;
+    const originY = clientY - rect.top;
+
+    const count = 4;
+    for (let i = 0; i < count; i++) {
+        const heart = document.createElement("span");
+        heart.className = "floating-heart";
+        heart.textContent = "❤️";
+        heart.style.left = `${originX}px`;
+        heart.style.top = `${originY}px`;
+        heart.style.setProperty("--heart-dx", `${Math.round((Math.random() - 0.5) * 60)}px`);
+        heart.style.setProperty("--heart-rot", `${Math.round((Math.random() - 0.5) * 40)}deg`);
+        heart.style.fontSize = `${(1.05 + Math.random() * 0.7).toFixed(2)}rem`;
+        heart.style.animationDelay = `${i * 60}ms`;
+
+        heart.addEventListener("animationend", () => heart.remove());
+        // Red de seguridad por si "animationend" no llega a disparar (p.ej. reduced motion)
+        setTimeout(() => heart.remove(), 1200);
+
+        container.appendChild(heart);
+    }
+}
+
+function openPeerDetailModal(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return;
+
+    const modal = document.getElementById("modal-peer-detail");
+    if (!modal) return;
+
+    document.getElementById("peer-detail-name").innerText = musician.name;
+    document.getElementById("peer-detail-instrument").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
+
+    const avatarLettersEl = document.getElementById("peer-detail-avatar-letters");
+    const avatarImgEl = document.getElementById("peer-detail-avatar-img");
+    const avatarWrapperEl = document.getElementById("peer-detail-avatar");
+    if (avatarWrapperEl) {
+        avatarWrapperEl.onclick = () => openPhotoPreviewModal(musicianId);
+    }
+    if (musician.photo) {
+        avatarImgEl.src = musician.photo;
+        avatarImgEl.classList.remove("hidden");
+        avatarLettersEl.classList.add("hidden");
+    } else {
+        avatarImgEl.classList.add("hidden");
+        avatarLettersEl.innerText = getInitials(musician.name);
+        avatarLettersEl.classList.remove("hidden");
+    }
+
+    const currentStreak = calculateMusicianStreak(musicianId);
+    document.getElementById("peer-detail-streak").innerText = currentStreak;
+
+    const medalsData = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+    const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+    document.getElementById("peer-detail-badges").innerText = unlockedInsigniasCount;
+
+    const metrics = getMusicianAttendanceMetrics(musicianId);
+    const attendancePct = metrics.attendancePct;
+
+    let strokeColor = "#2ECC71"; // verde
+    if (attendancePct < 50) {
+        strokeColor = "#E74C3C"; // rojo
+    } else if (attendancePct < 80) {
+        strokeColor = "#F1C40F"; // amarillo
+    }
+
+    const percentageText = document.getElementById("peer-detail-percentage-text");
+    if (percentageText) percentageText.textContent = `${Math.round(attendancePct)}%`;
+
+    const progressPath = document.getElementById("peer-detail-progress-path");
+    if (progressPath) {
+        progressPath.setAttribute("stroke-dasharray", `${Math.round(attendancePct)}, 100`);
+        progressPath.style.setProperty("stroke", strokeColor, "important");
+    }
+
+    const progressCircle = document.getElementById("peer-detail-progress-circle");
+    if (progressCircle) {
+        const svgEl = progressCircle.querySelector(".circular-chart");
+        if (svgEl) {
+            svgEl.classList.remove("gold", "red", "yellow", "green");
+            if (attendancePct < 50) {
+                svgEl.classList.add("red");
+            } else if (attendancePct < 80) {
+                svgEl.classList.add("yellow");
+            } else {
+                svgEl.classList.add("green");
+            }
+        }
+    }
+
+    modal.classList.add("active");
+}
+
 function openEditMusicianModal(id) {
     const m = state.musicians.find(mus => mus.id === id);
     if (!m) return;
 
     document.getElementById("musician-id").value = m.id;
     document.getElementById("musician-name").value = m.name;
+    document.getElementById("musician-fullname").value = m.fullName || "";
     document.getElementById("musician-instrument").value = m.instrument;
-    const roleVal = m.role || "Músico";
+    const roleVal = formatRoleShort(m.role);
     const roleSelect = document.getElementById("musician-role");
     const hasOption = Array.from(roleSelect.options).some(opt => opt.value === roleVal);
     roleSelect.value = hasOption ? roleVal : "Músico";
     
-
+    const checkBaja = document.getElementById("musician-is-baja");
+    if (checkBaja) {
+        checkBaja.checked = !!m.isBaja;
+    }
     
     document.getElementById("modal-title").innerText = "Editar Músico";
     document.getElementById("modal-musician").classList.add("active");
 }
 
 function deleteMusician(id) {
+    if (state.pastLockEnabled) {
+        showToast("Bloqueo de pasado activado, no se pueden eliminar músicos de la plantilla.", "warning");
+        return;
+    }
     const m = state.musicians.find(mus => mus.id === id);
     if (!m) return;
 
@@ -4766,22 +6374,35 @@ function deleteMusician(id) {
 // SECCIÓN: ESTADÍSTICAS AVANZADAS
 // ==========================================================================
 function renderStatistics() {
-    const yearFilter = document.getElementById("filter-year").value;
+    // Los datos de asistencia/músicos no cambian dentro de un mismo render; forzamos un
+    // recálculo fresco aquí y dejamos que el resto de funciones auxiliares (ranking,
+    // insignias, racha...) reutilicen la caché durante esta pasada.
+    invalidateMusicianStatsCache();
+    cleanupOrphanedMarchasRecords();
+
+    const allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ]));
+
+    const yearSelectEl = document.getElementById("filter-year");
+    populateSeasonSelect(yearSelectEl, allDates, true, yearSelectEl.value);
+    const yearFilter = yearSelectEl.value;
     const monthFilter = document.getElementById("filter-month").value;
     const typeFilter = document.getElementById("filter-type").value;
 
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    const allDates = Object.keys(state.attendance);
     const filteredDates = allDates.filter(dateStr => {
-        if (dateStr > todayStr) return false; // Excluir sesiones futuras de las estadísticas
+        if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
 
-        const dateObj = new Date(dateStr.replace(/-/g, "/"));
-        const year = dateObj.getFullYear().toString();
+        // dateStr puede llevar sufijo (sesiones múltiples/especiales el mismo día): quitarlo antes
+        // de parsear la fecha, si no new Date(...) da Invalid Date y el mes sale NaN.
+        const dateObj = new Date(dateStr.split("_")[0].replace(/-/g, "/"));
         const month = dateObj.getMonth().toString();
 
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -4802,9 +6423,14 @@ function renderStatistics() {
         if (streakContainer) streakContainer.innerHTML = "";
         document.getElementById("alerts-table-body").innerHTML = "<tr><td colspan='5' class='text-center text-muted'>Sin alertas de asistencia en este período.</td></tr>";
         renderStatsMarchasTop10([]);
+        renderStatsMarchasActuacion([]);
         renderStatsStreaks([]);
+        renderStatsRanking([]);
         renderStatsMarchasOlvidadas();
         renderGeneralOverviewChart();
+        renderDayHeatmap([]);
+        renderStatsEnsayos([]);
+        renderStatsDireccion([]);
         return;
     }
 
@@ -4822,20 +6448,16 @@ function renderStatistics() {
     });
 
     filteredDates.forEach(date => {
-        const dayRecord = state.attendance[date];
+        const dayRecord = state.attendance[date] || {};
         
         state.musicians.forEach(m => {
             const record = dayRecord[m.id];
             if (!record) return;
 
-            totalPresenceCheck++;
             musicianStats[m.id].total++;
 
             if (record.status === "present") {
-                totalPresentsCount++;
-                if (sectionStats[m.instrument]) {
-                    sectionStats[m.instrument].presents++;
-                }
+                // Contado en individual
             } else {
                 musicianStats[m.id].absent++;
                 if (!record.justified) {
@@ -4843,6 +6465,18 @@ function renderStatistics() {
                 }
                 if (record.reason) {
                     musicianStats[m.id].lastReason = record.reason;
+                }
+            }
+
+            // Excluir de las estadísticas globales de la banda si estaba de baja temporal en esta fecha
+            if (isMusicianOnLeaveOnDate(m, date)) return;
+
+            totalPresenceCheck++;
+
+            if (record.status === "present") {
+                totalPresentsCount++;
+                if (sectionStats[m.instrument]) {
+                    sectionStats[m.instrument].presents++;
                 }
             }
 
@@ -4954,15 +6588,21 @@ function renderStatistics() {
         `;
     }
 
+    window.lastFilteredDatesForStats = filteredDates;
     renderStatsMarchasTop10(filteredDates);
+    renderStatsMarchasActuacion(filteredDates);
     renderStatsStreaks(filteredDates);
+    renderStatsRanking(filteredDates);
     renderStatsMarchasOlvidadas();
     renderGeneralOverviewChart();
-    renderSectionAttendanceComparisonChart();
+    renderDayHeatmap(filteredDates);
+    renderStatsEnsayos(filteredDates);
+    renderStatsDireccion(filteredDates);
 }
 
 let showAllMarchasEnsayadas = false;
 let showAllMarchasOlvidadas = false;
+let showAllMarchasActuacion = false;
 
 function renderStatsMarchasTop10(filteredDates) {
     const playCounts = {};
@@ -5026,6 +6666,72 @@ function renderStatsMarchasTop10(filteredDates) {
     }
 }
 
+// Cuenta, por marcha, en cuántas actuaciones distintas del período aparece en su repertorio
+// ordenado (state.actuacionRepertoire) — no confundir con "playedMarchas" (uso en ensayos).
+function renderStatsMarchasActuacion(filteredDates) {
+    const playCounts = {};
+    if (state.actuacionRepertoire) {
+        filteredDates.forEach(date => {
+            const sessionInfo = state.sessionTypes[date];
+            if (!sessionInfo || sessionInfo.type !== "actuacion") return;
+            const list = state.actuacionRepertoire[date] || [];
+            new Set(list).forEach(mId => {
+                playCounts[mId] = (playCounts[mId] || 0) + 1;
+            });
+        });
+    }
+
+    const allMarchas = (state.marchas || [])
+        .map(m => ({ ...m, count: playCounts[m.id] || 0 }))
+        .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, 'es'));
+
+    const displayMarchas = showAllMarchasActuacion ? allMarchas : allMarchas.slice(0, 5);
+
+    const toggleBtn = document.getElementById("btn-toggle-all-marchas-actuacion");
+    if (toggleBtn) {
+        toggleBtn.innerText = showAllMarchasActuacion ? "−" : "+";
+        toggleBtn.title = showAllMarchasActuacion ? "Mostrar Top 5" : `Ver todas las marchas (${allMarchas.length})`;
+    }
+
+    const tbody = document.getElementById("stats-marchas-actuacion-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    if (displayMarchas.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted" style="padding: 20px;">
+                    No hay marchas registradas en el repertorio de la banda.
+                </td>
+            </tr>
+        `;
+    } else {
+        displayMarchas.forEach((m, idx) => {
+            let statusLabel = "";
+            if (m.status === "green") {
+                statusLabel = `<span style="color: var(--color-present); font-weight: 600;">🟢 Bien</span>`;
+            } else if (m.status === "yellow") {
+                statusLabel = `<span style="color: var(--color-justified); font-weight: 600;">🟡 Proceso</span>`;
+            } else {
+                statusLabel = `<span style="color: var(--color-absent); font-weight: 600;">🔴 Trabajar</span>`;
+            }
+
+            const tr = document.createElement("tr");
+            tr.style.cursor = "pointer";
+            tr.title = "Ver actuaciones en las que se ha tocado";
+            tr.innerHTML = `
+                <td><strong>#${idx + 1}</strong></td>
+                <td><strong>${escapeHtml(m.title)}</strong></td>
+                <td style="font-weight: bold; color: var(--color-gold); font-size: 0.92rem; padding-left: 20px;">${m.count}</td>
+                <td><span class="musician-count-badge" style="background-color: var(--bg-primary);">Nivel ${m.difficulty || 1}</span></td>
+                <td>${statusLabel}</td>
+            `;
+            tr.addEventListener("click", () => openMarchaHistoryModal(m.id));
+            tbody.appendChild(tr);
+        });
+    }
+}
+
 function renderStatsMarchasOlvidadas() {
     const tbody = document.getElementById("stats-marchas-olvidadas-table-body");
     if (!tbody) return;
@@ -5035,13 +6741,14 @@ function renderStatsMarchasOlvidadas() {
     
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(sessionKey => {
+            if (!isSessionConcluded(sessionKey)) return; // No contar ensayos que aún no han sucedido
             const sessionInfo = state.sessionTypes[sessionKey];
             const isRehearsal = !sessionInfo || sessionInfo.type === "ensayo";
             if (!isRehearsal) return;
-            
+
             const rawDate = sessionKey.split("_")[0];
             const list = state.playedMarchas[sessionKey] || [];
-            
+
             list.forEach(mId => {
                 if (!lastRehearsalDates[mId] || rawDate > lastRehearsalDates[mId]) {
                     lastRehearsalDates[mId] = rawDate;
@@ -5229,6 +6936,475 @@ function renderStatsStreaks(filteredDates) {
     });
 }
 
+let showAllRankingAsistencia = false;
+
+function renderStatsRanking(filteredDates) {
+    // Idempotente: si ya se invalidó al entrar en renderStatistics() esto es un no-op
+    // barato; si se llama de forma aislada (botón "ver todos") garantiza datos frescos.
+    invalidateMusicianStatsCache();
+    const container = document.getElementById("stats-ranking-container");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (!window.statsRankingToggleBound) {
+        window.statsRankingToggleBound = true;
+        const btnToggle = document.getElementById("btn-toggle-all-ranking-asistencia");
+        if (btnToggle) {
+            btnToggle.addEventListener("click", (e) => {
+                e.stopPropagation();
+                showAllRankingAsistencia = !showAllRankingAsistencia;
+                btnToggle.innerText = showAllRankingAsistencia ? "-" : "+";
+                btnToggle.title = showAllRankingAsistencia ? "Ver solo los 5 primeros" : "Ver todos los componentes";
+                renderStatsRanking(window.lastFilteredDatesForStats || []);
+            });
+        }
+    }
+
+    if (!state.musicians || state.musicians.length === 0 || !filteredDates || filteredDates.length === 0) {
+        container.innerHTML = "<p class='text-muted text-center' style='padding: 20px;'>No hay datos para calcular el ranking en este período.</p>";
+        return;
+    }
+
+    // Filtrar y ordenar ensayos (de más reciente a más antiguo) para calcular racha
+    const rehearsalDates = filteredDates.filter(date => {
+        const session = state.sessionTypes[date];
+        return !session || session.type === "ensayo";
+    }).sort((a, b) => b.localeCompare(a));
+
+    const rankingData = state.musicians.map(m => {
+        const musicianId = m.id;
+
+        // 1. Asistencia en el período filtrado
+        const metrics = getMusicianAttendanceMetrics(musicianId, d => filteredDates.includes(d));
+        const totalConvocated = metrics.totalConvocated;
+        const presentsCount = metrics.attended;
+        const attendancePct = metrics.attendancePct;
+
+        // 2. Racha consecutiva de ensayos asistidos en el período
+        let streak = 0;
+        for (let i = 0; i < rehearsalDates.length; i++) {
+            const date = rehearsalDates[i];
+            const dayRecord = state.attendance[date];
+            const record = dayRecord ? dayRecord[musicianId] : null;
+            if (record && record.status === "present") {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        // 3. Insignias obtenidas
+        const medals = getMusicianMedalsData(musicianId);
+        const badgesCount = medals.filter(med => med.unlocked && !med.isNegative).reduce((acc, med) => acc + (med.stars || 1), 0);
+
+        return {
+            id: m.id,
+            name: m.name,
+            instrument: m.instrument,
+            role: m.role,
+            attendancePct,
+            streak,
+            badgesCount
+        };
+    });
+
+    // Criterio de ordenación:
+    // 1. Mayor porcentaje de asistencia (redondeado a entero)
+    // 2. En caso de empate en el %, priorizar el que tenga mayor racha de asistencia
+    // 3. En caso de empate en racha, mayor número de insignias
+    // 4. Porcentaje decimal exacto
+    // 5. Orden alfabético
+    rankingData.sort((a, b) => {
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) return roundDiff;
+
+        if (b.streak !== a.streak) return b.streak - a.streak;
+
+        if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+
+    const itemsToDisplay = showAllRankingAsistencia ? rankingData : rankingData.slice(0, 5);
+
+    itemsToDisplay.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "comp-ranking-card";
+        card.style.display = "flex";
+        card.style.alignItems = "center";
+        card.style.justifyContent = "space-between";
+        card.style.padding = "6px 12px";
+        card.style.background = "rgba(0, 0, 0, 0.2)";
+        card.style.border = "1px solid var(--border-color)";
+        card.style.borderRadius = "8px";
+        card.style.gap = "10px";
+        card.style.flexWrap = "wrap";
+
+        let rankBadgeClass = "rank-badge";
+        if (index === 0) rankBadgeClass += " rank-gold";
+        else if (index === 1) rankBadgeClass += " rank-silver";
+        else if (index === 2) rankBadgeClass += " rank-bronze";
+
+        card.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; min-width: 140px; flex: 1; min-width: 0;">
+                <div class="${rankBadgeClass}">${index + 1}</div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; flex: 1;">
+                    <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${item.name}
+                    </span>
+                    <span style="font-size: 0.76rem; color: var(--text-muted); font-weight: 500; white-space: nowrap; opacity: 0.88;">
+                        • ${item.instrument}${item.role ? ` (${item.role})` : ''}
+                    </span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 0.85rem; font-weight: 600; flex-shrink: 0;">
+                <div style="color: var(--color-gold); font-family: 'Cinzel', serif; font-size: 0.95rem;" title="Porcentaje de Asistencia">
+                    ${Math.round(item.attendancePct)}%
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: #ff6a00;" title="Racha de asistencia consecutiva">
+                    🔥 <span>${item.streak}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: var(--color-gold);" title="Insignias obtenidas">
+                    🏅 <span>${item.badgesCount}</span>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+// ==========================================================================
+// ESTADÍSTICA DE ENSAYOS (DURACIÓN, GENERALES Y POR VOZ)
+// ==========================================================================
+function parseRehearsalDurationMinutes(timeStr) {
+    if (!timeStr || typeof timeStr !== "string") return 0;
+    const parts = timeStr.split(/[-–—]|(?:\sa\s)|(?:\shasta\s)/i);
+    if (parts.length >= 2) {
+        const parseTime = (s) => {
+            if (!s) return null;
+            const m = s.match(/(\d{1,2})[\:\s hH]*(\d{2})?/);
+            if (!m) return null;
+            const h = parseInt(m[1], 10);
+            const min = m[2] ? parseInt(m[2], 10) : 0;
+            if (isNaN(h) || h > 23 || isNaN(min) || min > 59) return null;
+            return h * 60 + min;
+        };
+
+        const startMin = parseTime(parts[0]);
+        const endMin = parseTime(parts[1]);
+
+        if (startMin !== null && endMin !== null) {
+            let diff = endMin - startMin;
+            if (diff <= 0) {
+                diff += 24 * 60; // Cruzó medianoche
+            }
+            if (diff > 0 && diff < 12 * 60) {
+                return diff;
+            }
+        }
+    }
+    return 0;
+}
+
+function formatMinutesToHoursStr(totalMinutes) {
+    if (!totalMinutes || totalMinutes <= 0) return "0 h";
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (mins === 0) {
+        return `${hours} h`;
+    }
+    if (hours === 0) {
+        return `${mins} min`;
+    }
+    return `${hours} h ${mins} min`;
+}
+
+function getSubtypeLabel(subtype, sessionInfo) {
+    const sub = (subtype || "").trim().toLowerCase();
+    if (!sub || sub === "general" || sub === "ensayo-general" || sub === "ensayo general") {
+        return "Ensayo General";
+    }
+    if (sub === "trompetas1" || sub === "ensayo-trompetas1") return "Ensayo Trompetas 1ª";
+    if (sub === "bajos" || sub === "ensayo-bajos") return "Ensayo Bajos";
+    if (sub === "trompetas2y3" || sub === "ensayo-trompetas2y3") return "Ensayo Trompetas 2ª y 3ª";
+    if (sub === "cornetas" || sub === "ensayo-cornetas") return "Ensayo Cornetas";
+    if (sub === "percusion" || sub === "ensayo-percusion") return "Ensayo Percusión";
+    if (sub === "primeras" || sub === "ensayo-primeras") return "Ensayo Primeras";
+
+    if (sessionInfo && Array.isArray(sessionInfo.convocatedVoices) && sessionInfo.convocatedVoices.length > 0) {
+        return "Ensayo " + sessionInfo.convocatedVoices.join(", ");
+    }
+
+    const cleanSub = sub.replace(/^ensayo-?/, "");
+    return "Ensayo " + cleanSub.charAt(0).toUpperCase() + cleanSub.slice(1);
+}
+
+function calculateRehearsalsStats(datesArray) {
+    let totalCount = 0;
+    let generalCount = 0;
+    let voiceCount = 0;
+    let totalMinutes = 0;
+    
+    const breakdownMap = {};
+
+    (datesArray || []).forEach(dateKey => {
+        const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+        const type = sessionInfo ? sessionInfo.type : "ensayo";
+        if (type !== "ensayo") return;
+
+        totalCount++;
+        const duration = parseRehearsalDurationMinutes(sessionInfo ? sessionInfo.time : "");
+        totalMinutes += duration;
+
+        const sub = sessionInfo ? sessionInfo.subtype : "general";
+        const label = getSubtypeLabel(sub, sessionInfo);
+
+        const isGen = (label === "Ensayo General");
+        if (isGen) {
+            generalCount++;
+        } else {
+            voiceCount++;
+        }
+
+        if (!breakdownMap[label]) {
+            breakdownMap[label] = {
+                label: label,
+                count: 0,
+                totalMinutes: 0,
+                isGeneral: isGen
+            };
+        }
+        breakdownMap[label].count++;
+        breakdownMap[label].totalMinutes += duration;
+    });
+
+    const breakdownList = Object.values(breakdownMap).sort((a, b) => {
+        if (a.isGeneral && !b.isGeneral) return -1;
+        if (!a.isGeneral && b.isGeneral) return 1;
+        return b.count - a.count || b.totalMinutes - a.totalMinutes;
+    }).map(item => {
+        const pctOfTotal = totalCount > 0 ? Math.round((item.count / totalCount) * 100) : 0;
+        return {
+            ...item,
+            pctOfTotal,
+            formattedHours: formatMinutesToHoursStr(item.totalMinutes)
+        };
+    });
+
+    return {
+        totalCount,
+        generalCount,
+        voiceCount,
+        totalMinutes,
+        formattedTotalHours: formatMinutesToHoursStr(totalMinutes),
+        breakdownList
+    };
+}
+
+function renderStatsEnsayos(filteredDates) {
+    const stats = calculateRehearsalsStats(filteredDates);
+
+    const totalEl = document.getElementById("stats-rehearsals-total-count");
+    const generalEl = document.getElementById("stats-rehearsals-general-count");
+    const voiceEl = document.getElementById("stats-rehearsals-voice-count");
+    const hoursEl = document.getElementById("stats-rehearsals-total-hours");
+    const bodyEl = document.getElementById("stats-rehearsals-breakdown-body");
+
+    if (totalEl) totalEl.innerText = stats.totalCount;
+    if (generalEl) generalEl.innerText = stats.generalCount;
+    if (voiceEl) voiceEl.innerText = stats.voiceCount;
+    if (hoursEl) hoursEl.innerText = stats.formattedTotalHours;
+
+    if (bodyEl) {
+        if (stats.breakdownList.length === 0) {
+            bodyEl.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted" style="padding: 20px;">
+                        No hay ensayos registrados en este período.
+                    </td>
+                </tr>
+            `;
+        } else {
+            let html = "";
+            stats.breakdownList.forEach(item => {
+                const badgeColor = item.isGeneral ? "var(--color-gold)" : "#3b82f6";
+                html += `
+                    <tr>
+                        <td>
+                            <strong style="color: var(--text-primary);">${item.label}</strong>
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;">${item.count}</span>
+                        </td>
+                        <td style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">
+                            ${item.pctOfTotal}%
+                        </td>
+                        <td style="text-align: right; padding-right: 15px; font-weight: 700; color: ${badgeColor}; font-size: 0.9rem;">
+                            ${item.formattedHours}
+                        </td>
+                    </tr>
+                `;
+            });
+            bodyEl.innerHTML = html;
+        }
+    }
+}
+
+function calculateDireccionStats(datesArray) {
+    let totalCount = 0;
+
+    const UNASSIGNED_LABEL = "Sin asignar";
+    const responsableMap = {};
+
+    (datesArray || []).forEach(dateKey => {
+        const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
+        const type = sessionInfo ? sessionInfo.type : "ensayo";
+        if (type !== "ensayo") return;
+
+        totalCount++;
+
+        // Un ensayo puede tener varios responsables (casos puntuales), separados por comas;
+        // se cuenta una vez para cada uno de ellos.
+        const responsableNames = (sessionInfo && sessionInfo.responsable)
+            ? sessionInfo.responsable.split(",").map(s => s.trim()).filter(Boolean)
+            : [];
+        const responsables = responsableNames.length > 0 ? responsableNames : [UNASSIGNED_LABEL];
+        const sub = sessionInfo ? sessionInfo.subtype : "general";
+        const label = getSubtypeLabel(sub, sessionInfo);
+
+        responsables.forEach(responsable => {
+            if (!responsableMap[responsable]) {
+                responsableMap[responsable] = {
+                    responsable: responsable,
+                    count: 0,
+                    typeCounts: {}
+                };
+            }
+            responsableMap[responsable].count++;
+            responsableMap[responsable].typeCounts[label] = (responsableMap[responsable].typeCounts[label] || 0) + 1;
+        });
+    });
+
+    const breakdownList = Object.values(responsableMap).sort((a, b) => b.count - a.count).map(item => {
+        const pctOfTotal = totalCount > 0 ? Math.round((item.count / totalCount) * 100) : 0;
+        const typesText = Object.entries(item.typeCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, count]) => `${label} ×${count}`)
+            .join(", ");
+        return {
+            ...item,
+            pctOfTotal,
+            typesText
+        };
+    });
+
+    return {
+        totalCount,
+        breakdownList
+    };
+}
+
+function renderStatsDireccion(filteredDates) {
+    const stats = calculateDireccionStats(filteredDates);
+
+    const bodyEl = document.getElementById("stats-direccion-breakdown-body");
+
+    if (bodyEl) {
+        if (stats.breakdownList.length === 0) {
+            bodyEl.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted" style="padding: 20px;">
+                        No hay ensayos registrados en este período.
+                    </td>
+                </tr>
+            `;
+        } else {
+            let html = "";
+            stats.breakdownList.forEach(item => {
+                const isUnassigned = item.responsable === "Sin asignar";
+                const nameColor = isUnassigned ? "var(--text-muted)" : "var(--text-primary)";
+                html += `
+                    <tr>
+                        <td>
+                            <strong style="color: ${nameColor};">${item.responsable}</strong>
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="display: inline-block; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 0.85rem;">${item.count}</span>
+                        </td>
+                        <td style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">
+                            ${item.pctOfTotal}%
+                        </td>
+                        <td style="color: var(--text-secondary); font-size: 0.85rem;">
+                            ${item.typesText}
+                        </td>
+                    </tr>
+                `;
+            });
+            bodyEl.innerHTML = html;
+        }
+    }
+
+    renderStatsDireccionPieChart(stats.breakdownList, stats.totalCount);
+}
+
+const DIRECCION_PIE_PALETTE = ["#D4AF37", "#3b82f6", "#2ecc71", "#e67e22", "#9b59b6", "#1abc9c", "#e84393", "#e74c3c", "#00b894", "#0984e3"];
+const DIRECCION_PIE_UNASSIGNED_COLOR = "#8a8a8a";
+
+function renderStatsDireccionPieChart(breakdownList, totalCount) {
+    const container = document.getElementById("stats-direccion-piechart-container");
+    if (!container) return;
+
+    if (!breakdownList || breakdownList.length === 0 || !totalCount) {
+        container.innerHTML = `<p class="text-muted" style="font-size: 0.85rem; padding: 4px 0;">No hay datos suficientes para el gráfico.</p>`;
+        return;
+    }
+
+    const cx = 90, cy = 90, outerR = 80, innerR = 46;
+    let angle = 0;
+    let colorIdx = 0;
+    let slicesSVG = "";
+    let legendHTML = "";
+
+    breakdownList.forEach(item => {
+        const isUnassigned = item.responsable === "Sin asignar";
+        const color = isUnassigned ? DIRECCION_PIE_UNASSIGNED_COLOR : DIRECCION_PIE_PALETTE[colorIdx % DIRECCION_PIE_PALETTE.length];
+        if (!isUnassigned) colorIdx++;
+
+        const span = totalCount > 0 ? (item.count / totalCount) * 360 : 0;
+        const trimmed = trimAngleGap(angle, angle + span, 2);
+        const path = donutSlicePath(cx, cy, innerR, outerR, trimmed.start, trimmed.end);
+        const title = `${item.responsable}: ${item.count} ensayo${item.count === 1 ? "" : "s"} (${item.pctOfTotal}%)`;
+        slicesSVG += `<path d="${path}" fill="${color}" stroke="var(--bg-card)" stroke-width="1.5"><title>${title}</title></path>`;
+
+        legendHTML += `
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; padding: 3px 0;">
+                <span style="width: 10px; height: 10px; border-radius: 3px; background: ${color}; flex-shrink: 0;"></span>
+                <span style="color: ${isUnassigned ? "var(--text-muted)" : "var(--text-primary)"}; font-weight: 600;">${item.responsable}</span>
+                <span style="color: var(--text-secondary); margin-left: auto; padding-left: 10px; white-space: nowrap;">${item.count} · ${item.pctOfTotal}%</span>
+            </div>
+        `;
+        angle += span;
+    });
+
+    container.innerHTML = `
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center;">
+            <svg viewBox="0 0 180 180" width="180" height="180" style="flex-shrink: 0;">
+                ${slicesSVG}
+                <text x="90" y="86" text-anchor="middle" style="font-size: 20px; font-weight: 700; fill: var(--text-primary); font-family: 'Outfit', sans-serif;">${totalCount}</text>
+                <text x="90" y="102" text-anchor="middle" style="font-size: 9px; fill: var(--text-muted); font-family: 'Outfit', sans-serif;">ENSAYOS</text>
+            </svg>
+            <div style="flex: 1; min-width: 180px;">
+                ${legendHTML}
+            </div>
+        </div>
+    `;
+}
+
 // Renderiza la cuadrícula de componentes con sus anillos SVG circulares de progreso
 function renderComponentsCircularStats() {
     const container = document.getElementById("stats-components-container");
@@ -5373,7 +7549,9 @@ function openMusicianDetailStats(musicianId) {
     if (!musician) return;
 
     document.getElementById("detail-musician-name").innerText = musician.name;
-    document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role}`;
+    document.getElementById("detail-musician-instrument").innerText = musician.fullName
+        ? `${musician.fullName} — ${musician.instrument} — ${musician.role}`
+        : `${musician.instrument} — ${musician.role}`;
 
     // Resetear filtros al abrir
     document.getElementById("detail-filter-year").value = "all";
@@ -5416,8 +7594,14 @@ function renderMusicianDetailContent() {
         }
     }
 
-    document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 119, 0, 0.16); color: #ff8c1a; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: 1px solid rgba(255, 120, 0, 0.65);"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>`;
-    document.getElementById("detail-musician-instrument").innerText = `${musician.instrument} — ${musician.role || "Músico"}`;
+    const bajaBadgeInHeader = musician.isBaja
+        ? `<span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(128, 128, 128, 0.16); color: #a0a0a0; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: 1px solid rgba(160, 160, 160, 0.4);"><span style="font-size: 0.9rem;">🚫</span> Baja</span>`
+        : '';
+
+    document.getElementById("detail-musician-name").innerHTML = `${musician.name} <span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 119, 0, 0.16); color: #ff8c1a; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: 1px solid rgba(255, 120, 0, 0.65);"><span style="font-size: 1rem;">🔥</span> ${currentStreak}</span><span class="streak-badge" style="font-size: 0.9rem; margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; border: ${badgeBorder};"><span style="font-size: 1rem;">${badgeIcon}</span> ${detailUnlockedCount}</span>${bajaBadgeInHeader}`;
+    document.getElementById("detail-musician-instrument").innerText = musician.fullName
+        ? `${musician.fullName} — ${musician.instrument} — ${musician.role || "Músico"}`
+        : `${musician.instrument} — ${musician.role || "Músico"}`;
 
     const detailChecks = [
         { id: "detail-badge-weather-check", val: !!musician.badgeWeather },
@@ -5464,21 +7648,31 @@ function renderMusicianDetailContent() {
         hermandadEventsInput.disabled = !isAdmin;
     }
 
-    const yearFilter = document.getElementById("detail-filter-year").value;
+    const detailYearSelect = document.getElementById("detail-filter-year");
     const monthFilter = document.getElementById("detail-filter-month").value;
     const typeFilter = document.getElementById("detail-filter-type").value;
 
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    // Filtrar fechas
-    const filteredDates = Object.keys(state.attendance).filter(dateStr => {
-        if (dateStr > todayStr) return false; // Excluir sesiones futuras de las estadísticas
+    // Obtener todas las fechas únicas de sessionTypes y attendance
+    const allDates = Array.from(new Set([
+        ...Object.keys(state.sessionTypes || {}),
+        ...Object.keys(state.attendance || {})
+    ]));
 
-        const dateObj = new Date(dateStr.replace(/-/g, "/"));
-        const year = dateObj.getFullYear().toString();
+    populateSeasonSelect(detailYearSelect, allDates, true, detailYearSelect.value);
+    const yearFilter = detailYearSelect.value;
+
+    // Filtrar fechas pasadas y aplicables al filtro del modal
+    const filteredDates = allDates.filter(dateStr => {
+        if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
+
+        // dateStr puede llevar sufijo (sesiones múltiples/especiales el mismo día): quitarlo antes
+        // de parsear la fecha, si no new Date(...) da Invalid Date y el mes sale NaN.
+        const dateObj = new Date(dateStr.split("_")[0].replace(/-/g, "/"));
         const month = dateObj.getMonth().toString();
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -5493,14 +7687,20 @@ function renderMusicianDetailContent() {
     const reasonCounts = {};
 
     filteredDates.forEach(date => {
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        if (!record) return;
-        totalSessions++;
+        const sessionInfo = state.sessionTypes ? state.sessionTypes[date] : null;
+        const sessionObj = sessionInfo || { type: "ensayo", subtype: "general" };
 
-        if (record.status === "present") {
+        const isSpecial = sessionObj.type === "ensayo" && sessionObj.subtype && sessionObj.subtype !== "general" && sessionObj.convocatedVoices && sessionObj.convocatedVoices.length > 0;
+        if (isSpecial && !sessionObj.convocatedVoices.includes(musician.instrument)) {
+            return;
+        }
+
+        totalSessions++;
+        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
+
+        if (record && record.status === "present") {
             presents++;
         } else {
-            const sessionInfo = state.sessionTypes[date];
             let sessionLabel = "General";
             if (sessionInfo) {
                 if (sessionInfo.type === "actuacion") {
@@ -5529,27 +7729,28 @@ function renderMusicianDetailContent() {
             }
             const sessionTypeName = sessionInfo ? sessionInfo.type : "ensayo";
 
-            if (record.justified) {
+            const isJustified = record && record.justified;
+            if (isJustified) {
                 absentJustified++;
             } else {
                 absentUnjustified++;
             }
 
-            const reason = record.reason || "Sin especificar";
+            const reason = (record && record.reason) ? record.reason : "Sin especificar";
             reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
 
             absenceRecords.push({
                 date,
                 sessionLabel,
                 sessionType: sessionTypeName,
-                justified: record.justified,
+                justified: isJustified,
                 reason
             });
         }
     });
 
     const totalAbsent = absentJustified + absentUnjustified;
-    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 0;
+    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 100;
 
     // Tarjetas resumen
     const pctEl = document.getElementById("detail-attendance-pct");
@@ -5711,7 +7912,7 @@ function renderMusicianDetailContent() {
         const categories = [
             {
                 title: "📅 Asistencia",
-                ids: ["asistencia", "comprometido", "veterano", "racha", "god", "titular", "capitan", "volver_ensayar"]
+                ids: ["asistencia", "comprometido", "veterano", "racha", "god", "titular", "top", "capitan", "volver_ensayar"]
             },
             {
                 title: "📜 Legado",
@@ -5777,6 +7978,93 @@ function renderMusicianDetailContent() {
             `;
         }).join("");
     }
+
+    renderMusicianMonthlyEvolution(musicianId);
+    renderMusicianLeavesSection(musician);
+}
+
+function renderMusicianLeavesSection(musician) {
+    const container = document.getElementById("detail-musician-leaves-container");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    const leaves = musician.leaves || [];
+    if (leaves.length === 0) {
+        container.innerHTML = `<p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">Sin períodos de baja registrados.</p>`;
+        return;
+    }
+
+    const sortedLeaves = [...leaves].sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""));
+    const isAdmin = getAuthRole() === "admin";
+
+    const listHtml = sortedLeaves.map(leave => {
+        const startFormatted = formatDateCompactSpanish(leave.startDate);
+        const endFormatted = leave.endDate ? formatDateCompactSpanish(leave.endDate) : "Actualidad (En baja)";
+        const isActive = !leave.endDate;
+
+        const badgeStyle = isActive
+            ? "background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3);"
+            : "background: rgba(128, 128, 128, 0.15); color: #a0a0a0; border: 1px solid rgba(160, 160, 160, 0.3);";
+
+        const deleteBtnHtml = isAdmin ? `
+            <button type="button" class="btn-delete-leave-period" data-leave-id="${leave.id}" data-musician-id="${musician.id}" title="Eliminar período de baja" style="background: none; border: none; cursor: pointer; color: var(--color-absent); padding: 4px 6px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(231, 76, 60, 0.15)'" onmouseout="this.style.background='transparent'">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
+        ` : '';
+
+        return `
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 8px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+                    <span style="font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; white-space: nowrap; ${badgeStyle}">
+                        ${isActive ? "Baja Activa" : "Baja Finalizada"}
+                    </span>
+                    <span style="font-size: 0.88rem; color: var(--text-primary); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        📅 ${startFormatted} &mdash; ${endFormatted}
+                    </span>
+                </div>
+                ${deleteBtnHtml}
+            </div>
+        `;
+    }).join("");
+
+    container.innerHTML = listHtml;
+
+    if (isAdmin) {
+        container.querySelectorAll(".btn-delete-leave-period").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const leaveId = btn.getAttribute("data-leave-id");
+                const musicianId = btn.getAttribute("data-musician-id");
+                deleteMusicianLeavePeriod(musicianId, leaveId);
+            });
+        });
+    }
+}
+
+function deleteMusicianLeavePeriod(musicianId, leaveId) {
+    const musIdx = state.musicians.findIndex(m => String(m.id) === String(musicianId));
+    if (musIdx === -1) return;
+
+    const musician = state.musicians[musIdx];
+    if (!confirm(`¿Eliminar este período de baja de ${musician.name}?`)) return;
+
+    const newLeaves = (musician.leaves || []).filter(l => l.id !== leaveId);
+    const hasActiveLeave = newLeaves.some(l => !l.endDate);
+
+    state.musicians[musIdx] = {
+        ...musician,
+        isBaja: hasActiveLeave,
+        leaves: newLeaves
+    };
+
+    dbSaveMusician(state.musicians[musIdx]);
+    showToast("Período de baja eliminado", "success");
+    renderMusicianDetailContent(musicianId);
+    renderPlantillaTable();
+    renderStatistics();
 }
 
 function downloadMusicianPDFReport() {
@@ -5793,10 +8081,9 @@ function downloadMusicianPDFReport() {
     const allDates = Object.keys(state.attendance);
     const filteredDates = allDates.filter(dateStr => {
         const dateObj = new Date(dateStr);
-        const year = dateObj.getFullYear().toString();
         const month = dateObj.getMonth().toString();
 
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -5875,7 +8162,7 @@ function downloadMusicianPDFReport() {
     });
 
     const totalAbsent = absentJustified + absentUnjustified;
-    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 0;
+    const pct = totalSessions > 0 ? Math.round((presents / totalSessions) * 100) : 100;
     const pctAbsent = totalSessions > 0 ? Math.round((totalAbsent / totalSessions) * 100) : 0;
 
     let reasonsHTML = "";
@@ -5889,10 +8176,102 @@ function downloadMusicianPDFReport() {
         `;
     }
 
-    const filterTextYear = yearFilter === "all" ? "Todos los años" : yearFilter;
+    const filterTextYear = yearFilter === "all" ? "Todas las temporadas" : `Temporada ${yearFilter}`;
     const monthsNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const filterTextMonth = monthFilter === "all" ? "Todos los meses" : monthsNames[parseInt(monthFilter)];
     const filterTextType = typeFilter === "all" ? "Ensayos y Actuaciones" : (typeFilter === "ensayo" ? "Solo Ensayos" : "Solo Actuaciones");
+
+    // Calcular datos de evolución mensual para el informe impreso
+    const todayPrint = new Date();
+    const todayStrPrint = `${todayPrint.getFullYear()}-${String(todayPrint.getMonth() + 1).padStart(2, '0')}-${String(todayPrint.getDate()).padStart(2, '0')}`;
+
+    const seasonMonthsPrint = getSeasonMonthsArray(yearFilter === "all" ? getCurrentSeasonLabel() : yearFilter);
+
+    const monthlyDataForPrint = seasonMonthsPrint.map(sm => {
+        let presents = 0;
+        let total = 0;
+
+        Object.keys(state.attendance).forEach(dateStr => {
+            if (dateStr > todayStrPrint) return;
+            const dateParts = dateStr.split("-");
+            const y = dateParts[0];
+            const m = parseInt(dateParts[1], 10);
+
+            if (y === sm.year && m === sm.monthNum) {
+                const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
+                if (typeFilter !== "all" && sessionType !== typeFilter) return;
+
+                const rec = state.attendance[dateStr] ? state.attendance[dateStr][musicianId] : null;
+                if (rec) {
+                    total++;
+                    if (rec.status === "present") presents++;
+                }
+            }
+        });
+
+        const pct = total > 0 ? Math.round((presents / total) * 100) : null;
+        return { label: sm.label, presents, total, pct };
+    });
+
+    let printMonthlyBarsHTML = "";
+    monthlyDataForPrint.forEach(item => {
+        const hasData = item.pct !== null;
+        const heightPct = hasData ? item.pct : 0;
+        const displayValue = hasData ? `${item.pct}%` : "-";
+        
+        let barBg = "#d0d0d0";
+        let valColor = "#666666";
+
+        if (hasData) {
+            if (item.pct >= 80) {
+                barBg = "#2ecc71";
+                valColor = "#27ae60";
+            } else if (item.pct >= 60) {
+                barBg = "#d4af37";
+                valColor = "#b89628";
+            } else {
+                barBg = "#e74c3c";
+                valColor = "#c0392b";
+            }
+        }
+
+        printMonthlyBarsHTML += `
+            <div style="display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; position: relative;">
+                <span style="font-size: 7pt; font-weight: 700; color: ${valColor}; margin-bottom: 2px; z-index: 2;">
+                    ${displayValue}
+                </span>
+                <div style="width: 55%; height: ${heightPct}%; background-color: ${barBg}; border-radius: 2px 2px 0 0; min-height: ${hasData ? '2px' : '0px'};"></div>
+                <span style="position: absolute; bottom: -17px; font-size: 7pt; color: #333; font-weight: 600; white-space: nowrap;">
+                    ${item.label}
+                </span>
+            </div>
+        `;
+    });
+
+    const printMonthlyChartSectionHTML = `
+        <div class="print-section-title" style="margin-top: 14px;">Evolución Temporal Mensual</div>
+        <div style="display: flex; height: 110px; width: 100%; border-bottom: 1.5px solid #ccc; border-left: 1.5px solid #ccc; position: relative; padding: 10px 5px 0 28px; box-sizing: border-box; margin-bottom: 22px; background: #fdfdfd; border-radius: 4px;">
+            <div style="position: absolute; left: 0; top: 0; bottom: 20px; width: 24px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 6.5pt; color: #666; padding-right: 4px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+            
+            <div style="position: absolute; left: 24px; right: 0; top: 0; bottom: 20px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px dashed #e0e0e0; width: 100%;"></div>
+                <div style="border-top: 1px solid #ccc; width: 100%;"></div>
+            </div>
+
+            <div style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 20px; box-sizing: border-box; gap: 2px;">
+                ${printMonthlyBarsHTML}
+            </div>
+        </div>
+    `;
 
     let tableRowsHTML = "";
     if (sessionsList.length === 0) {
@@ -5938,6 +8317,7 @@ function downloadMusicianPDFReport() {
 
         <div class="print-musician-info">
             <h2 class="print-musician-name">${musician.name}</h2>
+            ${musician.fullName ? `<p class="print-musician-instrument"><strong>Nombre completo:</strong> ${musician.fullName}</p>` : ""}
             <p class="print-musician-instrument"><strong>Sección:</strong> ${musician.instrument} | <strong>Rol:</strong> ${musician.role}</p>
         </div>
 
@@ -5972,6 +8352,8 @@ function downloadMusicianPDFReport() {
             </div>
         </div>
 
+        ${printMonthlyChartSectionHTML}
+
         ${reasonsHTML}
 
         <div class="print-section-title">Historial Detallado de Sesiones</div>
@@ -5997,6 +8379,65 @@ function downloadMusicianPDFReport() {
     }, 10000);
 }
 
+// Descarga en PDF el listado del repertorio de una temporada concreta de la página de Repertorio:
+// solo título de la marcha, ordenado alfabéticamente y numerado, sin más datos.
+function downloadRepertoireSeasonPDF(season) {
+    if (!season) {
+        showToast("Selecciona una temporada válida", "warning");
+        return;
+    }
+
+    const seasonMarchas = getMarchasForSeason(season)
+        .slice()
+        .sort((a, b) => a.title.localeCompare(b.title, 'es'));
+
+    if (seasonMarchas.length === 0) {
+        showToast(`No hay marchas en el repertorio de la temporada ${season}`, "warning");
+        return;
+    }
+
+    const rowsHTML = seasonMarchas.map((m, idx) => `
+        <tr>
+            <td style="width: 40px; text-align: center; font-weight: 600; color: #6c757d;">${idx + 1}</td>
+            <td>${m.title}</td>
+        </tr>
+    `).join("");
+
+    const printArea = document.getElementById("print-report-area");
+
+    printArea.innerHTML = `
+        <div class="print-header">
+            <div>
+                <h1 class="print-title">YACENTE</h1>
+                <div class="print-subtitle">Repertorio de la Temporada ${season}</div>
+            </div>
+            <div class="print-meta">
+                <strong>Temporada:</strong> ${season}<br>
+                <strong>Total marchas:</strong> ${seasonMarchas.length}<br>
+                <strong>Fecha:</strong> ${new Date().toLocaleDateString("es-ES")}
+            </div>
+        </div>
+
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;">Nº</th>
+                    <th>Marcha</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHTML}
+            </tbody>
+        </table>
+    `;
+
+    window.print();
+
+    setTimeout(() => {
+        printArea.innerHTML = "";
+    }, 10000);
+}
+
 function downloadRepertoirePDFReport() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
@@ -6004,7 +8445,10 @@ function downloadRepertoirePDFReport() {
     const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
 
-    if (!state.marchas || state.marchas.length === 0) {
+    // El músico siempre exporta el repertorio de la temporada actual.
+    const currentSeasonMarchas = getMarchasForSeason(getCurrentSeasonLabel());
+
+    if (currentSeasonMarchas.length === 0) {
         showToast("No hay marchas en el repertorio para exportar", "warning");
         return;
     }
@@ -6015,7 +8459,7 @@ function downloadRepertoirePDFReport() {
 
     // Count statistics
     const stats = { green: 0, yellow: 0, red: 0, none: 0 };
-    state.marchas.forEach(marcha => {
+    currentSeasonMarchas.forEach(marcha => {
         const key = `${musicianId}_${marcha.id}`;
         const status = state.musicianMarchaStatuses[key] || "none";
         if (status === "green") stats.green++;
@@ -6024,7 +8468,7 @@ function downloadRepertoirePDFReport() {
         else stats.none++;
     });
 
-    const sorted = [...(state.marchas || [])].sort((a, b) => a.title.localeCompare(b.title));
+    const sorted = currentSeasonMarchas.slice().sort((a, b) => a.title.localeCompare(b.title));
     
     // Determine dynamic column count to make it fit on exactly ONE page
     let columnCount = 2;
@@ -6070,7 +8514,7 @@ function downloadRepertoirePDFReport() {
         <div class="print-header">
             <div>
                 <h1 class="print-title">YACENTE</h1>
-                <div class="print-subtitle">Repertorio General y Nivel de Dominio</div>
+                <div class="print-subtitle">Repertorio de la Temporada ${getCurrentSeasonLabel()} y Nivel de Dominio</div>
             </div>
             <div class="print-meta">
                 <strong>Músico:</strong> ${musician.name}<br>
@@ -6097,10 +8541,10 @@ function downloadRepertoirePDFReport() {
                 <span>Sin marcar (${stats.none})</span>
             </div>
             <div style="margin-left: auto; font-weight: 600;">
-                Total: ${state.marchas.length} marchas
+                Total: ${currentSeasonMarchas.length} marchas
             </div>
         </div>
-        
+
         <div class="print-repertoire-grid">
             ${columnsHTML}
         </div>
@@ -6201,14 +8645,76 @@ function downloadSeasonPDFReport(selectedSeason) {
         });
     });
 
-    const totalFaltasTotalesGral = totalFaltasUnjustifiedGral + totalFaltasJustifiedGral;
     const avgAttendancePct = totalEvaluationsGral > 0 ? Math.round((totalAsistenciasGral / totalEvaluationsGral) * 100) : 0;
     const avgUnjustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100) : 0;
-    const avgJustifiedPct = totalEvaluationsGral > 0 ? Math.round((totalFaltasJustifiedGral / totalEvaluationsGral) * 100) : 0;
     const presentsPctOfTotal = totalEvaluationsGral > 0 ? ((totalAsistenciasGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
     const absentUnjustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasUnjustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
     const absentJustifiedPctOfTotal = totalEvaluationsGral > 0 ? ((totalFaltasJustifiedGral / totalEvaluationsGral) * 100).toFixed(1) : "0.0";
 
+    // 1. ESTADÍSTICA DE ENSAYOS Y HORAS
+    const rehearsalsStats = calculateRehearsalsStats(seasonDates);
+    let rehearsalsBreakdownHTML = "";
+    if (rehearsalsStats.breakdownList.length === 0) {
+        rehearsalsBreakdownHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin ensayos registrados en este período.</td></tr>`;
+    } else {
+        rehearsalsStats.breakdownList.forEach(item => {
+            const color = item.isGeneral ? "#d4af37" : "#3b82f6";
+            rehearsalsBreakdownHTML += `
+                <tr>
+                    <td><strong>${item.label}</strong></td>
+                    <td style="text-align: center;">${item.count}</td>
+                    <td style="text-align: center;">${item.pctOfTotal}%</td>
+                    <td style="text-align: right; padding-right: 15px; font-weight: bold; color: ${color};">${item.formattedHours}</td>
+                </tr>
+            `;
+        });
+    }
+
+    // 2. DISTRIBUCIÓN POR DÍAS DE LA SEMANA
+    const dayNamesSpanish = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    const dayIndexMap = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
+    const dayStats = dayNamesSpanish.map(name => ({ name, sessions: 0, presents: 0, totalChecks: 0 }));
+
+    seasonDates.forEach(date => {
+        const parts = date.split("-");
+        const dObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        const dayIdx = dayIndexMap[dObj.getDay()];
+        if (dayStats[dayIdx] !== undefined) {
+            dayStats[dayIdx].sessions++;
+            const dayRecord = state.attendance[date] || {};
+            state.musicians.forEach(m => {
+                const r = dayRecord[m.id];
+                if (r) {
+                    dayStats[dayIdx].totalChecks++;
+                    if (r.status === "present") dayStats[dayIdx].presents++;
+                }
+            });
+        }
+    });
+
+    let dayStatsHTML = "";
+    dayStats.forEach(ds => {
+        if (ds.sessions > 0) {
+            const pct = ds.totalChecks > 0 ? Math.round((ds.presents / ds.totalChecks) * 100) : 0;
+            let color = "#2ecc71";
+            if (pct < 50) color = "#e74c3c";
+            else if (pct < 80) color = "#d4af37";
+
+            dayStatsHTML += `
+                <tr>
+                    <td><strong>${ds.name}</strong></td>
+                    <td style="text-align: center;">${ds.sessions} ${ds.sessions === 1 ? 'convocatoria' : 'convocatorias'}</td>
+                    <td style="text-align: center;">${ds.presents} / ${ds.totalChecks}</td>
+                    <td style="text-align: right; padding-right: 15px; color: ${color}; font-weight: bold;">${pct}%</td>
+                </tr>
+            `;
+        }
+    });
+    if (!dayStatsHTML) {
+        dayStatsHTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin datos en este período.</td></tr>`;
+    }
+
+    // 3. ASISTENCIA POR SECCIONES
     const sections = {};
     state.musicians.forEach(m => {
         const sec = m.instrument || "Otros";
@@ -6234,9 +8740,9 @@ function downloadSeasonPDFReport(selectedSeason) {
     sortedSections.forEach(secName => {
         const s = sections[secName];
         const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 0;
-        let color = "var(--color-absent)";
-        if (pct >= 80) color = "var(--color-present)";
-        else if (pct >= 50) color = "var(--color-gold)";
+        let color = "#e74c3c";
+        if (pct >= 80) color = "#2ecc71";
+        else if (pct >= 50) color = "#d4af37";
 
         sectionsHTML += `
             <tr>
@@ -6249,6 +8755,7 @@ function downloadSeasonPDFReport(selectedSeason) {
         `;
     });
 
+    // 4. RACHAS Y TOP 5 ASISTENCIA
     const musiciansList = Object.values(musicianStats);
 
     const top3Streaks = [...musiciansList]
@@ -6278,32 +8785,76 @@ function downloadSeasonPDFReport(selectedSeason) {
         }
     }
 
-    const top5Attendance = [...musiciansList]
-        .filter(m => m.total > 0)
-        .sort((a, b) => {
-            const pctA = a.presents / a.total;
-            const pctB = b.presents / b.total;
-            return pctB - pctA || b.presents - a.presents;
-        })
-        .slice(0, 5);
+    // 5. RANKING COMPLETO DE COMPONENTES
+    const fullRankingData = state.musicians.map(m => {
+        const musicianId = m.id;
+        const metrics = getMusicianAttendanceMetrics(musicianId, d => seasonDates.includes(d));
+        const totalConvocated = metrics.totalConvocated;
+        const presentsCount = metrics.attended;
+        const attendancePct = metrics.attendancePct;
 
-    let top5HTML = "";
-    top5Attendance.forEach((m, idx) => {
-        const pct = Math.round((m.presents / m.total) * 100);
-        top5HTML += `
+        const rehearsalDates = seasonDates.filter(date => {
+            const session = state.sessionTypes[date];
+            return !session || session.type === "ensayo";
+        }).sort((a, b) => b.localeCompare(a));
+
+        let streak = 0;
+        for (let i = 0; i < rehearsalDates.length; i++) {
+            const date = rehearsalDates[i];
+            const dayRecord = state.attendance[date];
+            const record = dayRecord ? dayRecord[musicianId] : null;
+            if (record && record.status === "present") {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        const medals = getMusicianMedalsData(musicianId);
+        const badgesCount = medals.filter(med => med.unlocked && !med.isNegative).reduce((acc, med) => acc + (med.stars || 1), 0);
+
+        return {
+            id: m.id,
+            name: m.name,
+            instrument: m.instrument,
+            role: m.role,
+            attendancePct,
+            presentsCount,
+            totalConvocated,
+            streak,
+            badgesCount
+        };
+    }).sort((a, b) => {
+        const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+        if (roundDiff !== 0) return roundDiff;
+        if (b.streak !== a.streak) return b.streak - a.streak;
+        if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+        const exactDiff = b.attendancePct - a.attendancePct;
+        if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+        return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+
+    let fullRankingHTML = "";
+    fullRankingData.forEach((item, idx) => {
+        const pct = Math.round(item.attendancePct);
+        let color = "#2ecc71";
+        if (pct < 50) color = "#e74c3c";
+        else if (pct < 80) color = "#d4af37";
+
+        fullRankingHTML += `
             <tr>
-                <td><strong>${idx + 1}º ${m.name}</strong></td>
-                <td>${m.instrument}</td>
-                <td style="text-align: center;">${m.presents} / ${m.total}</td>
-                <td style="text-align: right; padding-right: 15px; color: var(--color-present); font-weight: bold;">${pct}%</td>
+                <td style="text-align: center; font-weight: bold;">#${idx + 1}</td>
+                <td><strong>${item.name}</strong></td>
+                <td>${item.instrument} ${item.role ? `(${item.role})` : ''}</td>
+                <td style="text-align: center;">${item.presentsCount} / ${item.totalConvocated}</td>
+                <td style="text-align: center; font-weight: bold; color: #ff6a00;">${item.streak} 🔥</td>
+                <td style="text-align: center; font-weight: bold; color: #d4af37;">${item.badgesCount} 🏅</td>
+                <td style="text-align: right; padding-right: 15px; font-weight: bold; color: ${color};">${pct}%</td>
             </tr>
         `;
     });
 
-    if (top5HTML === "") {
-        top5HTML = `<tr><td colspan="4" style="text-align: center; color: #94a3b8;">Sin datos en este periodo.</td></tr>`;
-    }
-
+    // 6. ALERTAS DE ASISTENCIA (<50%)
     const alertMusicians = musiciansList
         .filter(m => m.total > 0 && (m.presents / m.total) < 0.5)
         .sort((a, b) => (a.presents / a.total) - (b.presents / b.total));
@@ -6316,15 +8867,17 @@ function downloadSeasonPDFReport(selectedSeason) {
                 <td><strong>${m.name}</strong></td>
                 <td>${m.instrument}</td>
                 <td style="text-align: center;">${m.presents} / ${m.total}</td>
-                <td style="text-align: right; padding-right: 15px; font-weight: bold;">${pct}%</td>
+                <td style="text-align: center; color: #e74c3c; font-weight: bold;">${m.absentUnjustified}</td>
+                <td style="text-align: right; padding-right: 15px; font-weight: bold; color: #e74c3c;">${pct}%</td>
             </tr>
         `;
     });
 
     if (alertsHTML === "") {
-        alertsHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b; font-style: italic;">No hay componentes por debajo del 50% de asistencia en esta temporada. ¡Buen compromiso general!</td></tr>`;
+        alertsHTML = `<tr><td colspan="5" style="text-align: center; color: #64748b; font-style: italic;">No hay componentes por debajo del 50% de asistencia en esta temporada. ¡Buen compromiso general!</td></tr>`;
     }
 
+    // 7. REPERTORIO DE LA TEMPORADA
     const totalMarchas = state.marchas ? state.marchas.length : 0;
     let greenCount = 0;
     let yellowCount = 0;
@@ -6391,18 +8944,65 @@ function downloadSeasonPDFReport(selectedSeason) {
         `;
     });
 
-    const top5LeastEnsayadas = [...sortedMarchas]
-        .sort((a, b) => a.count - b.count || a.title.localeCompare(b.title))
-        .slice(0, 5);
+    // Marchas más olvidadas con días sin ensayar
+    const lastRehearsalDatesSeason = {};
+    if (state.playedMarchas) {
+        Object.keys(state.playedMarchas).forEach(sessionKey => {
+            if (!isSessionConcluded(sessionKey)) return; // No contar ensayos que aún no han sucedido
+            const sessionInfo = state.sessionTypes[sessionKey];
+            const isRehearsal = !sessionInfo || sessionInfo.type === "ensayo";
+            if (!isRehearsal) return;
 
-    let top5LeastEnsayadasHTML = "";
-    top5LeastEnsayadas.forEach((m, idx) => {
-        const countText = m.count === 0 ? "0 Ensayos" : `${m.count} ${m.count === 1 ? 'ensayo' : 'ensayos'}`;
-        const style = m.count === 0 ? `style="color: var(--color-absent); font-weight: 500;"` : "";
-        top5LeastEnsayadasHTML += `
+            const rawDate = sessionKey.split("_")[0];
+            const list = state.playedMarchas[sessionKey] || [];
+            
+            list.forEach(mId => {
+                if (!lastRehearsalDatesSeason[mId] || rawDate > lastRehearsalDatesSeason[mId]) {
+                    lastRehearsalDatesSeason[mId] = rawDate;
+                }
+            });
+        });
+    }
+
+    const todayDate = new Date();
+    const todayStartObj = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+
+    const marchasOlvidadasData = (state.marchas || []).map(m => {
+        const lastDateStr = lastRehearsalDatesSeason[m.id];
+        let days = Infinity;
+        let daysLabel = "Nunca";
+        
+        if (lastDateStr) {
+            const parts = lastDateStr.split("-");
+            const lastDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            const diffTime = todayStartObj - lastDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            days = Math.max(0, diffDays);
+            daysLabel = `${days} ${days === 1 ? 'día' : 'días'}`;
+        }
+        
+        return {
+            ...m,
+            days: days,
+            daysLabel: daysLabel
+        };
+    }).sort((a, b) => {
+        if (a.days === Infinity && b.days !== Infinity) return -1;
+        if (a.days !== Infinity && b.days === Infinity) return 1;
+        if (a.days === Infinity && b.days === Infinity) {
+            return a.title.localeCompare(b.title, 'es');
+        }
+        return b.days - a.days || a.title.localeCompare(b.title, 'es');
+    });
+
+    const top5Olvidadas = marchasOlvidadasData.slice(0, 5);
+    let top5OlvidadasHTML = "";
+    top5Olvidadas.forEach((m, idx) => {
+        const daysColor = m.days === Infinity ? "#e74c3c" : (m.days > 30 ? "#d4af37" : "#475569");
+        top5OlvidadasHTML += `
             <div class="print-repertoire-item-row">
                 <span>${idx + 1}. <strong>${m.title}</strong></span>
-                <span ${style}>${countText}</span>
+                <span style="color: ${daysColor}; font-weight: 600;">${m.daysLabel} sin ensayar</span>
             </div>
         `;
     });
@@ -6414,7 +9014,7 @@ function downloadSeasonPDFReport(selectedSeason) {
         <div class="print-header">
             <div class="print-brand">
                 <h1 class="print-title">YACENTE</h1>
-                <div class="print-subtitle">Asociación Musical Yacente • Informe de Temporada</div>
+                <div class="print-subtitle">Asociación Musical Yacente • Informe Global de Temporada</div>
             </div>
             <div class="print-meta">
                 <strong>Temporada:</strong> ${selectedSeason}<br>
@@ -6423,127 +9023,202 @@ function downloadSeasonPDFReport(selectedSeason) {
             </div>
         </div>
 
-        <div class="print-section-title">1. Resumen General de la Temporada</div>
-        <div class="print-grid">
-            <div class="print-stat-box">
-                <div class="print-stat-title">Asistencia Media</div>
-                <div class="print-stat-value" style="color: ${avgAttendancePct >= 80 ? 'var(--color-present)' : (avgAttendancePct >= 50 ? 'var(--color-gold)' : 'var(--color-absent)')};">${avgAttendancePct}%</div>
-                <div class="print-stat-desc">${avgAttendancePct >= 80 ? 'Excelente (>=80%)' : (avgAttendancePct >= 50 ? 'Aceptable (50%-80%)' : 'Crítico (<50%)')}</div>
+        <div class="print-page-block">
+            <div class="print-section-title">1. Resumen General de la Temporada</div>
+            <div class="print-grid">
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Asistencia Media</div>
+                    <div class="print-stat-value" style="color: ${avgAttendancePct >= 80 ? '#2ecc71' : (avgAttendancePct >= 50 ? '#d4af37' : '#e74c3c')};">${avgAttendancePct}%</div>
+                    <div class="print-stat-desc">${avgAttendancePct >= 80 ? 'Excelente (>=80%)' : (avgAttendancePct >= 50 ? 'Aceptable (50%-80%)' : 'Crítico (<50%)')}</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Total Convocatorias</div>
+                    <div class="print-stat-value">${totalConvocatorias}</div>
+                    <div class="print-stat-desc">${totalEnsayosCount} Ensayos | ${totalActuacionesCount} Actuaciones</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Incidencia de Faltas</div>
+                    <div class="print-stat-value" style="color: #e74c3c;">${avgUnjustifiedPct}%</div>
+                    <div class="print-stat-desc">${totalFaltasUnjustifiedGral} Faltas sin justificar</div>
+                </div>
             </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Total Convocatorias</div>
-                <div class="print-stat-value">${totalConvocatorias}</div>
-                <div class="print-stat-desc">${totalEnsayosCount} Ensayos | ${totalActuacionesCount} Actuaciones</div>
-            </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Incidencia de Faltas</div>
-                <div class="print-stat-value" style="color: var(--color-absent);">${avgUnjustifiedPct}%</div>
-                <div class="print-stat-desc">${totalFaltasUnjustifiedGral} Faltas sin justificar</div>
-            </div>
-        </div>
-        <div class="print-grid" style="margin-top: -5px;">
-            <div class="print-stat-box">
-                <div class="print-stat-title">Asistencias Totales</div>
-                <div class="print-stat-value" style="color: var(--color-present); font-size: 13pt;">${totalAsistenciasGral.toLocaleString()} presencias</div>
-                <div class="print-stat-desc">${presentsPctOfTotal}% del total general</div>
-            </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Faltas Justificadas</div>
-                <div class="print-stat-value" style="color: var(--color-justified); font-size: 13pt;">${totalFaltasJustifiedGral.toLocaleString()} justificadas</div>
-                <div class="print-stat-desc">${absentJustifiedPctOfTotal}% del total general</div>
-            </div>
-            <div class="print-stat-box">
-                <div class="print-stat-title">Faltas Sin Justificar</div>
-                <div class="print-stat-value" style="color: var(--color-absent); font-size: 13pt;">${totalFaltasUnjustifiedGral.toLocaleString()} injustificadas</div>
-                <div class="print-stat-desc">${absentUnjustifiedPctOfTotal}% del total general</div>
-            </div>
-        </div>
-
-        <div class="print-section-title">2. Asistencia por Secciones / Voces</div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Sección / Instrumento</th>
-                    <th style="text-align: center;">Presencias</th>
-                    <th style="text-align: center;">Faltas S.J.</th>
-                    <th style="text-align: center;">Faltas Just.</th>
-                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${sectionsHTML}
-            </tbody>
-        </table>
-
-        <div class="print-section-title">3. Compromiso y Rendimiento de Componentes</div>
-        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
-            Top 3 Rachas de Asistencia de la Temporada
-        </div>
-        <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
-            ${streaksHTML}
-        </div>
-
-        <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 15px; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
-            Top 5 Componentes con Mayor Asistencia
-        </div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Músico</th>
-                    <th>Sección</th>
-                    <th style="text-align: center;">Asistidas / Convocadas</th>
-                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${top5HTML}
-            </tbody>
-        </table>
-
-        <div class="print-section-title">4. Componentes con Alerta de Asistencia (&lt;50%)</div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Músico</th>
-                    <th>Sección</th>
-                    <th style="text-align: center;">Asistidas / Convocadas</th>
-                    <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${alertsHTML}
-            </tbody>
-        </table>
-
-        <div class="print-section-title">5. Trabajo de Repertorio de la Temporada</div>
-        <div class="print-grid">
-            <div class="print-stat-box" style="padding: 8px;">
-                <div class="print-stat-title">Marchas en Catálogo</div>
-                <div class="print-stat-value" style="font-size: 13pt;">${totalMarchas} marchas</div>
-            </div>
-            <div class="print-stat-box" style="padding: 8px;">
-                <div class="print-stat-title">Bien Trabajadas (🟢)</div>
-                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-present);">${greenCount} (${greenPct}%)</div>
-            </div>
-            <div class="print-stat-box" style="padding: 8px;">
-                <div class="print-stat-title">Por Trabajar (🔴)</div>
-                <div class="print-stat-value" style="font-size: 13pt; color: var(--color-absent);">${redCount} (${redPct}%)</div>
+            <div class="print-grid" style="margin-top: -5px;">
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Asistencias Totales</div>
+                    <div class="print-stat-value" style="color: #2ecc71; font-size: 13pt;">${totalAsistenciasGral.toLocaleString()} presencias</div>
+                    <div class="print-stat-desc">${presentsPctOfTotal}% del total general</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Faltas Justificadas</div>
+                    <div class="print-stat-value" style="color: #d4af37; font-size: 13pt;">${totalFaltasJustifiedGral.toLocaleString()} justificadas</div>
+                    <div class="print-stat-desc">${absentJustifiedPctOfTotal}% del total general</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Faltas Sin Justificar</div>
+                    <div class="print-stat-value" style="color: #e74c3c; font-size: 13pt;">${totalFaltasUnjustifiedGral.toLocaleString()} injustificadas</div>
+                    <div class="print-stat-desc">${absentUnjustifiedPctOfTotal}% del total general</div>
+                </div>
             </div>
         </div>
 
-        <div class="print-repertoire-flex">
-            <div class="print-repertoire-col">
-                <div class="print-repertoire-col-title">Top 5 Marchas más Ensayadas</div>
-                ${top5MostEnsayadasHTML}
+        <div class="print-page-block">
+            <div class="print-section-title">2. Estadística de Ensayos y Horas Ensayadas</div>
+            <div class="print-grid">
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Ensayos Totales</div>
+                    <div class="print-stat-value">${rehearsalsStats.totalCount}</div>
+                    <div class="print-stat-desc">Generales y por voz</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Ensayos Generales</div>
+                    <div class="print-stat-value" style="color: #d4af37;">${rehearsalsStats.generalCount}</div>
+                    <div class="print-stat-desc">Toda la plantilla</div>
+                </div>
+                <div class="print-stat-box">
+                    <div class="print-stat-title">Ensayos por Voz</div>
+                    <div class="print-stat-value" style="color: #3b82f6;">${rehearsalsStats.voiceCount}</div>
+                    <div class="print-stat-desc">Secciones específicas</div>
+                </div>
             </div>
-            <div class="print-repertoire-col">
-                <div class="print-repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
-                ${top5LeastEnsayadasHTML}
+            <div class="print-grid" style="margin-top: -5px; grid-template-columns: 1fr;">
+                <div class="print-stat-box" style="padding: 10px;">
+                    <div class="print-stat-title">Horas Totales Invertidas en Ensayos</div>
+                    <div class="print-stat-value" style="color: #2ecc71; font-size: 15pt;">${rehearsalsStats.formattedTotalHours}</div>
+                    <div class="print-stat-desc">Tiempo acumulado en ensayos según horario fijado</div>
+                </div>
+            </div>
+            <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-top: 10px; margin-bottom: 6px;">
+                Desglose por Modalidad / Sección de Ensayo
+            </div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Tipo / Sección Convocada</th>
+                        <th style="text-align: center;">Nº Ensayos</th>
+                        <th style="text-align: center;">% del Total</th>
+                        <th style="text-align: right; padding-right: 15px;">Horas Ensayadas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rehearsalsBreakdownHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">3. Distribución y Asistencia por Día de la Semana</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Día de la Semana</th>
+                        <th style="text-align: center;">Convocatorias</th>
+                        <th style="text-align: center;">Asistencias vs Convocados</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asistencia Media</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dayStatsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">4. Asistencia por Secciones / Voces</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Sección / Instrumento</th>
+                        <th style="text-align: center;">Presencias</th>
+                        <th style="text-align: center;">Faltas S.J.</th>
+                        <th style="text-align: center;">Faltas Just.</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sectionsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">5. Compromiso y Rachas Destacadas</div>
+            <div style="font-size: 8.5pt; font-weight: 700; color: #475569; margin-bottom: 8px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+                Top 3 Rachas de Asistencia de la Temporada
+            </div>
+            <div class="print-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 15px;">
+                ${streaksHTML}
             </div>
         </div>
 
-        <div class="print-footer">
-            Asociación Musical Yacente • Salamanca • Sistema de Asistencia e Informes Interno
+        <div class="print-page-block">
+            <div class="print-section-title">6. Ranking Completo de Asistencia de la Plantilla</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">Pos.</th>
+                        <th>Componente</th>
+                        <th>Sección / Rol</th>
+                        <th style="text-align: center;">Asistidas / Convocadas</th>
+                        <th style="text-align: center;">Racha</th>
+                        <th style="text-align: center;">Insignias</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asist.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${fullRankingHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">7. Componentes con Alerta de Asistencia (&lt;50%)</div>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Músico</th>
+                        <th>Sección</th>
+                        <th style="text-align: center;">Asistidas / Convocadas</th>
+                        <th style="text-align: center;">Faltas Injust.</th>
+                        <th style="text-align: right; padding-right: 15px;">% Asistencia</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${alertsHTML}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-page-block">
+            <div class="print-section-title">8. Trabajo y Estado del Repertorio</div>
+            <div class="print-grid">
+                <div class="print-stat-box" style="padding: 8px;">
+                    <div class="print-stat-title">Marchas en Catálogo</div>
+                    <div class="print-stat-value" style="font-size: 13pt;">${totalMarchas} marchas</div>
+                </div>
+                <div class="print-stat-box" style="padding: 8px;">
+                    <div class="print-stat-title">Bien Trabajadas (🟢)</div>
+                    <div class="print-stat-value" style="font-size: 13pt; color: #2ecc71;">${greenCount} (${greenPct}%)</div>
+                </div>
+                <div class="print-stat-box" style="padding: 8px;">
+                    <div class="print-stat-title">Por Trabajar (🔴)</div>
+                    <div class="print-stat-value" style="font-size: 13pt; color: #e74c3c;">${redCount} (${redPct}%)</div>
+                </div>
+            </div>
+
+            <div class="print-repertoire-flex">
+                <div class="print-repertoire-col">
+                    <div class="print-repertoire-col-title">Top 5 Marchas más Ensayadas</div>
+                    ${top5MostEnsayadasHTML}
+                </div>
+                <div class="print-repertoire-col">
+                    <div class="print-repertoire-col-title">Top 5 Marchas Olvidadas / Menos Ensayadas</div>
+                    ${top5OlvidadasHTML}
+                </div>
+            </div>
+        </div>
+
+        <div class="print-footer" style="margin-top: 25px; padding-top: 10px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 8pt; color: #64748b;">
+            Asociación Musical Yacente • Salamanca • Informe Oficial de Temporada
         </div>
     `;
 
@@ -6564,7 +9239,8 @@ function openVoiceDetailStats(voiceName) {
     document.getElementById("detail-voice-name").innerText = voiceName;
     
     // Heredar los filtros actuales seleccionados en la pantalla de estadísticas principal
-    document.getElementById("voice-filter-year").value = document.getElementById("filter-year").value;
+    const inheritedSeason = document.getElementById("filter-year").value;
+    populateSeasonSelect(document.getElementById("voice-filter-year"), Object.keys(state.attendance), true, inheritedSeason);
     document.getElementById("voice-filter-month").value = document.getElementById("filter-month").value;
     document.getElementById("voice-filter-type").value = document.getElementById("filter-type").value;
     
@@ -6584,10 +9260,9 @@ function renderVoiceDetailContent() {
     const allDates = Object.keys(state.attendance);
     const filteredDates = allDates.filter(dateStr => {
         const dateObj = new Date(dateStr);
-        const year = dateObj.getFullYear().toString();
         const month = dateObj.getMonth().toString();
 
-        const yearMatches = yearFilter === "all" || year === yearFilter;
+        const yearMatches = yearFilter === "all" || isDateInSeason(dateStr.split("_")[0], yearFilter);
         const monthMatches = monthFilter === "all" || month === monthFilter;
         const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
         const typeMatches = typeFilter === "all" || sessionType === typeFilter;
@@ -6705,6 +9380,44 @@ function formatDateShortSpanish(dateStr) {
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
+function formatDateCompactSpanish(dateStr) {
+    if (!dateStr) return "";
+    try {
+        const cleanDateStr = dateStr.split("_")[0];
+        const parts = cleanDateStr.split("-");
+        if (parts.length < 3) return dateStr;
+        const date = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        if (isNaN(date.getTime())) return dateStr;
+        return date.toLocaleDateString("es-ES", {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+function isMusicianOnLeaveOnDate(musician, dateStr) {
+    if (!musician) return false;
+    const leaves = musician.leaves || [];
+    const cleanDate = (dateStr || "").split("_")[0];
+    if (!cleanDate) return false;
+
+    if (leaves.length === 0) {
+        return !!musician.isBaja;
+    }
+
+    return leaves.some(period => {
+        const start = period.startDate;
+        const end = period.endDate;
+        if (!start) return false;
+        if (cleanDate < start) return false;
+        if (end && cleanDate > end) return false;
+        return true;
+    });
+}
+
 function showToast(message, type = "success") {
     const container = document.getElementById("toast-container");
     const toast = document.createElement("div");
@@ -6741,7 +9454,7 @@ function setupFirebaseListeners() {
     document.getElementById("btn-cancel-firebase-modal").addEventListener("click", closeFirebaseModal);
     
     // Guardar credenciales de Firebase (Activar Nube)
-    document.getElementById("form-firebase-config").addEventListener("submit", (e) => {
+    document.getElementById("form-firebase-config").addEventListener("submit", async (e) => {
         e.preventDefault();
         const configJson = document.getElementById("firebase-config-json").value.trim();
         const password = document.getElementById("firebase-admin-password").value.trim();
@@ -6770,15 +9483,15 @@ function setupFirebaseListeners() {
             showToast("Configuración guardada. Conectando a la nube...", "success");
             
             // Inicializar Firebase
-            initFirebase();
-            
+            await initFirebase();
+
             const db = firebase.firestore();
             
             // Verificar primero si ya existe un documento de seguridad en Firestore
             db.collection("config").doc("security").get()
-                .then(secDoc => {
+                .then(async secDoc => {
                     const hasCloudSecurity = secDoc.exists && secDoc.data() && secDoc.data().passwordHash;
-                    
+
                     if (hasCloudSecurity) {
                         const existingHash = secDoc.data().passwordHash;
                         state.firebasePasswordHash = existingHash;
@@ -6789,10 +9502,15 @@ function setupFirebaseListeners() {
                             const togglePastLock = document.getElementById("toggle-past-lock");
                             if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
                         }
-                        
+
                         if (password.length > 0) {
-                            const enteredHash = hashString(password);
-                            if (enteredHash === existingHash || password === "admin") {
+                            const { valid, upgradedHash } = await verifyPassword(password, existingHash);
+                            if (valid) {
+                                if (upgradedHash) {
+                                    state.firebasePasswordHash = upgradedHash;
+                                    localStorage.setItem("yacente_firebase_hash", upgradedHash);
+                                    db.collection("config").doc("security").set({ passwordHash: upgradedHash }, { merge: true }).catch(() => {});
+                                }
                                 sessionStorage.setItem("yacente_authenticated", "true");
                                 sessionStorage.setItem("yacente_role", "admin");
                                 localStorage.setItem("yacente_authenticated", "true");
@@ -6807,7 +9525,7 @@ function setupFirebaseListeners() {
                     } else {
                         // Es la primera vez que se configura esta base de datos
                         if (password.length > 0) {
-                            state.firebasePasswordHash = hashString(password);
+                            state.firebasePasswordHash = await hashPassword(password);
                             sessionStorage.setItem("yacente_authenticated", "true");
                             sessionStorage.setItem("yacente_role", "admin");
                             localStorage.setItem("yacente_authenticated", "true");
@@ -6898,18 +9616,39 @@ function setupFirebaseListeners() {
     }
 
     // Desbloquear pantalla (Lock Screen Form)
-    document.getElementById("form-lock-screen").addEventListener("submit", (e) => {
+    document.getElementById("form-lock-screen").addEventListener("submit", async (e) => {
         e.preventDefault();
-        
+
         if (activeTab === "admin") {
             // LOGIN DE ADMINISTRACIÓN
             const enteredPassword = passwordInput.value.trim();
-            const enteredHash = hashString(enteredPassword);
-            
+
+            const grantAdminAccess = (toastMsg, offline) => {
+                sessionStorage.setItem("yacente_authenticated", "true");
+                sessionStorage.setItem("yacente_role", "admin");
+                localStorage.setItem("yacente_authenticated", "true");
+                localStorage.setItem("yacente_role", "admin");
+                document.body.classList.remove("component-portal");
+
+                // Ocultar PWA Bottom Navigation
+                const mobNav = document.getElementById("component-mobile-nav");
+                if (mobNav) mobNav.classList.add("hidden");
+
+                hideLockScreen();
+                if (!offline) startCloudSync();
+                renderActiveSection("section-pasar-lista");
+                showToast(toastMsg, "success");
+            };
+            const denyAdminAccess = () => {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Contraseña incorrecta";
+                showToast("Contraseña de directiva incorrecta", "error");
+            };
+
             if (isCloudActive()) {
                 const db = firebase.firestore();
                 db.collection("config").doc("security").get()
-                    .then(doc => {
+                    .then(async doc => {
                         let validHash = state.firebasePasswordHash; // fallback local
                         if (doc.exists && doc.data()) {
                             if (doc.data().passwordHash) {
@@ -6924,71 +9663,52 @@ function setupFirebaseListeners() {
                                 if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
                             }
                         }
-                        
-                        if (enteredHash === validHash || (!validHash && enteredPassword === "admin")) {
-                            sessionStorage.setItem("yacente_authenticated", "true");
-                            sessionStorage.setItem("yacente_role", "admin");
-                            localStorage.setItem("yacente_authenticated", "true");
-                            localStorage.setItem("yacente_role", "admin");
-                            document.body.classList.remove("component-portal");
-                            
-                            // Ocultar PWA Bottom Navigation
-                            const mobNav = document.getElementById("component-mobile-nav");
-                            if (mobNav) mobNav.classList.add("hidden");
-                            
-                            hideLockScreen();
-                            startCloudSync();
-                            renderActiveSection("section-pasar-lista");
-                            showToast("Panel desbloqueado correctamente", "success");
+
+                        // "admin" solo funciona si esta base de datos nunca ha tenido contraseña configurada
+                        if (!validHash && enteredPassword === "admin") {
+                            grantAdminAccess("Panel desbloqueado correctamente", false);
+                            return;
+                        }
+                        const { valid, upgradedHash } = await verifyPassword(enteredPassword, validHash);
+                        if (valid) {
+                            if (upgradedHash) {
+                                state.firebasePasswordHash = upgradedHash;
+                                localStorage.setItem("yacente_firebase_hash", upgradedHash);
+                                db.collection("config").doc("security").set({ passwordHash: upgradedHash }, { merge: true }).catch(() => {});
+                            }
+                            grantAdminAccess("Panel desbloqueado correctamente", false);
                         } else {
-                            errorMsg.classList.remove("hidden");
-                            errorMsg.innerText = "Contraseña incorrecta";
-                            showToast("Contraseña de directiva incorrecta", "error");
+                            denyAdminAccess();
                         }
                     })
-                    .catch(err => {
+                    .catch(async err => {
                         console.error("Error de conexión al validar contraseña:", err);
-                        if (enteredHash === state.firebasePasswordHash || enteredPassword === "admin") {
-                            sessionStorage.setItem("yacente_authenticated", "true");
-                            sessionStorage.setItem("yacente_role", "admin");
-                            localStorage.setItem("yacente_authenticated", "true");
-                            localStorage.setItem("yacente_role", "admin");
-                            document.body.classList.remove("component-portal");
-                            
-                            // Ocultar PWA Bottom Navigation
-                            const mobNav = document.getElementById("component-mobile-nav");
-                            if (mobNav) mobNav.classList.add("hidden");
-                            
-                            hideLockScreen();
-                            startCloudSync();
-                            renderActiveSection("section-pasar-lista");
-                            showToast("Panel desbloqueado en modo offline", "success");
+                        const validHash = state.firebasePasswordHash;
+                        if (!validHash && enteredPassword === "admin") {
+                            grantAdminAccess("Panel desbloqueado en modo offline", true);
+                            return;
+                        }
+                        const { valid } = await verifyPassword(enteredPassword, validHash);
+                        if (valid) {
+                            grantAdminAccess("Panel desbloqueado en modo offline", true);
                         } else {
-                            errorMsg.classList.remove("hidden");
-                            errorMsg.innerText = "Contraseña incorrecta";
-                            showToast("Contraseña de directiva incorrecta", "error");
+                            denyAdminAccess();
                         }
                     });
             } else {
-                // Modo local sin config en la nube
-                if (enteredHash === state.firebasePasswordHash || enteredPassword === "admin") {
-                    sessionStorage.setItem("yacente_authenticated", "true");
-                    sessionStorage.setItem("yacente_role", "admin");
-                    localStorage.setItem("yacente_authenticated", "true");
-                    localStorage.setItem("yacente_role", "admin");
-                    document.body.classList.remove("component-portal");
-                    
-                    // Ocultar PWA Bottom Navigation
-                    const mobNav = document.getElementById("component-mobile-nav");
-                    if (mobNav) mobNav.classList.add("hidden");
-                    
-                    hideLockScreen();
-                    renderActiveSection("section-pasar-lista");
-                    showToast("Panel local desbloqueado", "success");
+                // Modo local sin config en la nube ("admin" solo si nunca se ha configurado contraseña local)
+                const validHash = state.firebasePasswordHash;
+                if (!validHash && enteredPassword === "admin") {
+                    grantAdminAccess("Panel local desbloqueado", true);
                 } else {
-                    errorMsg.classList.remove("hidden");
-                    errorMsg.innerText = "Contraseña incorrecta (Usa 'admin' en modo local)";
-                    showToast("Contraseña incorrecta", "error");
+                    const { valid } = await verifyPassword(enteredPassword, validHash);
+                    if (valid) {
+                        grantAdminAccess("Panel local desbloqueado", true);
+                    } else {
+                        errorMsg.classList.remove("hidden");
+                        errorMsg.innerText = validHash ? "Contraseña incorrecta" : "Contraseña incorrecta (usa 'admin' la primera vez para configurar una nueva)";
+                        showToast("Contraseña incorrecta", "error");
+                    }
                 }
             }
         } else {
@@ -7010,7 +9730,21 @@ function setupFirebaseListeners() {
                 showToast("Músico no encontrado", "error");
                 return;
             }
-            
+
+            if (!musician.fullName || !musician.fullName.trim()) {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Facilita los datos solicitados a la dirección para poder acceder a tu cuenta";
+                showToast("Facilita los datos solicitados a la dirección para poder acceder a tu cuenta", "warning");
+                return;
+            }
+
+            if (musician.pinLocked) {
+                errorMsg.classList.remove("hidden");
+                errorMsg.innerText = "Tu contraseña se ha bloqueado por demasiados intentos fallidos. Ponte en contacto con la dirección para restablecerla.";
+                showToast("PIN bloqueado por demasiados intentos. Contacta con la dirección.", "error");
+                return;
+            }
+
             const performAuth = () => {
                 sessionStorage.setItem("yacente_authenticated", "true");
                 sessionStorage.setItem("yacente_role", "component");
@@ -7057,11 +9791,25 @@ function setupFirebaseListeners() {
             } else {
                 // Validación de PIN
                 if (musician.pin === enteredPin) {
+                    if (musician.pinFailedAttempts) {
+                        musician.pinFailedAttempts = 0;
+                        dbSaveMusician(musician);
+                    }
                     performAuth();
                 } else {
-                    errorMsg.classList.remove("hidden");
-                    errorMsg.innerText = "PIN incorrecto. Si lo has olvidado, consulta con la Directiva.";
-                    showToast("El PIN introducido es incorrecto", "error");
+                    musician.pinFailedAttempts = (musician.pinFailedAttempts || 0) + 1;
+                    if (musician.pinFailedAttempts >= 5) {
+                        musician.pinLocked = true;
+                        dbSaveMusician(musician);
+                        errorMsg.classList.remove("hidden");
+                        errorMsg.innerText = "Tu contraseña se ha bloqueado por demasiados intentos fallidos. Ponte en contacto con la dirección para restablecerla.";
+                        showToast("PIN bloqueado por demasiados intentos. Contacta con la dirección.", "error");
+                    } else {
+                        dbSaveMusician(musician);
+                        errorMsg.classList.remove("hidden");
+                        errorMsg.innerText = "PIN incorrecto. Si lo has olvidado, consulta con la Directiva.";
+                        showToast("El PIN introducido es incorrecto", "error");
+                    }
                 }
             }
         }
@@ -7078,10 +9826,7 @@ function getDemoRepertoire() {
 }
 
 function renderMarchasList() {
-    const pageTitle = document.getElementById("page-title");
-    if (pageTitle && document.getElementById("section-marchas").classList.contains("active")) {
-        pageTitle.innerText = `Repertorio (${state.marchas ? state.marchas.length : 0})`;
-    }
+    cleanupOrphanedMarchasRecords();
 
     const gridContainer = document.getElementById("marchas-grid-container");
     const statusColumns = document.getElementById("marchas-status-columns");
@@ -7113,11 +9858,46 @@ function renderMarchasList() {
 
     const searchQuery = document.getElementById("search-marcha") ? document.getElementById("search-marcha").value.toLowerCase().trim() : "";
 
-    // Count plays dynamically
+    // Filtro de Temporada (obligatorio: no existe opción "Todas")
+    const marchasYearSelect = document.getElementById("marchas-filter-year");
+    if (marchasYearSelect) populateRepertoireSeasonSelect(marchasYearSelect, marchasYearSelect.value);
+    const marchasSeasonFilter = marchasYearSelect ? marchasYearSelect.value : getCurrentSeasonLabel();
+
+    // Repertorio de la temporada seleccionada: por defecto todo el repertorio, salvo las marchas
+    // retiradas específicamente de esta temporada o añadidas en exclusiva a otra temporada distinta.
+    const seasonMarchas = getMarchasForSeason(marchasSeasonFilter);
+
+    const pageTitle = document.getElementById("page-title");
+    if (pageTitle && document.getElementById("section-marchas").classList.contains("active")) {
+        pageTitle.innerText = `Repertorio (${seasonMarchas.length})`;
+    }
+
+    // El contador de "veces tocada" se cuenta dentro de la temporada seleccionada en el filtro
+    // (igual que la pertenencia al repertorio): cada temporada tiene sus propias estadísticas.
+    const matchesMarchasFilters = (date) => {
+        if (!isSessionConcluded(date)) return false; // Solo ensayos/actuaciones que ya han sucedido
+        const rawDate = date.split("_")[0];
+        return isDateInSeason(rawDate, marchasSeasonFilter);
+    };
+
+    // Count plays dynamically: veces ensayada (playedMarchas) + veces tocada en actuación
+    // (actuacionRepertoire), respetando la temporada seleccionada.
     const playCounts = {};
     if (state.playedMarchas) {
         Object.keys(state.playedMarchas).forEach(date => {
+            if (!matchesMarchasFilters(date)) return;
             const list = state.playedMarchas[date] || [];
+            list.forEach(mId => {
+                playCounts[mId] = (playCounts[mId] || 0) + 1;
+            });
+        });
+    }
+    if (state.actuacionRepertoire) {
+        Object.keys(state.actuacionRepertoire).forEach(date => {
+            const sessionInfo = state.sessionTypes[date];
+            if (!sessionInfo || sessionInfo.type !== "actuacion") return;
+            if (!matchesMarchasFilters(date)) return;
+            const list = new Set(state.actuacionRepertoire[date] || []);
             list.forEach(mId => {
                 playCounts[mId] = (playCounts[mId] || 0) + 1;
             });
@@ -7125,9 +9905,9 @@ function renderMarchasList() {
     }
 
     // Sort marchas alphabetically in-place before filtering
-    (state.marchas || []).sort((a, b) => a.title.localeCompare(b.title, 'es'));
+    seasonMarchas.sort((a, b) => a.title.localeCompare(b.title, 'es'));
 
-    const filteredMarchas = (state.marchas || []).filter(m => {
+    const filteredMarchas = seasonMarchas.filter(m => {
         const titleMatch = m.title.toLowerCase().startsWith(searchQuery);
         return titleMatch;
     });
@@ -7198,7 +9978,7 @@ function renderMarchasList() {
         }
 
         card.addEventListener("click", (e) => {
-            if (e.target.closest(".marcha-actions-compact") || e.target.closest(".btn-action")) {
+            if (e.target.closest(".marcha-actions-compact") || e.target.closest(".btn-action") || e.target.closest(".marcha-plays-compact")) {
                 return;
             }
             openMarchaNotesModal(m.id);
@@ -7222,24 +10002,16 @@ function renderMarchasList() {
                 <div class="marcha-right-controls" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto;">
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 6px;">
                         ${metaHtml}
-                        <span class="marcha-plays-compact" title="Veces tocada">${count} ens.</span>
+                        <span class="marcha-plays-compact" title="Veces ensayada + tocada en actuación (pulsa para ver detalle)" style="cursor: pointer;">${count}</span>
                     </div>
                     <div class="marcha-actions-compact" style="display: flex; align-items: center; gap: 3px;">
-                        <button class="btn-action history view-marcha-history-btn" data-id="${m.id}" title="Ver Ensayos" style="${btnStyle} color: var(--color-gold);">
-                            <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                        </button>
                         <button class="btn-action edit edit-marcha-btn" data-id="${m.id}" title="Editar Marcha" style="${btnStyle} color: var(--color-gold);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
-                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Eliminar Marcha" style="${btnStyle} color: var(--color-absent);">
+                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Quitar de esta temporada" style="${btnStyle} color: var(--color-absent);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -7259,23 +10031,15 @@ function renderMarchasList() {
                     <div class="marcha-meta-compact" style="display: flex; align-items: center; gap: 2px; margin-right: 0px;">
                         ${metaHtml}
                     </div>
-                    <span class="marcha-plays-compact" title="Veces tocada" style="padding: 1px 3px; font-size: 0.62rem;">${count}e</span>
+                    <span class="marcha-plays-compact" title="Veces ensayada + tocada en actuación (pulsa para ver detalle)" style="padding: 1px 3px; font-size: 0.62rem; cursor: pointer;">${count}</span>
                     <div class="marcha-actions-compact" style="display: flex; align-items: center; gap: 2px;">
-                        <button class="btn-action history view-marcha-history-btn" data-id="${m.id}" title="Ver Ensayos" style="${btnStyle} color: var(--color-gold);">
-                            <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                        </button>
                         <button class="btn-action edit edit-marcha-btn" data-id="${m.id}" title="Editar Marcha" style="${btnStyle} color: var(--color-gold);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
-                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Eliminar Marcha" style="${btnStyle} color: var(--color-absent);">
+                        <button class="btn-action delete delete-marcha-btn" data-id="${m.id}" title="Quitar de esta temporada" style="${btnStyle} color: var(--color-absent);">
                             <svg viewBox="0 0 24 24" width="${iconSize}" height="${iconSize}" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -7303,40 +10067,20 @@ function renderMarchasList() {
         }
 
         // Bind events dynamically
-        card.querySelector(".view-marcha-history-btn").addEventListener("click", () => {
+        card.querySelector(".marcha-plays-compact").addEventListener("click", (e) => {
+            e.stopPropagation();
             openMarchaHistoryModal(m.id);
         });
 
         card.querySelector(".edit-marcha-btn").addEventListener("click", () => {
-            const modal = document.getElementById("modal-marcha");
-            document.getElementById("modal-marcha-title").innerText = "Editar Marcha";
-            document.getElementById("marcha-id").value = m.id;
-            document.getElementById("marcha-title-input").value = m.title;
-            document.getElementById("marcha-status-input").value = m.status || "green";
-            document.getElementById("marcha-difficulty-input").value = m.difficulty || "1";
-            modal.classList.add("active");
+            openEditMarchaModal(m.id);
         });
 
         card.querySelector(".delete-marcha-btn").addEventListener("click", () => {
-            if (confirm(`¿Estás seguro de que quieres eliminar la marcha "${m.title}" del repertorio? Esto también borrará sus registros de ensayos.`)) {
-                // Delete from repertoire
-                state.marchas = state.marchas.filter(item => item.id !== m.id);
-                dbDeleteMarcha(m.id);
-
-                // Clean from play history
-                if (state.playedMarchas) {
-                    Object.keys(state.playedMarchas).forEach(date => {
-                        if (state.playedMarchas[date].includes(m.id)) {
-                            state.playedMarchas[date] = state.playedMarchas[date].filter(id => id !== m.id);
-                            dbSavePlayedMarchas(date, state.playedMarchas[date]);
-                        }
-                    });
-                }
-
-                saveStateToLocalStorage();
+            if (confirm(`¿Quitar "${m.title}" del repertorio de la temporada ${marchasSeasonFilter}? Seguirá disponible en el resto de temporadas y no se borrará su historial de ensayos.`)) {
+                removeMarchaFromSeason(m.id, marchasSeasonFilter);
                 renderMarchasList();
-                renderRehearsalMarchasWidget();
-                showToast("Marcha eliminada del repertorio", "error");
+                showToast(`Marcha retirada del repertorio de la temporada ${marchasSeasonFilter}`, "error");
             }
         });
 
@@ -7471,10 +10215,30 @@ function renderRehearsalMarchasWidget() {
         const marcha = (state.marchas || []).find(m => m.id === mId);
         const name = marcha ? marcha.title : "Marcha Desconocida";
         
+        let statusCircle = "";
+        let diffBadge = "";
+        if (marcha) {
+            let statusTitle = "Por trabajar";
+            let circleSymbol = "🔴";
+            if (marcha.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
+            else if (marcha.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
+            statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
+
+            const diffNum = marcha.difficulty || 1;
+            diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
+        }
+
         const badge = document.createElement("div");
         badge.className = "marcha-tag";
+        badge.style.display = "inline-flex";
+        badge.style.alignItems = "center";
+        badge.style.gap = "4px";
         badge.innerHTML = `
-            <span>${name}</span>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(name)}</span>
+            <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;">
+                ${statusCircle}
+                ${diffBadge}
+            </div>
             <button class="marcha-tag-delete" title="Quitar marcha" data-id="${mId}">&times;</button>
         `;
 
@@ -7494,16 +10258,29 @@ function renderRehearsalMarchasWidget() {
 // ==========================================================================
 // MODAL: HISTORIAL DE ENSAYOS DE UNA MARCHA
 // ==========================================================================
+// Modal combinado de historial de una marcha: ensayos (playedMarchas) + actuaciones
+// (actuacionRepertoire), cada apartado con su propia lista escroleable.
 function openMarchaHistoryModal(marchId) {
     const m = state.marchas.find(item => item.id === marchId);
     if (!m) return;
 
     document.getElementById("marcha-history-repertoire-info").innerText = m.title;
 
+    renderMarchaHistoryEnsayosSection(marchId);
+    renderMarchaHistoryActuacionesSection(marchId);
+
+    document.getElementById("modal-marcha-history").classList.add("active");
+}
+
+function renderMarchaHistoryEnsayosSection(marchId) {
     const datesPlayed = Object.keys(state.playedMarchas || {}).filter(date => {
+        if (!isSessionConcluded(date)) return false; // No mostrar ensayos que aún no han sucedido
         const isRehearsal = !state.sessionTypes[date] || state.sessionTypes[date].type === "ensayo";
         return isRehearsal && state.playedMarchas[date].includes(marchId);
     }).sort((a, b) => b.localeCompare(a));
+
+    const countEl = document.getElementById("marcha-history-ensayos-count");
+    if (countEl) countEl.innerText = `(${datesPlayed.length})`;
 
     const tbody = document.getElementById("marcha-history-table-body");
     const emptyState = document.getElementById("marcha-history-empty");
@@ -7516,16 +10293,16 @@ function openMarchaHistoryModal(marchId) {
     } else {
         emptyState.classList.add("hidden");
         tableCard.classList.remove("hidden");
-        
+
         datesPlayed.forEach(date => {
             const dayRecord = state.attendance[date] || {};
             const sessionInfo = state.sessionTypes[date];
             const isSpecialRehearsal = isSectionRehearsal(sessionInfo);
             const convocated = isSpecialRehearsal ? (sessionInfo.convocatedVoices || []) : [];
-            
+
             let present = 0;
             let total = 0;
-            
+
             state.musicians.forEach(mus => {
                 if (isSpecialRehearsal && !convocated.includes(mus.instrument)) return;
                 total++;
@@ -7533,9 +10310,9 @@ function openMarchaHistoryModal(marchId) {
                     present++;
                 }
             });
-            
+
             const ratio = total > 0 ? Math.round((present / total) * 100) : 0;
-            
+
             let labelText = "General";
             if (sessionInfo) {
                 const sub = sessionInfo.subtype;
@@ -7547,7 +10324,7 @@ function openMarchaHistoryModal(marchId) {
                 else if (sub === "voces") labelText = "Voces";
                 else if (sub === "primeras") labelText = "Primeras";
             }
-            
+
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td style="white-space: nowrap; font-weight: 600;">${formatDateSpanish(date)}</td>
@@ -7561,13 +10338,101 @@ function openMarchaHistoryModal(marchId) {
             tbody.appendChild(tr);
         });
     }
+}
 
-    document.getElementById("modal-marcha-history").classList.add("active");
+// Lista las actuaciones (nombre + fecha) en cuyo repertorio ordenado aparece la marcha dada.
+function renderMarchaHistoryActuacionesSection(marchaId) {
+    const actuacionDates = Object.keys(state.actuacionRepertoire || {}).filter(date => {
+        if (!isSessionConcluded(date)) return false; // No mostrar actuaciones que aún no han sucedido
+        const sessionInfo = state.sessionTypes[date];
+        return sessionInfo && sessionInfo.type === "actuacion" && (state.actuacionRepertoire[date] || []).includes(marchaId);
+    }).sort((a, b) => b.localeCompare(a));
+
+    const countEl = document.getElementById("marcha-actuaciones-history-count");
+    if (countEl) countEl.innerText = `(${actuacionDates.length})`;
+
+    const tbody = document.getElementById("marcha-actuaciones-history-table-body");
+    const emptyState = document.getElementById("marcha-actuaciones-history-empty");
+    const tableCard = tbody.closest(".card-table");
+    tbody.innerHTML = "";
+
+    if (actuacionDates.length === 0) {
+        emptyState.classList.remove("hidden");
+        tableCard.classList.add("hidden");
+    } else {
+        emptyState.classList.add("hidden");
+        tableCard.classList.remove("hidden");
+
+        actuacionDates.forEach(date => {
+            const sessionInfo = state.sessionTypes[date];
+            const actuacionName = sessionInfo.name || "Actuación";
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="font-weight: 600;">${escapeHtml(actuacionName)}</td>
+                <td style="white-space: nowrap; color: var(--text-secondary);">${formatDateSpanish(date)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 }
 
 // ==========================================================================
 // SECCIÓN: CALENDARIO MENSUAL Y OBJETIVOS
 // ==========================================================================
+function openQuickSessionModalForDate(dateKey) {
+    if (!dateKey) return;
+    state.isAddingNewSession = true;
+    state.currentDate = dateKey;
+
+    const attendanceDateEl = document.getElementById("attendance-date");
+    if (attendanceDateEl) {
+        attendanceDateEl.value = dateKey;
+    }
+
+    const modalQuickSession = document.getElementById("modal-quick-session");
+    if (!modalQuickSession) return;
+
+    const titleEl = document.getElementById("quick-session-title");
+    if (titleEl) {
+        titleEl.innerText = `Configurar Sesión - ${formatDateSpanish(dateKey)}`;
+    }
+
+    const actuacionNameEl = document.getElementById("quick-session-actuacion-name");
+    if (actuacionNameEl) {
+        actuacionNameEl.value = "";
+    }
+
+    const tripInputEl = document.getElementById("quick-session-trip-input");
+    if (tripInputEl) {
+        tripInputEl.checked = false;
+    }
+
+    const typeEl = document.getElementById("quick-session-type");
+    if (typeEl) {
+        typeEl.value = "ensayo-general";
+    }
+
+    renderRehearsalLocationOptions();
+    setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
+
+    const actuacionGroup = document.getElementById("quick-session-actuacion-group");
+    if (actuacionGroup) {
+        actuacionGroup.classList.add("hidden");
+    }
+
+    const locationGroup = document.getElementById("quick-session-location-group");
+    if (locationGroup) {
+        locationGroup.classList.remove("hidden");
+    }
+
+    const timeGroup = document.getElementById("quick-session-time-group");
+    if (timeGroup) {
+        timeGroup.classList.remove("hidden");
+    }
+
+    modalQuickSession.classList.add("active");
+}
+
 function renderCalendar() {
     const grid = document.getElementById("calendar-days-grid");
     const monthYearHeader = document.getElementById("calendar-month-year");
@@ -7623,7 +10488,9 @@ function renderCalendar() {
         dayCell.innerHTML = `<span class="calendar-day-number">${dayNum}</span>`;
         const prevMonthStr = String(prevMonth + 1).padStart(2, '0');
         const prevDayStr = String(dayNum).padStart(2, '0');
-        dayCell.setAttribute("data-date", `${prevYear}-${prevMonthStr}-${prevDayStr}`);
+        const prevDateKey = `${prevYear}-${prevMonthStr}-${prevDayStr}`;
+        dayCell.setAttribute("data-date", prevDateKey);
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(prevDateKey));
         cells.push(dayCell);
     }
 
@@ -7704,35 +10571,7 @@ function renderCalendar() {
         });
 
         // Evento click para planificar sesión (Añadir nueva sesión)
-        dayCell.addEventListener("click", () => {
-            state.isAddingNewSession = true;
-            state.currentDate = dateKey;
-            document.getElementById("attendance-date").value = dateKey;
-            
-            const modalQuickSession = document.getElementById("modal-quick-session");
-            document.getElementById("quick-session-title").innerText = `Configurar Sesión - ${formatDateSpanish(dateKey)}`;
-            
-            // Reset modal values for a fresh new session
-            document.getElementById("quick-session-actuacion-name").value = "";
-            document.getElementById("quick-session-type").value = "ensayo-general";
-            if (document.getElementById("quick-session-location")) {
-                document.getElementById("quick-session-location").value = "Parking";
-            }
-            if (document.getElementById("quick-session-time")) {
-                document.getElementById("quick-session-time").value = "";
-            }
-            
-            // Hide actuation name field by default
-            const actuacionGroup = document.getElementById("quick-session-actuacion-group");
-            actuacionGroup.classList.add("hidden");
-            
-            const locationGroup = document.getElementById("quick-session-location-group");
-            if (locationGroup) {
-                locationGroup.classList.remove("hidden");
-            }
-            
-            modalQuickSession.classList.add("active");
-        });
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(dateKey));
 
         cells.push(dayCell);
     }
@@ -7752,7 +10591,9 @@ function renderCalendar() {
         dayCell.innerHTML = `<span class="calendar-day-number">${day}</span>`;
         const nextMonthStr = String(nextMonth + 1).padStart(2, '0');
         const nextDayStr = String(day).padStart(2, '0');
-        dayCell.setAttribute("data-date", `${nextYear}-${nextMonthStr}-${nextDayStr}`);
+        const nextDateKey = `${nextYear}-${nextMonthStr}-${nextDayStr}`;
+        dayCell.setAttribute("data-date", nextDateKey);
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(nextDateKey));
         cells.push(dayCell);
     }
 
@@ -7847,7 +10688,12 @@ function getWeekNumber(d) {
     return weekNo;
 }
 
-function getWeeksGroupedByMonth(year) {
+const WEEKLY_GOALS_MONTH_ORDER = [
+    "Septiembre", "Octubre", "Noviembre", "Diciembre",
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto"
+];
+
+function getWeeksGroupedBySeason(seasonLabel) {
     const months = [
         "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
@@ -7855,23 +10701,28 @@ function getWeeksGroupedByMonth(year) {
     const grouped = {};
     months.forEach(m => grouped[m] = []);
 
-    // Empezar el 1 de Enero
-    let d = new Date(year, 0, 1);
-    
-    // Retroceder al lunes de la semana que contiene el 1 de Enero
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    if (isNaN(year1) || isNaN(year2)) return grouped;
+
+    // Empezar el 1 de Septiembre del primer año de la temporada
+    let d = new Date(year1, 8, 1);
+
+    // Retroceder al lunes de la semana que contiene el 1 de Septiembre
     const dayOfWeek = d.getDay(); // 0 = Domingo, 1 = Lunes...
     const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    d = new Date(year, 0, diff);
+    d = new Date(year1, 8, diff);
 
-    const end = new Date(year + 1, 0, 7);
+    // La temporada termina el 31 de Agosto del segundo año
+    const end = new Date(year2, 8, 7);
     while (d < end) {
         const monday = new Date(d);
         const sunday = new Date(d);
         sunday.setDate(monday.getDate() + 6);
 
         const monthName = months[monday.getMonth()];
-        
-        if (monday.getFullYear() === year || sunday.getFullYear() === year) {
+        const mondayInSeason = (monday.getFullYear() === year1 && monday.getMonth() >= 8) || (monday.getFullYear() === year2 && monday.getMonth() < 8);
+
+        if (mondayInSeason) {
             const weekKey = `${monday.getFullYear()}_W${String(getWeekNumber(monday)).padStart(2, '0')}`;
             grouped[monthName].push({
                 key: weekKey,
@@ -7883,23 +10734,42 @@ function getWeeksGroupedByMonth(year) {
     return grouped;
 }
 
+// Genera un rango fijo de temporadas (2 anteriores, la actual y la siguiente) para el selector de planificación semanal.
+function getWeeklyGoalsSeasonOptions() {
+    const current = getCurrentSeasonLabel();
+    const { year1 } = getSeasonBounds(current);
+    const seasons = [];
+    for (let offset = -2; offset <= 1; offset++) {
+        seasons.push(`${year1 + offset}-${year1 + offset + 1}`);
+    }
+    return seasons;
+}
+
+function populateWeeklyGoalsSeasonSelect(selectEl) {
+    if (!selectEl) return;
+    const seasons = getWeeklyGoalsSeasonOptions();
+    const currentSeason = getCurrentSeasonLabel();
+    const optionsHtml = seasons.map(s => `<option value="${s}"${s === currentSeason ? " selected" : ""}>${s}</option>`).join("");
+    if (selectEl.innerHTML !== optionsHtml) {
+        const previousValue = selectEl.value;
+        selectEl.innerHTML = optionsHtml;
+        if (seasons.includes(previousValue)) selectEl.value = previousValue;
+    }
+}
+
 function renderWeeklyGoalsList() {
     const container = document.getElementById("weekly-goals-container");
     if (!container) return;
-    
+
     const yearSelect = document.getElementById("weekly-goals-year-select");
-    const year = parseInt(yearSelect.value) || new Date().getFullYear();
-    
+    populateWeeklyGoalsSeasonSelect(yearSelect);
+    const season = yearSelect.value || getCurrentSeasonLabel();
+
     container.innerHTML = "";
-    
-    const weeksGrouped = getWeeksGroupedByMonth(year);
-    
-    const monthNames = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
-    
-    monthNames.forEach(month => {
+
+    const weeksGrouped = getWeeksGroupedBySeason(season);
+
+    WEEKLY_GOALS_MONTH_ORDER.forEach(month => {
         const weeks = weeksGrouped[month];
         if (!weeks || weeks.length === 0) return;
         
@@ -10440,15 +13310,81 @@ function populateLoginMusicians() {
     if (currentVal) select.value = currentVal;
 }
 
-function getMusicianMedalsData(musicianId) {
-    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
-    if (!musician) return [];
+// ==========================================================================
+// CACHÉ DE ESTADÍSTICAS POR MÚSICO
+// ==========================================================================
+// getMusicianAttendanceMetrics/BaseMedalsData/AttendanceRank se llaman en cascada
+// unas a otras para calcular rankings e insignias (p.ej. renderStatsRanking llama a
+// getMusicianMedalsData por cada músico, y esa función internamente vuelve a recorrer
+// TODOS los músicos para calcular el ranking). Sin caché, esto provocaba recalcular el
+// historial completo de asistencia decenas de veces por cada carga de la página de
+// Estadísticas. La caché se invalida explícitamente (invalidateMusicianStatsCache) en
+// cada listener de sincronización con la nube y en las pantallas que la consumen, así
+// que dentro de un mismo "ciclo" de datos siempre se recalcula al menos una vez.
+let _musicianStatsCache = {
+    allDates: null,
+    metrics: new Map(),
+    streak: new Map(),
+    baseMedals: new Map(),
+    rankList: null
+};
+
+function invalidateMusicianStatsCache() {
+    _musicianStatsCache = {
+        allDates: null,
+        metrics: new Map(),
+        streak: new Map(),
+        baseMedals: new Map(),
+        rankList: null
+    };
+}
+
+function getAllSessionDatesCached() {
+    if (!_musicianStatsCache.allDates) {
+        _musicianStatsCache.allDates = Array.from(new Set([
+            ...Object.keys(state.sessionTypes || {}),
+            ...Object.keys(state.attendance || {})
+        ]));
+    }
+    return _musicianStatsCache.allDates;
+}
+
+function getMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
+    // Solo se cachea la variante sin filtro de fechas (la que se recalcula en cascada
+    // desde el ranking y las insignias); las llamadas con filtro son puntuales (una por
+    // músico) y no forman parte del cuello de botella.
+    if (!dateFilterFn && _musicianStatsCache.metrics.has(musicianId)) {
+        return _musicianStatsCache.metrics.get(musicianId);
+    }
+
+    const result = computeMusicianAttendanceMetrics(musicianId, dateFilterFn);
+
+    if (!dateFilterFn) {
+        _musicianStatsCache.metrics.set(musicianId, result);
+    }
+
+    return result;
+}
+
+function computeMusicianAttendanceMetrics(musicianId, dateFilterFn = null) {
+    const musician = state.musicians ? state.musicians.find(m => String(m.id) === String(musicianId)) : null;
+    if (!musician) {
+        return {
+            totalConvocated: 0,
+            attended: 0,
+            absent: 0,
+            justified: 0,
+            attendedPerformances: 0,
+            totalPerformances: 0,
+            attendancePct: 100
+        };
+    }
 
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const currentStreak = calculateMusicianStreak(musicianId);
-    
+    const allDates = getAllSessionDatesCached();
+
     let totalConvocated = 0;
     let attended = 0;
     let absent = 0;
@@ -10456,35 +13392,139 @@ function getMusicianMedalsData(musicianId) {
     let attendedPerformances = 0;
     let totalPerformances = 0;
 
-    Object.keys(state.attendance).forEach(date => {
-        if (date > todayStr) return;
+    allDates.forEach(date => {
+        if (!isSessionConcluded(date)) return;
+        if (dateFilterFn && !dateFilterFn(date)) return;
+        if (isMusicianOnLeaveOnDate(musician, date)) return; // De baja: la fecha no cuenta ni a favor ni en contra
 
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        if (!record) return;
+        const session = state.sessionTypes ? state.sessionTypes[date] : null;
+        const sessionObj = session || { type: "ensayo", subtype: "general" };
 
-        const session = state.sessionTypes[date];
+        const isSpecial = sessionObj.type === "ensayo" && sessionObj.subtype && sessionObj.subtype !== "general" && sessionObj.convocatedVoices && sessionObj.convocatedVoices.length > 0;
+        if (isSpecial && !sessionObj.convocatedVoices.includes(musician.instrument)) {
+            return;
+        }
 
-        if (record.status === "present") {
+        totalConvocated++;
+        if (sessionObj.type === "actuacion") {
+            totalPerformances++;
+        }
+
+        const dayRecord = state.attendance ? state.attendance[date] : null;
+        const record = dayRecord ? dayRecord[musicianId] : null;
+
+        if (record && record.status === "present") {
             attended++;
-            totalConvocated++;
-            if (session && session.type === "actuacion") {
+            if (sessionObj.type === "actuacion") {
                 attendedPerformances++;
             }
-        } else if (record.status === "absent") {
-            totalConvocated++;
+        } else if (record && record.status === "absent") {
             if (record.justified) {
                 justified++;
             } else {
                 absent++;
             }
-        }
-        
-        if (session && session.type === "actuacion") {
-            totalPerformances++;
+        } else {
+            absent++;
         }
     });
-    
+
     const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+
+    return {
+        totalConvocated,
+        attended,
+        absent,
+        justified,
+        attendedPerformances,
+        totalPerformances,
+        attendancePct
+    };
+}
+
+// Suma las estrellas de las insignias desbloqueadas (igual que se muestra en Mi Ficha / Top 25),
+// anulando el total si el músico tiene activa la alerta "Volver...a ensayar".
+function countUnlockedBadgeStars(medalsData) {
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+    if (hasVolverEnsayar) return 0;
+    return medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+}
+
+// Calcula la posición (1 = mejor) de un músico en el ranking de asistencia de la banda,
+// usando EXACTAMENTE el mismo criterio de ordenación que el panel "Top 25 Asistencia" de
+// Mi Ficha (renderComponenteRanking): % de asistencia, número de insignias, % exacto, racha y nombre.
+// Para el número de insignias se usa getMusicianBaseMedalsData (todas las insignias EXCEPTO "Top"),
+// de forma que la insignia "Top" no se cuenta a sí misma y no hay referencia circular.
+function getMusicianAttendanceRank(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return null;
+
+    // El ranking completo es el mismo para todos los músicos que lo consultan dentro de
+    // un mismo ciclo de datos, así que se calcula una única vez y se reutiliza (en vez de
+    // recorrer y ordenar TODA la plantilla por cada músico que pide su posición).
+    if (!_musicianStatsCache.rankList) {
+        const ranked = (state.musicians || []).map(m => {
+            const metrics = getMusicianAttendanceMetrics(m.id);
+            return {
+                id: m.id,
+                name: m.name,
+                attendancePct: metrics.attendancePct,
+                streak: calculateMusicianStreak(m.id),
+                badgesCount: countUnlockedBadgeStars(getMusicianBaseMedalsData(m.id))
+            };
+        });
+
+        ranked.sort((a, b) => {
+            const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
+            if (roundDiff !== 0) return roundDiff;
+
+            if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
+
+            const exactDiff = b.attendancePct - a.attendancePct;
+            if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+
+            if (b.streak !== a.streak) return b.streak - a.streak;
+
+            return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+        });
+
+        _musicianStatsCache.rankList = ranked;
+    }
+
+    const idx = _musicianStatsCache.rankList.findIndex(r => String(r.id) === String(musicianId));
+    return idx === -1 ? null : idx + 1;
+}
+
+// Calcula todas las insignias EXCEPTO "Top". Se usa tanto para mostrar la ficha del músico
+// como, internamente, para calcular el número de insignias de cada músico a la hora de
+// desempatar el ranking de asistencia (ver getMusicianAttendanceRank) sin que la insignia
+// "Top" se cuente a sí misma (lo que crearía una referencia circular).
+function getMusicianBaseMedalsData(musicianId) {
+    if (_musicianStatsCache.baseMedals.has(musicianId)) {
+        return _musicianStatsCache.baseMedals.get(musicianId);
+    }
+    const result = computeMusicianBaseMedalsData(musicianId);
+    _musicianStatsCache.baseMedals.set(musicianId, result);
+    return result;
+}
+
+function computeMusicianBaseMedalsData(musicianId) {
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return [];
+
+    const currentStreak = calculateMusicianStreak(musicianId);
+    
+    const metrics = getMusicianAttendanceMetrics(musicianId);
+    const totalConvocated = metrics.totalConvocated;
+    const attended = metrics.attended;
+    const absent = metrics.absent;
+    const justified = metrics.justified;
+    const attendedPerformances = metrics.attendedPerformances;
+    const totalPerformances = metrics.totalPerformances;
+    const attendancePct = metrics.attendancePct;
 
     // 6. Estudio musical
     let greenMarchas = 0;
@@ -10523,8 +13563,10 @@ function getMusicianMedalsData(musicianId) {
     }
 
     // 7. El clavo, Hasta en la sopa, God (Cálculo de asistencia perfecta mensual/consecutiva)
+    // Solo cuentan los ensayos ya concluidos: un preaviso de asistencia futura no es
+    // asistencia real hasta que el director pasa lista y el ensayo termina.
     const rehearsalDates = Object.keys(state.attendance)
-        .filter(d => state.attendance[d] && state.attendance[d][musicianId] && state.sessionTypes[d] && state.sessionTypes[d].type === "ensayo")
+        .filter(d => state.attendance[d] && state.attendance[d][musicianId] && state.sessionTypes[d] && state.sessionTypes[d].type === "ensayo" && isSessionConcluded(d))
         .sort();
         
     let clavoUnlocked = false;
@@ -10598,10 +13640,37 @@ function getMusicianMedalsData(musicianId) {
         });
     }
 
+    let starsGod = 0;
+    let descGod = "";
+    let unlockedGod = false;
+    let nextGoalGod = 1;
+
+    if (maxConsecutiveMonths >= 12) {
+        starsGod = 3;
+        descGod = "¡Insignia de Oro conseguida! 1 año completo de asistencia perfecta a los ensayos.";
+        unlockedGod = true;
+        nextGoalGod = 12;
+    } else if (maxConsecutiveMonths >= 6) {
+        starsGod = 2;
+        descGod = "Insignia de Plata conseguida. 6 meses de asistencia perfecta a los ensayos. Alcanza 12 meses para el nivel Oro.";
+        unlockedGod = true;
+        nextGoalGod = 12;
+    } else if (maxConsecutiveMonths >= 1) {
+        starsGod = 1;
+        descGod = "Insignia de Bronce conseguida. 1 mes de asistencia perfecta a los ensayos. Alcanza 6 meses para el nivel Plata.";
+        unlockedGod = true;
+        nextGoalGod = 6;
+    } else {
+        starsGod = 0;
+        descGod = "Asiste a todos los ensayos durante 1 mes natural para desbloquear Bronce.";
+        unlockedGod = false;
+        nextGoalGod = 1;
+    }
+
     // Doblete
     const performanceDateCounts = {};
     Object.keys(state.attendance).forEach(dateKey => {
-        const record = state.attendance[dateKey][musicianId];
+        const record = state.attendance[dateKey] ? state.attendance[dateKey][musicianId] : null;
         const session = state.sessionTypes[dateKey];
         if (record && record.status === "present" && session && session.type === "actuacion") {
             const baseDate = dateKey.split("_")[0];
@@ -10613,7 +13682,7 @@ function getMusicianMedalsData(musicianId) {
     // Trotamundos (calculado automáticamente en base a actuaciones asistidas marcadas como viaje)
     let tripCount = 0;
     Object.keys(state.attendance).forEach(dateKey => {
-        const record = state.attendance[dateKey][musicianId];
+        const record = state.attendance[dateKey] ? state.attendance[dateKey][musicianId] : null;
         const session = state.sessionTypes[dateKey];
         if (record && record.status === "present" && session && session.type === "actuacion" && session.isTrip === true) {
             tripCount++;
@@ -10725,9 +13794,12 @@ function getMusicianMedalsData(musicianId) {
     let hasPerformances = false;
     let hasPerfectYear = false;
 
+    const TITULAR_MIN_ACTUACIONES = 3;
     Object.keys(performancesByYear).forEach(y => {
         const stats = performancesByYear[y];
-        if (stats.total > 0) {
+        // Exige un mínimo de actuaciones en el año para evitar que un solo bolo (o pocos)
+        // dispare un 100% artificial y desbloquee la insignia sin trayectoria real.
+        if (stats.total >= TITULAR_MIN_ACTUACIONES) {
             hasPerformances = true;
             const pct = (stats.attended / stats.total) * 100;
             if (pct > maxTitularPct) {
@@ -10742,24 +13814,24 @@ function getMusicianMedalsData(musicianId) {
     if (hasPerformances) {
         if (hasPerfectYear) {
             starsTitular = 3;
-            descTitular = "Oro conseguido: Asiste al 100% de actuaciones en un año.";
+            descTitular = "Oro conseguido: Asiste al 100% de actuaciones en un año (mínimo 3 actuaciones).";
             unlockedTitular = true;
         } else if (maxTitularPct > 95) {
             starsTitular = 2;
-            descTitular = "Plata conseguido: Asiste a >95% de las actuaciones en un año. Necesitas el 100% para conseguir Oro.";
+            descTitular = "Plata conseguido: Asiste a >95% de las actuaciones en un año (mínimo 3 actuaciones). Necesitas el 100% para conseguir Oro.";
             unlockedTitular = true;
         } else if (maxTitularPct > 90) {
             starsTitular = 1;
-            descTitular = "Bronce conseguido: Asiste a >90% de las actuaciones en un año. Necesitas >95% para conseguir Plata.";
+            descTitular = "Bronce conseguido: Asiste a >90% de las actuaciones en un año (mínimo 3 actuaciones). Necesitas >95% para conseguir Plata.";
             unlockedTitular = true;
         } else {
             starsTitular = 0;
-            descTitular = "Asiste a >90% de las actuaciones en un año para desbloquear Bronce.";
+            descTitular = "Asiste a >90% de las actuaciones en un año (mínimo 3 actuaciones) para desbloquear Bronce.";
             unlockedTitular = false;
         }
     } else {
         starsTitular = 0;
-        descTitular = "Asiste a >90% de las actuaciones en un año para desbloquear Bronce.";
+        descTitular = "Asiste a >90% de las actuaciones en un año (mínimo 3 actuaciones) para desbloquear Bronce.";
         unlockedTitular = false;
     }
 
@@ -10770,22 +13842,8 @@ function getMusicianMedalsData(musicianId) {
         let isHighest = true;
         peers.forEach(peer => {
             if (peer.id === musicianId) return;
-            
-            let pConvocated = 0;
-            let pAttended = 0;
-            Object.keys(state.attendance).forEach(date => {
-                if (date > todayStr) return;
-                const record = state.attendance[date] ? state.attendance[date][peer.id] : null;
-                if (!record) return;
-                if (record.status === "present") {
-                    pAttended++;
-                    pConvocated++;
-                } else if (record.status === "absent") {
-                    pConvocated++;
-                }
-            });
-            const peerPct = pConvocated > 0 ? (pAttended / pConvocated) * 100 : 0;
-            if (peerPct > attendancePct) {
+            const peerMetrics = getMusicianAttendanceMetrics(peer.id);
+            if (peerMetrics.attendancePct > attendancePct) {
                 isHighest = false;
             }
         });
@@ -10878,7 +13936,7 @@ function getMusicianMedalsData(musicianId) {
         { id: "veterano", title: "Paso firme", icon: "👣", desc: descVeterano, unlocked: unlockedVeterano, stars: starsVeterano, progressPct: Math.min((attended / nextGoalVeterano) * 100, 100), progressText: `${attended}/${nextGoalVeterano}` },
         { id: "comprometido", title: "Comprometido", icon: "📝", desc: "Cero ausencias injustificadas.", unlocked: absent === 0 && totalConvocated > 0, progressPct: (absent === 0 && totalConvocated > 0) ? 100 : 0, progressText: (absent === 0 && totalConvocated > 0) ? 'Sin faltas injustificadas' : `Faltas: ${absent}` },
         { id: "estudio", title: "Estudio musical", icon: "📚", desc: descEstudio, unlocked: unlockedEstudio, stars: starsEstudio, progressPct: Math.min((greenMarchas / nextGoalEstudio) * 100, 100), progressText: `${greenMarchas}/${nextGoalEstudio} dominada${greenMarchas === 1 ? '' : 's'}` },
-        { id: "god", title: "Alma de la banda", icon: "👑", desc: "Asiste a todos los ensayos durante 1 año.", unlocked: godUnlocked, progressPct: godUnlocked ? 100 : Math.min((maxConsecutiveMonths / 12) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, 12)}/12 meses` },
+        { id: "god", title: "Alma de la banda", icon: "👑", desc: descGod, unlocked: unlockedGod, stars: starsGod, progressPct: Math.min((maxConsecutiveMonths / nextGoalGod) * 100, 100), progressText: `${Math.min(maxConsecutiveMonths, nextGoalGod)}/${nextGoalGod} mes${nextGoalGod === 1 ? '' : 'es'}` },
         { id: "marea", title: "Contra viento y marea", icon: "⛈️", desc: "Ensaya bajo condiciones climáticas extremas.", unlocked: !!musician.badgeWeather, progressPct: !!musician.badgeWeather ? 100 : 0, progressText: !!musician.badgeWeather ? "¡Otorgado!" : "No otorgada" },
         { id: "doblete", title: "Doblete", icon: "👥", desc: "Toca en dos actuaciones el mismo día.", unlocked: dobleteUnlocked, progressPct: dobleteUnlocked ? 100 : 0, progressText: dobleteUnlocked ? "¡Conseguido!" : "0/2 salidas" },
         { id: "trotamundos", title: "Catador de paellas", icon: "✈️", desc: descTrotamundos, unlocked: unlockedTrotamundos, stars: starsTrotamundos, progressPct: Math.min((tripCount / nextGoalTrotamundos) * 100, 100), progressText: `${tripCount}/${nextGoalTrotamundos} viaje${tripCount === 1 ? '' : 's'}` },
@@ -10897,19 +13955,92 @@ function getMusicianMedalsData(musicianId) {
     ];
 }
 
+// Devuelve todas las insignias de un músico, incluyendo "Top". El criterio para otorgar
+// "Top" se basa en la posición del músico en el mismo ranking de asistencia que alimenta
+// el panel "Top 25 Asistencia" de Mi Ficha (ver getMusicianAttendanceRank).
+function getMusicianMedalsData(musicianId) {
+    const baseMedals = getMusicianBaseMedalsData(musicianId);
+    if (baseMedals.length === 0) return baseMedals;
+
+    const attendanceRank = getMusicianAttendanceRank(musicianId);
+    let starsTop = 0;
+    let descTop = "";
+    let unlockedTop = false;
+    let progressPctTop = 0;
+    let progressTextTop = "Posición no disponible";
+
+    if (attendanceRank !== null) {
+        if (attendanceRank <= 5) {
+            starsTop = 3;
+            unlockedTop = true;
+            progressPctTop = 100;
+            descTop = `Oro conseguido: estás en el Top 5 de asistencia de la banda (posición #${attendanceRank}).`;
+            progressTextTop = `Posición #${attendanceRank} · Top 5`;
+        } else if (attendanceRank <= 10) {
+            starsTop = 2;
+            unlockedTop = true;
+            progressPctTop = 66;
+            descTop = `Plata conseguida: estás en el Top 10 de asistencia (posición #${attendanceRank}). Sube al Top 5 para el Oro.`;
+            progressTextTop = `Posición #${attendanceRank} · Top 10`;
+        } else if (attendanceRank <= 25) {
+            starsTop = 1;
+            unlockedTop = true;
+            progressPctTop = 33;
+            descTop = `Bronce conseguido: estás en el Top 25 de asistencia (posición #${attendanceRank}). Sube al Top 10 para la Plata.`;
+            progressTextTop = `Posición #${attendanceRank} · Top 25`;
+        } else {
+            starsTop = 0;
+            unlockedTop = false;
+            progressPctTop = 0;
+            descTop = "Entra en el Top 25 de asistencia de la banda para desbloquear Bronce.";
+            progressTextTop = `Posición #${attendanceRank}`;
+        }
+    }
+
+    return [
+        ...baseMedals,
+        { id: "top", title: "Top", icon: "🥇", desc: descTop, unlocked: unlockedTop, stars: starsTop, progressPct: progressPctTop, progressText: progressTextTop }
+    ];
+}
+
 function calculateMusicianStreak(musicianId) {
+    if (_musicianStatsCache.streak.has(musicianId)) {
+        return _musicianStatsCache.streak.get(musicianId);
+    }
+    const result = computeMusicianStreak(musicianId);
+    _musicianStatsCache.streak.set(musicianId, result);
+    return result;
+}
+
+function computeMusicianStreak(musicianId) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const dates = Object.keys(state.attendance)
+    const musician = state.musicians ? state.musicians.find(m => String(m.id) === String(musicianId)) : null;
+
+    const dates = Object.keys(state.sessionTypes || {})
         .filter(d => {
-            if (d > todayStr) return false; // Excluir futuros
+            if (d > todayStr) return false;
 
             const session = state.sessionTypes[d];
             if (session && session.type !== "ensayo") return false;
 
-            const record = state.attendance[d] ? state.attendance[d][musicianId] : null;
-            if (!record) return false; // Si no hay registro, se ignora
+            const isSpecial = session && session.subtype && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
+            if (isSpecial && musician && !session.convocatedVoices.includes(musician.instrument)) {
+                return false;
+            }
+
+            if (musician && isMusicianOnLeaveOnDate(musician, d)) return false; // De baja: la fecha no rompe ni cuenta en la racha
+
+            const dayRecord = state.attendance[d];
+            if (!dayRecord || Object.keys(dayRecord).length === 0) return false;
+
+            if (d === todayStr) {
+                const rec = dayRecord[musicianId];
+                if (!rec || (rec.status === "absent" && !rec.confirmed && !rec.takenByDirector)) {
+                    return false;
+                }
+            }
 
             return true;
         })
@@ -10933,7 +14064,7 @@ function calculateMusicianBestStreak(musicianId) {
 
     const dates = Object.keys(state.attendance)
         .filter(d => {
-            if (d > todayStr) return false; // Excluir futuros
+            if (!isSessionConcluded(d)) return false; // Excluir no concluidos
 
             const session = state.sessionTypes[d];
             if (session && session.type !== "ensayo") return false;
@@ -10996,9 +14127,264 @@ function openStreakInfoModal() {
     }
 }
 
+function openInsigniasInfoModal() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const medalsData = getMusicianMedalsData(musicianId);
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+
+    const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
+        if (!m.unlocked || m.isNegative) return acc;
+        return acc + (m.stars || 1);
+    }, 0);
+
+    const iconBigEl = document.getElementById("modal-insignias-icon-big");
+    const countBigEl = document.getElementById("modal-insignias-count-big");
+    const subtitleEl = document.getElementById("modal-insignias-subtitle");
+    const msgEl = document.getElementById("modal-insignias-message");
+    const statusBoxEl = document.getElementById("modal-insignias-status-box");
+    const statusValEl = document.getElementById("modal-insignias-status-val");
+    const modal = document.getElementById("modal-insignias-info");
+
+    if (countBigEl) countBigEl.innerText = unlockedInsigniasCount;
+
+    if (hasVolverEnsayar) {
+        if (iconBigEl) iconBigEl.innerText = "⚠️";
+        if (subtitleEl) {
+            subtitleEl.innerText = "Insignias Suspendidas";
+            subtitleEl.style.color = "var(--color-absent)";
+        }
+        if (msgEl) {
+            msgEl.innerText = "⚠️ Tus insignias conseguidas están temporalmente suspendidas por una asistencia inferior al 50%. Recuerda que ERES IMPORTANTE para el grupo. Acude a los próximos ensayos para recuperar tu porcentaje y reactivar todos tus reconocimientos. ¡Tus compañeros cuentan contigo!";
+        }
+        if (statusBoxEl) {
+            statusBoxEl.style.background = "rgba(231, 76, 60, 0.12)";
+            statusBoxEl.style.color = "var(--color-absent)";
+        }
+        if (statusValEl) {
+            statusValEl.innerText = "Anuladas por baja asistencia (<50%)";
+        }
+    } else {
+        if (iconBigEl) iconBigEl.innerText = "🏅";
+        if (subtitleEl) {
+            subtitleEl.innerText = "Insignias Desbloqueadas";
+            subtitleEl.style.color = "var(--text-secondary)";
+        }
+        if (statusBoxEl) {
+            statusBoxEl.style.background = "rgba(212, 175, 55, 0.1)";
+            statusBoxEl.style.color = "var(--color-gold)";
+        }
+        if (statusValEl) {
+            statusValEl.innerText = `Medallero Activo (${unlockedInsigniasCount} ${unlockedInsigniasCount === 1 ? 'insignia' : 'insignias'})`;
+        }
+
+        if (msgEl) {
+            if (unlockedInsigniasCount === 0) {
+                msgEl.innerText = "¡Empieza tu colección de reconocimientos! Asiste a los ensayos y actuaciones y completa temporadas para desbloquear tus primeras insignias.";
+            } else if (unlockedInsigniasCount <= 3) {
+                msgEl.innerText = `¡Buen trabajo! Has acumulado ${unlockedInsigniasCount} ${unlockedInsigniasCount === 1 ? 'insignia' : 'insignias'}. Vas por muy buen camino en tu trayectoria con la banda. ¡Sigue sumando logros!`;
+            } else if (unlockedInsigniasCount <= 7) {
+                msgEl.innerText = `¡Excelente trayectoria! Cuentas con ${unlockedInsigniasCount} insignias en tu medallero. Tu constancia y compromiso enriquecen enormemente a la agrupación.`;
+            } else {
+                msgEl.innerText = `🏆 ¡Colección legendaria! Tienes ${unlockedInsigniasCount} insignias conseguidas. Eres un ejemplo de dedicación y fidelidad absoluta para toda la banda.`;
+            }
+        }
+    }
+
+    if (modal) {
+        modal.classList.add("active");
+    }
+}
+
+const MEDAL_TIER_DEFINITIONS = {
+    racha: [
+        { label: "Bronce 🥉", req: "5 ensayos consecutivos", stars: 1 },
+        { label: "Plata 🥈", req: "10 ensayos consecutivos", stars: 2 },
+        { label: "Oro 🥇", req: "20 ensayos consecutivos", stars: 3 }
+    ],
+    god: [
+        { label: "Bronce 🥉", req: "Asiste a todos los ensayos durante 1 mes", stars: 1 },
+        { label: "Plata 🥈", req: "Asiste a todos los ensayos durante 6 meses", stars: 2 },
+        { label: "Oro 🥇", req: "Asiste a todos los ensayos durante 1 año", stars: 3 }
+    ],
+    asistencia: [
+        { label: "Bronce 🥉", req: ">80% de asistencia general", stars: 1 },
+        { label: "Plata 🥈", req: ">90% de asistencia general", stars: 2 },
+        { label: "Oro 🥇", req: ">95% de asistencia general", stars: 3 }
+    ],
+    veterano: [
+        { label: "Bronce 🥉", req: "15 asistencias totales", stars: 1 },
+        { label: "Plata 🥈", req: "50 asistencias totales", stars: 2 },
+        { label: "Oro 🥇", req: "100 asistencias totales", stars: 3 }
+    ],
+    estudio: [
+        { label: "Bronce 🥉", req: "50 marchas dominadas", stars: 1 },
+        { label: "Plata 🥈", req: "60 marchas dominadas", stars: 2 },
+        { label: "Oro 🥇", req: "Todas las marchas del repertorio", stars: 3 }
+    ],
+    trotamundos: [
+        { label: "Bronce 🥉", req: "10 viajes fuera de la ciudad", stars: 1 },
+        { label: "Plata 🥈", req: "25 viajes fuera de la ciudad", stars: 2 },
+        { label: "Oro 🥇", req: "50 viajes fuera de la ciudad", stars: 3 }
+    ],
+    titular: [
+        { label: "Bronce 🥉", req: ">90% asistencia a actuaciones (año)", stars: 1 },
+        { label: "Plata 🥈", req: ">95% asistencia a actuaciones (año)", stars: 2 },
+        { label: "Oro 🥇", req: "100% asistencia a actuaciones (año)", stars: 3 }
+    ],
+    ruta: [
+        { label: "Bronce 🥉", req: "5 viajes en bus con la banda", stars: 1 },
+        { label: "Plata 🥈", req: "10 viajes en bus con la banda", stars: 2 },
+        { label: "Oro 🥇", req: "20 viajes en bus con la banda", stars: 3 }
+    ],
+    hermandad: [
+        { label: "Bronce 🥉", req: "1 convivencia / actividad extramusical", stars: 1 },
+        { label: "Plata 🥈", req: "5 convivencias / actividades extramusicales", stars: 2 },
+        { label: "Oro 🥇", req: "10 convivencias / actividades extramusicales", stars: 3 }
+    ],
+    top: [
+        { label: "Bronce 🥉", req: "Top 25 de asistencia de la banda", stars: 1 },
+        { label: "Plata 🥈", req: "Top 10 de asistencia de la banda", stars: 2 },
+        { label: "Oro 🥇", req: "Top 5 de asistencia de la banda", stars: 3 }
+    ]
+};
+
+function openSingleInsigniaDetailModal(medalId) {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const medalsData = getMusicianMedalsData(musicianId);
+    const medal = medalsData.find(m => m.id === medalId);
+    if (!medal) return;
+
+    const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
+
+    const titleEl = document.getElementById("modal-insignia-detail-title");
+    const iconEl = document.getElementById("modal-insignia-detail-icon");
+    const iconWrapperEl = document.getElementById("modal-insignia-detail-icon-wrapper");
+    const statusBadgeEl = document.getElementById("modal-insignia-detail-status-badge");
+    const descEl = document.getElementById("modal-insignia-detail-desc");
+    const progressTextEl = document.getElementById("modal-insignia-detail-progress-text");
+    const progressBarEl = document.getElementById("modal-insignia-detail-progress-bar");
+    const tiersSectionEl = document.getElementById("modal-insignia-detail-tiers-section");
+    const tiersContainerEl = document.getElementById("modal-insignia-detail-tiers-container");
+    const modal = document.getElementById("modal-single-insignia-detail");
+
+    if (titleEl) titleEl.innerText = medal.title;
+    if (iconEl) iconEl.innerText = medal.icon;
+    if (descEl) descEl.innerText = medal.desc;
+    if (progressTextEl) progressTextEl.innerText = medal.progressText;
+    if (progressBarEl) progressBarEl.style.width = `${medal.progressPct}%`;
+
+    // Estilo del icono circunscrito principal
+    if (iconWrapperEl) {
+        if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+            iconWrapperEl.style.background = "rgba(231, 76, 60, 0.15)";
+            iconWrapperEl.style.border = "2px solid #E74C3C";
+            iconWrapperEl.style.boxShadow = "0 0 12px rgba(231, 76, 60, 0.3)";
+            iconWrapperEl.style.opacity = "1";
+            iconWrapperEl.style.filter = "none";
+        } else if (medal.isNegative && medal.unlocked) {
+            iconWrapperEl.style.background = "rgba(231, 76, 60, 0.15)";
+            iconWrapperEl.style.border = "2px solid #E74C3C";
+            iconWrapperEl.style.boxShadow = "0 0 12px rgba(231, 76, 60, 0.3)";
+            iconWrapperEl.style.opacity = "1";
+            iconWrapperEl.style.filter = "none";
+        } else if (medal.unlocked) {
+            iconWrapperEl.style.background = "rgba(212, 175, 55, 0.15)";
+            iconWrapperEl.style.border = "2px solid #D4AF37";
+            iconWrapperEl.style.boxShadow = "0 0 12px rgba(212, 175, 55, 0.3)";
+            iconWrapperEl.style.opacity = "1";
+            iconWrapperEl.style.filter = "none";
+        } else {
+            iconWrapperEl.style.background = "rgba(255, 255, 255, 0.03)";
+            iconWrapperEl.style.border = "2px solid rgba(255, 255, 255, 0.12)";
+            iconWrapperEl.style.boxShadow = "none";
+            iconWrapperEl.style.opacity = "0.5";
+            iconWrapperEl.style.filter = "grayscale(1)";
+        }
+    }
+
+    // Estado general
+    if (statusBadgeEl) {
+        if (hasVolverEnsayar && medal.unlocked && !medal.isNegative) {
+            statusBadgeEl.innerText = "Anulada";
+            statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
+            statusBadgeEl.style.color = "var(--color-absent)";
+            statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+        } else if (medal.isNegative && medal.unlocked) {
+            statusBadgeEl.innerText = "Alerta Activa";
+            statusBadgeEl.style.background = "rgba(231, 76, 60, 0.15)";
+            statusBadgeEl.style.color = "var(--color-absent)";
+            statusBadgeEl.style.border = "1px solid rgba(231, 76, 60, 0.4)";
+        } else if (medal.unlocked) {
+            const starsText = medal.stars ? ` (${'★'.repeat(medal.stars)})` : '';
+            statusBadgeEl.innerText = `Conseguida${starsText}`;
+            statusBadgeEl.style.background = "rgba(212, 175, 55, 0.15)";
+            statusBadgeEl.style.color = "#D4AF37";
+            statusBadgeEl.style.border = "1px solid rgba(212, 175, 55, 0.4)";
+        } else {
+            statusBadgeEl.innerText = "Bloqueada";
+            statusBadgeEl.style.background = "rgba(149, 165, 166, 0.15)";
+            statusBadgeEl.style.color = "#95a5a6";
+            statusBadgeEl.style.border = "1px solid rgba(149, 165, 166, 0.4)";
+        }
+    }
+
+    // Generar niveles solo si la insignia tiene sistema de estrellas
+    const tierDefs = MEDAL_TIER_DEFINITIONS[medal.id];
+    if (tierDefs && tierDefs.length > 0) {
+        if (tiersSectionEl) tiersSectionEl.style.display = "block";
+        if (tiersContainerEl) {
+            tiersContainerEl.innerHTML = "";
+            const TIER_COLORS = {
+                1: { color: "#CD7F32", bg: "rgba(205, 127, 50, 0.15)", border: "#CD7F32" }, // Bronce
+                2: { color: "#C0C0C0", bg: "rgba(192, 192, 192, 0.15)", border: "#C0C0C0" }, // Plata
+                3: { color: "#FFD700", bg: "rgba(255, 215, 0, 0.15)", border: "#FFD700" }   // Oro
+            };
+
+            tierDefs.forEach(tier => {
+                const isAchieved = !hasVolverEnsayar && medal.unlocked && (medal.stars >= tier.stars);
+                const isSuspended = hasVolverEnsayar && medal.unlocked && (medal.stars >= tier.stars);
+
+                let badgeHTML = '';
+                if (isSuspended) {
+                    badgeHTML = '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; background: rgba(231, 76, 60, 0.15); color: var(--color-absent);">⚠️ Anulada</span>';
+                } else if (isAchieved) {
+                    badgeHTML = '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; background: rgba(46, 204, 113, 0.15); color: #2ecc71;">✔ Conseguido</span>';
+                } else {
+                    badgeHTML = '<span style="font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">🔒 Pendiente</span>';
+                }
+
+                const tc = TIER_COLORS[tier.stars] || TIER_COLORS[1];
+
+                const tierRow = document.createElement("div");
+                tierRow.style.cssText = "background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; display: flex; align-items: center; justify-content: space-between; gap: 10px;";
+                tierRow.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; border: 2px solid ${tc.border}; background: ${tc.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <span style="font-size: 0.95rem; line-height: 1;">${medal.icon}</span>
+                            <span style="font-size: 0.58rem; color: ${tc.color}; font-weight: 800; line-height: 1; margin-top: 1px;">${'★'.repeat(tier.stars)}</span>
+                        </div>
+                        <span style="color: var(--text-primary); font-size: 0.82rem; font-weight: 500; line-height: 1.3;">${tier.req}</span>
+                    </div>
+                    <div style="flex-shrink: 0;">${badgeHTML}</div>
+                `;
+                tiersContainerEl.appendChild(tierRow);
+            });
+        }
+    } else {
+        if (tiersSectionEl) tiersSectionEl.style.display = "none";
+    }
+
+    if (modal) modal.classList.add("active");
+}
+
 
 
 function renderComponentFicha() {
+    invalidateMusicianStatsCache();
     const musicianId = sessionStorage.getItem("yacente_musician_id") || localStorage.getItem("yacente_musician_id");
     const musician = state.musicians.find(m => m.id == musicianId);
     if (!musician) {
@@ -11042,7 +14428,13 @@ function renderComponentFicha() {
     
     document.getElementById("comp-profile-name").innerText = musician.name;
     document.getElementById("comp-profile-details").innerText = `${musician.instrument} • ${musician.role || "Músico"}`;
-    
+
+    const bajaBanner = document.getElementById("comp-baja-banner");
+    if (bajaBanner) {
+        const todayStr = new Date().toISOString().split("T")[0];
+        bajaBanner.classList.toggle("hidden", !isMusicianOnLeaveOnDate(musician, todayStr));
+    }
+
     const currentStreak = calculateMusicianStreak(musicianId);
     document.getElementById("comp-streak-val").innerText = currentStreak;
     
@@ -11052,49 +14444,18 @@ function renderComponentFicha() {
         streakBadge.onclick = () => openStreakInfoModal();
     }
     
-    let totalConvocated = 0;
-    let attended = 0;
-    let absent = 0;
-    let justified = 0;
-    let attendedPerformances = 0;
-    let totalPerformances = 0;
-
-    const dNow = new Date();
-    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-
-    Object.keys(state.attendance).forEach(date => {
-        if (date > todayStr) return; // Excluir sesiones futuras de las estadísticas de asistencia
-
-        const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-        if (!record) return; // Si no hay registro en la base de datos para este músico, no computa (igual que el director)
-
-        const session = state.sessionTypes[date];
-
-        if (record.status === "present") {
-            attended++;
-            totalConvocated++;
-            if (session && session.type === "actuacion") {
-                attendedPerformances++;
-            }
-        } else if (record.status === "absent") {
-            totalConvocated++;
-            if (record.justified) {
-                justified++;
-            } else {
-                absent++;
-            }
-        }
-        
-        if (session && session.type === "actuacion") {
-            totalPerformances++;
-        }
-    });
-    
-    const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+    const metrics = getMusicianAttendanceMetrics(musicianId);
+    const totalConvocated = metrics.totalConvocated;
+    const attended = metrics.attended;
+    const absent = metrics.absent;
+    const justified = metrics.justified;
+    const attendancePct = metrics.attendancePct;
 
     // Poblar debug box
     const debugBox = document.getElementById("ficha-debug-box");
     if (debugBox) {
+        const dNow = new Date();
+        const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
         const matchingRecords = Object.keys(state.attendance)
             .map(d => ({ date: d, status: state.attendance[d][musicianId] ? state.attendance[d][musicianId].status : 'none' }))
             .filter(x => x.status !== 'none');
@@ -11153,6 +14514,8 @@ function renderComponentFicha() {
     medalsData.forEach(medal => {
         const medalCard = document.getElementById(`medal-${medal.id}`);
         if (medalCard) {
+            medalCard.style.cursor = "pointer";
+            medalCard.onclick = () => openSingleInsigniaDetailModal(medal.id);
             if (medal.isNegative) {
                 medalCard.className = `medal-card ${medal.unlocked ? 'negative-unlocked' : 'locked'}`;
             } else {
@@ -11229,6 +14592,8 @@ function renderComponentFicha() {
     }
     const compInsigniasBadge = document.getElementById("comp-insignias-badge");
     if (compInsigniasBadge) {
+        compInsigniasBadge.style.cursor = "pointer";
+        compInsigniasBadge.onclick = () => openInsigniasInfoModal();
         const iconEl = compInsigniasBadge.querySelector(".insignias-badge-icon");
         if (hasVolverEnsayar) {
             compInsigniasBadge.classList.add("alarm-red");
@@ -11260,35 +14625,26 @@ function renderComponenteRanking() {
     const rankingData = state.musicians.map(musician => {
         const musicianId = musician.id;
         
-        let totalConvocated = 0;
-        let attended = 0;
-        
-        Object.keys(state.attendance).forEach(date => {
-            if (date > todayStr) return;
-            const record = state.attendance[date] ? state.attendance[date][musicianId] : null;
-            if (!record) return;
-            
-            totalConvocated++;
-            if (record.status === "present") {
-                attended++;
-            }
-        });
-        
-        const attendancePct = totalConvocated > 0 ? (attended / totalConvocated) * 100 : 100;
+        const metrics = getMusicianAttendanceMetrics(musicianId);
+        const attendancePct = metrics.attendancePct;
         const currentStreak = calculateMusicianStreak(musicianId);
         
+        // Insignias mostradas en la tarjeta (incluye "Top"): total real de insignias conseguidas.
         const medalsData = getMusicianMedalsData(musicianId);
-        const hasVolverEnsayar = medalsData.some(m => m.id === "volver_ensayar" && m.unlocked);
-        const unlockedInsigniasCount = hasVolverEnsayar ? 0 : medalsData.reduce((acc, m) => {
-            if (!m.unlocked || m.isNegative) return acc;
-            return acc + (m.stars || 1);
-        }, 0);
-        
+        const unlockedInsigniasCount = countUnlockedBadgeStars(medalsData);
+
+        // Insignias usadas para desempatar el ranking: excluye "Top" para que esta insignia
+        // no se otorgue en base a un ranking que ella misma influye (ver getMusicianAttendanceRank).
+        const baseBadgesCountForSort = countUnlockedBadgeStars(getMusicianBaseMedalsData(musicianId));
+
         return {
+            id: musicianId,
             name: musician.name,
+            photo: musician.photo || "",
             attendancePct,
             streak: currentStreak,
-            badgesCount: unlockedInsigniasCount
+            badgesCount: unlockedInsigniasCount,
+            baseBadgesCountForSort
         };
     });
 
@@ -11301,8 +14657,8 @@ function renderComponenteRanking() {
         }
 
         // 1. Criterio de desempate por empate en % de asistencia: Mayor número de insignias acumuladas
-        if (b.badgesCount !== a.badgesCount) {
-            return b.badgesCount - a.badgesCount;
+        if (b.baseBadgesCountForSort !== a.baseBadgesCountForSort) {
+            return b.baseBadgesCountForSort - a.baseBadgesCountForSort;
         }
 
         // 2. Si empatan también en insignias, comparar el porcentaje decimal exacto
@@ -11326,16 +14682,22 @@ function renderComponenteRanking() {
     top25.forEach((item, index) => {
         const card = document.createElement("div");
         card.className = "comp-ranking-card";
-        
+        card.style.cursor = "pointer";
+
         // Estilo especial para el top 3
         let rankBadgeClass = "rank-badge";
         if (index === 0) rankBadgeClass += " rank-gold";
         else if (index === 1) rankBadgeClass += " rank-silver";
         else if (index === 2) rankBadgeClass += " rank-bronze";
-        
+
+        const avatarMarkup = item.photo
+            ? `<img src="${item.photo}" alt="${item.name}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 50%; flex-shrink: 0; border: 1px solid var(--color-gold);">`
+            : `<div style="width: 30px; height: 30px; border-radius: 50%; background: rgba(212, 175, 55, 0.15); color: var(--color-gold); border: 1px solid rgba(212, 175, 55, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; flex-shrink: 0;">${getInitials(item.name)}</div>`;
+
         card.innerHTML = `
             <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
                 <div class="${rankBadgeClass}">${index + 1}</div>
+                ${avatarMarkup}
                 <div style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); flex: 1;">
                     ${item.name}
                 </div>
@@ -11352,7 +14714,9 @@ function renderComponenteRanking() {
                 </div>
             </div>
         `;
-        
+
+        card.addEventListener("click", () => openPeerDetailModal(item.id));
+
         container.appendChild(card);
     });
 }
@@ -11420,7 +14784,7 @@ function renderComponentHistorial() {
 
     // Obtener todas las fechas en las que el músico está convocado (sólo pasadas, anteriores a hoy)
     const allConvocatedDates = allUniqueDates.filter(date => {
-        if (date >= todayStr) return false;
+        if (!isSessionConcluded(date)) return false;
         
         const session = state.sessionTypes[date];
         if (session && session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0) {
@@ -11568,8 +14932,19 @@ function openCompRehearsalDetailModal(date) {
     const sessionType = (sessionInfo && sessionInfo.type) || "ensayo";
     const rawDate = date.split("_")[0];
     
-    // Safety check for played marches
-    const playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+    // Check repertoire/played marchas: for performance check actuacionRepertoire first, then playedMarchas
+    let playedTodayIds = [];
+    if (sessionType === "actuacion") {
+        playedTodayIds = (state && state.actuacionRepertoire && (state.actuacionRepertoire[date] || state.actuacionRepertoire[rawDate])) || [];
+        if (playedTodayIds.length === 0) {
+            playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+        }
+    } else {
+        playedTodayIds = (state && state.playedMarchas && (state.playedMarchas[date] || state.playedMarchas[rawDate])) || [];
+        if (playedTodayIds.length === 0) {
+            playedTodayIds = (state && state.actuacionRepertoire && (state.actuacionRepertoire[date] || state.actuacionRepertoire[rawDate])) || [];
+        }
+    }
 
     // Title and Subtitle
     const titleEl = document.getElementById("comp-rehearsal-detail-title");
@@ -11644,14 +15019,26 @@ function openCompRehearsalDetailModal(date) {
         countsEl.innerText = `${presentCount} presentes de ${totalConvocated} convocados`;
     }
 
-    // Render Played Marches List
+    // Section title label update ("Repertorio" for actuacion vs "Marchas Ensayadas" for ensayo)
+    const marchasLabelEl = document.getElementById("comp-rehearsal-detail-marchas-label");
+    if (marchasLabelEl) {
+        marchasLabelEl.innerText = sessionType === "actuacion" ? "Repertorio" : "Marchas Ensayadas";
+    }
+
+    // Render Played Marches / Repertoire List
     const marchasContainer = document.getElementById("comp-rehearsal-detail-marchas");
     if (marchasContainer) {
         marchasContainer.innerHTML = "";
+        marchasContainer.style.maxHeight = "250px";
+        marchasContainer.style.overflowY = "auto";
+
         if (playedTodayIds.length === 0) {
+            const emptyText = sessionType === "actuacion" 
+                ? "No hay registro de repertorio en esta actuación." 
+                : "No hay registro de marchas tocadas en este ensayo.";
             marchasContainer.innerHTML = `
                 <div class="empty-state" style="padding: 16px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--border-color);">
-                    <p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">No hay registro de marchas tocadas en este ${sessionType}.</p>
+                    <p class="text-muted" style="margin: 0; font-size: 0.85rem; font-style: italic;">${emptyText}</p>
                 </div>
             `;
         } else {
@@ -11660,29 +15047,35 @@ function openCompRehearsalDetailModal(date) {
                 const m = marchasArray.find(item => item.id === mId);
                 const itemDiv = document.createElement("div");
                 itemDiv.style.background = "rgba(212, 175, 55, 0.08)";
-                itemDiv.style.border = "1px solid rgba(212, 175, 55, 0.25)";
-                itemDiv.style.borderRadius = "8px";
-                itemDiv.style.padding = "10px 14px";
+                itemDiv.style.border = "1px solid rgba(212, 175, 55, 0.2)";
+                itemDiv.style.borderRadius = "6px";
+                itemDiv.style.padding = "6px 10px";
                 itemDiv.style.display = "flex";
                 itemDiv.style.alignItems = "center";
-                itemDiv.style.justifyContent = "space-between";
-                itemDiv.style.gap = "10px";
 
+                let statusCircle = "";
+                let diffBadge = "";
                 if (m) {
-                    itemDiv.innerHTML = `
-                        <div style="min-width: 0; flex: 1;">
-                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🎵 ${m.title}</div>
-                            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">${m.composer || m.author || "Autor Desconocido"}</div>
-                        </div>
-                        ${m.difficulty ? `<span class="badge" style="background: rgba(255,255,255,0.06); color: var(--color-gold); font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(212, 175, 55, 0.3); font-weight: 600;">Nivel ${m.difficulty}</span>` : ""}
-                    `;
-                } else {
-                    itemDiv.innerHTML = `
-                        <div style="min-width: 0; flex: 1;">
-                            <div style="font-weight: 600; font-size: 0.92rem; color: var(--text-primary);">🎵 Marcha (${mId})</div>
-                        </div>
-                    `;
+                    let statusTitle = "Por trabajar";
+                    let circleSymbol = "🔴";
+                    if (m.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
+                    else if (m.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
+                    statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
+
+                    const diffNum = m.difficulty || 1;
+                    diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
                 }
+
+                const titleText = m ? m.title : `Marcha (${mId})`;
+                itemDiv.innerHTML = `
+                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">🎵 ${escapeHtml(titleText)}</span>
+                        <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                            ${statusCircle}
+                            ${diffBadge}
+                        </div>
+                    </div>
+                `;
                 marchasContainer.appendChild(itemDiv);
             });
         }
@@ -11726,24 +15119,26 @@ function openUpcomingEventDetailModal(date) {
     let badgeClass = "pending";
     let badgeText = "Pendiente";
 
-    if (record) {
+    const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
+
+    if (isExplicitPreaviso) {
         if (record.status === "present") {
             badgeClass = "present";
-            badgeText = "Presente";
+            badgeText = "Asistiré";
         } else if (record.status === "absent") {
             if (record.justified) {
                 badgeClass = "justified";
                 badgeText = "Justificada";
             } else {
                 badgeClass = "absent";
-                badgeText = "Ausente";
+                badgeText = "Faltaré";
             }
         }
     }
 
     if (badgeEl) {
         badgeEl.className = `comp-attendance-badge ${badgeClass} clickable-badge`;
-        badgeEl.innerText = "Preaviso";
+        badgeEl.innerText = badgeText;
     }
 
     // Date
@@ -11758,10 +15153,54 @@ function openUpcomingEventDetailModal(date) {
         timeEl.innerText = sessionInfo && sessionInfo.time ? `${sessionInfo.time} h` : "Por determinar";
     }
 
-    // Location
+    // Location & Maps Link
     const locEl = document.getElementById("upcoming-event-detail-location");
+    const mapsBtn = document.getElementById("upcoming-event-detail-maps-btn");
+    const mapBox = document.getElementById("upcoming-event-detail-map-box");
+    const mapContent = document.getElementById("upcoming-event-detail-map-content");
+    const locationName = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking" : "Por determinar");
+
     if (locEl) {
-        locEl.innerText = sessionInfo && sessionInfo.location ? sessionInfo.location : (sessionType === "ensayo" ? "Parking de la Sede" : "Por determinar");
+        locEl.innerText = locationName;
+    }
+
+    const locObj = (state.rehearsalLocations || []).find(l => l.name && locationName && l.name.trim().toLowerCase() === locationName.trim().toLowerCase());
+
+    let targetMapsUrl = "";
+    if (locationName && locationName !== "Por determinar") {
+        let mapsUrl = (locObj && locObj.mapsUrl) ? locObj.mapsUrl.trim() : locationName;
+        if (mapsUrl.startsWith("http://") || mapsUrl.startsWith("https://")) {
+            targetMapsUrl = mapsUrl;
+        } else {
+            targetMapsUrl = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(mapsUrl);
+        }
+    }
+
+    if (mapsBtn) {
+        if (!targetMapsUrl) {
+            mapsBtn.classList.add("hidden");
+        } else {
+            mapsBtn.classList.remove("hidden");
+            mapsBtn.href = targetMapsUrl;
+        }
+    }
+
+    if (mapBox && mapContent) {
+        if (locObj && locObj.image && locObj.image.trim()) {
+            mapBox.classList.remove("hidden");
+            if (targetMapsUrl) {
+                mapContent.innerHTML = `
+                    <a href="${escapeHtml(targetMapsUrl)}" target="_blank" rel="noopener noreferrer" style="display: block; width: 100%; height: 100%; text-decoration: none; cursor: pointer;" title="Abrir ubicación en Google Maps">
+                        <img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px; transition: transform 0.2s ease, filter 0.2s ease;" alt="${escapeHtml(locationName)}">
+                    </a>
+                `;
+            } else {
+                mapContent.innerHTML = `<img src="${locObj.image}" style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 10px;" alt="${escapeHtml(locationName)}">`;
+            }
+        } else {
+            mapBox.classList.add("hidden");
+            mapContent.innerHTML = "";
+        }
     }
 
     // Convocated Voices Box
@@ -11822,17 +15261,19 @@ function renderComponentEventos() {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    // Obtener todas las fechas únicas de sessionTypes y attendance
-    const allUniqueDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes),
-        ...Object.keys(state.attendance)
-    ]));
+    // Solo sessionTypes es la fuente fiable de eventos reales: un ensayo/actuación siempre
+    // crea su entrada en sessionTypes al mismo tiempo que en attendance (ver creación de
+    // ensayos), pero attendance puede tener una entrada vacía "huérfana" para hoy generada
+    // localmente por initializeAttendanceForDate() en dispositivos sin sincronización con la
+    // nube activa. Si se incluyera attendance aquí, esa entrada huérfana se mostraría como un
+    // "Ensayo General" fantasma que no existe para nadie más.
+    const allUniqueDates = Object.keys(state.sessionTypes);
 
     // Obtener todas las fechas de hoy y futuras en las que el músico está convocado
     const allFutureDates = allUniqueDates.filter(date => {
         if (date < todayStr) return false;
-        
-        const session = state.sessionTypes[date] || { type: "ensayo", subtype: "general", name: "Ensayo" };
+
+        const session = state.sessionTypes[date];
         const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
         if (isSpecialRehearsal && !session.convocatedVoices.includes(musician.instrument)) {
             return false;
@@ -11858,17 +15299,24 @@ function renderComponentEventos() {
         let badgeClass = "pending clickable-badge";
         let badgeText = "Pendiente";
 
-        if (record) {
-            badgeText = "Preaviso";
+        const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
+
+        if (isExplicitPreaviso) {
             if (record.status === "present") {
                 badgeClass = "present clickable-badge";
+                badgeText = "Asistiré";
             } else if (record.status === "absent") {
                 if (record.justified) {
                     badgeClass = "justified clickable-badge";
+                    badgeText = "Justificada";
                 } else {
                     badgeClass = "absent clickable-badge";
+                    badgeText = "Faltaré";
                 }
             }
+        } else {
+            badgeClass = "pending clickable-badge";
+            badgeText = "Pendiente";
         }
         
         const typeClass = session.type === "ensayo" ? "ensayo" : "actuacion";
@@ -11923,7 +15371,7 @@ function renderComponentEventos() {
         row.innerHTML = `
             <div class="comp-date-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; width: 60px; min-width: 60px; padding: 6px; box-sizing: border-box; text-align: center; border-left: 3px solid var(--color-gold);">
                 <div style="font-size: 1.35rem; font-weight: 700; color: var(--text-color); line-height: 1.1; font-family: 'Outfit', sans-serif;">${dy}</div>
-                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--color-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
+                <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-gold); font-weight: 600; margin-top: 2px; font-family: 'Outfit', sans-serif; letter-spacing: 0.5px;">${moAbbr}</div>
                 <div style="font-size: 0.62rem; color: var(--text-muted); font-weight: 500; font-family: 'Outfit', sans-serif; margin-top: 1px;">${yr}</div>
             </div>
             <div class="comp-session-card" style="flex: 1; min-width: 0; margin: 0; display: flex; justify-content: space-between; align-items: center;">
@@ -12047,6 +15495,9 @@ function renderComponenteCalendario() {
                 return true;
             });
 
+        const indicatorContainer = document.createElement("div");
+        indicatorContainer.className = "comp-calendar-indicator-container";
+
         if (daySessions.length > 0) {
             const isPastDay = dateKey < todayDateKey;
 
@@ -12060,7 +15511,7 @@ function renderComponenteCalendario() {
             dayCell.addEventListener("click", () => {
                 if (daySessions.length === 1) {
                     if (isPastDay) {
-                        openRehearsalDetailModal(dateKey);
+                        openCompRehearsalDetailModal(dateKey);
                     } else {
                         openUpcomingEventDetailModal(dateKey);
                     }
@@ -12068,10 +15519,6 @@ function renderComponenteCalendario() {
                     openMultiEventSelectModal(dateKey, daySessions, isPastDay);
                 }
             });
-
-            // Añadir contenedor de etiquetas rectangulares
-            const indicatorContainer = document.createElement("div");
-            indicatorContainer.className = "comp-calendar-indicator-container";
 
             daySessions.forEach(session => {
                 const badge = document.createElement("span");
@@ -12087,8 +15534,9 @@ function renderComponenteCalendario() {
                 // Determinar estado de preaviso o asistencia para la clase de color
                 let badgeClass = "pending";
                 const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+                const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
 
-                if (record) {
+                if (isExplicitPreaviso) {
                     if (record.status === "present") {
                         badgeClass = "present";
                     } else if (record.status === "absent") {
@@ -12096,7 +15544,7 @@ function renderComponenteCalendario() {
                     }
                 } else {
                     if (isPastDay) {
-                        badgeClass = "absent";
+                        badgeClass = (record && record.status === "present") ? "present" : ((record && record.justified) ? "justified" : "absent");
                     } else {
                         badgeClass = "pending";
                     }
@@ -12107,8 +15555,9 @@ function renderComponenteCalendario() {
 
                 indicatorContainer.appendChild(badge);
             });
-            dayCell.appendChild(indicatorContainer);
         }
+
+        dayCell.appendChild(indicatorContainer);
 
         cells.push(dayCell);
     }
@@ -12174,16 +15623,18 @@ function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn";
-        btn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease;";
+        btn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease; box-sizing: border-box; gap: 12px; text-align: left;";
 
         let labelText = "general";
+        let badgeClass = "pending";
+
         if (session.type === "actuacion") {
             labelText = "actuación";
+            badgeClass = "actuacion";
         } else if (session.subtype === "secciones" || (session.convocatedVoices && session.convocatedVoices.length > 0 && session.subtype !== "general")) {
             labelText = "voz";
         }
 
-        let badgeClass = "pending";
         const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
 
         if (record) {
@@ -12199,17 +15650,20 @@ function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
         const titleText = session.name || (session.type === "actuacion" ? "Actuación Oficial" : (labelText === "voz" ? "Ensayo por Voces" : "Ensayo General"));
 
         btn.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
-                <div style="font-weight: 700; font-size: 0.95rem; text-align: left;">${titleText}</div>
-                <div style="font-size: 0.78rem; color: var(--text-muted);">⏰ ${session.time ? session.time + ' h' : 'Hora por determinar'}</div>
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; word-break: break-word; overflow-wrap: anywhere;">
+                <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary); line-height: 1.35; text-align: left; width: 100%;">${titleText}</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; font-weight: 500;">
+                    <span>⏰</span>
+                    <span>${session.time ? session.time + ' h' : 'Hora por determinar'}</span>
+                </div>
             </div>
-            <span class="comp-calendar-badge ${badgeClass}" style="padding: 4px 10px; font-size: 0.75rem;">${labelText}</span>
+            <span class="comp-multi-event-badge ${badgeClass}">${labelText}</span>
         `;
 
         btn.addEventListener("click", () => {
             modal.classList.remove("active");
             if (isPastDay) {
-                openRehearsalDetailModal(dateKey);
+                openCompRehearsalDetailModal(dateKey);
             } else {
                 openUpcomingEventDetailModal(dateKey);
             }
@@ -12243,18 +15697,20 @@ function setupMultiEventSelectModalEvents() {
 function renderComponentRepertorio() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
-    
-    const totalCount = state.marchas ? state.marchas.length : 0;
+
+    // El músico siempre ve el repertorio de la temporada actual, sin selector de temporada.
+    const currentSeasonMarchas = getMarchasForSeason(getCurrentSeasonLabel());
+    const totalCount = currentSeasonMarchas.length;
     const titleEl = document.querySelector("#section-componente-repertorio h3");
     if (titleEl) {
         titleEl.textContent = `Mi Repertorio (${totalCount})`;
     }
-    
+
     const searchVal = document.getElementById("search-comp-marcha").value.toLowerCase().trim();
     const container = document.getElementById("componente-repertorio-lista");
     container.innerHTML = "";
-    
-    if (!state.marchas || state.marchas.length === 0) {
+
+    if (currentSeasonMarchas.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="padding: 30px 10px; text-align: center;">
                 <p class="text-muted" style="margin: 0; font-size: 0.88rem;">No hay marchas registradas en el repertorio general.</p>
@@ -12262,14 +15718,14 @@ function renderComponentRepertorio() {
         `;
         return;
     }
-    
-    const filtered = state.marchas.filter(m => {
+
+    const filtered = currentSeasonMarchas.filter(m => {
         const titleMatch = m.title && m.title.toLowerCase().includes(searchVal);
         const composer = m.composer || m.author || "";
         const composerMatch = composer.toLowerCase().includes(searchVal);
         return titleMatch || composerMatch;
     }).sort((a, b) => a.title.localeCompare(b.title));
-    
+
     if (filtered.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="padding: 30px 10px; text-align: center;">
@@ -12290,6 +15746,7 @@ function renderComponentRepertorio() {
         
         const card = document.createElement("div");
         card.className = "comp-marcha-card";
+        card.style.cursor = "pointer";
         card.innerHTML = `
             <div class="comp-marcha-info">
                 <h4 class="comp-marcha-title">${marcha.title}</h4>
@@ -12299,7 +15756,8 @@ function renderComponentRepertorio() {
         `;
         
         const btn = card.querySelector(".comp-status-btn-single");
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
             let nextStatus = "";
             if (currentStatus === "") nextStatus = "red";
             else if (currentStatus === "red") nextStatus = "yellow";
@@ -12308,7 +15766,11 @@ function renderComponentRepertorio() {
             
             updateMusicianMarchaStatus(musicianId, marcha.id, nextStatus);
         });
-        
+
+        card.addEventListener("click", () => {
+            openMarchaAudioLinksModal(marcha.id);
+        });
+
         container.appendChild(card);
     });
 }
@@ -12343,6 +15805,272 @@ function updateMusicianMarchaStatus(musicianId, marchaId, status) {
     
     showToast("Dominio personal actualizado", "success");
     renderComponentRepertorio();
+}
+
+function openAddMarchaModal() {
+    const form = document.getElementById("form-marcha");
+    if (form) form.reset();
+    document.getElementById("marcha-id").value = "";
+    document.getElementById("marcha-title-input").value = "";
+    document.getElementById("marcha-status-input").value = "green";
+    document.getElementById("marcha-difficulty-input").value = "1";
+    if (document.getElementById("marcha-audio-youtube-input")) document.getElementById("marcha-audio-youtube-input").value = "";
+    if (document.getElementById("marcha-audio-spotify-input")) document.getElementById("marcha-audio-spotify-input").value = "";
+    
+    const titleEl = document.getElementById("modal-marcha-title");
+    if (titleEl) titleEl.innerText = "Añadir Nueva Marcha";
+    
+    const modal = document.getElementById("modal-marcha");
+    if (modal) modal.classList.add("active");
+}
+
+function openEditMarchaModal(id) {
+    const m = (state.marchas || []).find(item => String(item.id) === String(id));
+    if (!m) return;
+    
+    document.getElementById("marcha-id").value = m.id;
+    document.getElementById("marcha-title-input").value = m.title || "";
+    document.getElementById("marcha-status-input").value = m.status || "green";
+    document.getElementById("marcha-difficulty-input").value = m.difficulty || 1;
+    
+    if (document.getElementById("marcha-audio-youtube-input")) {
+        document.getElementById("marcha-audio-youtube-input").value = m.youtubeUrl || "";
+    }
+    if (document.getElementById("marcha-audio-spotify-input")) {
+        document.getElementById("marcha-audio-spotify-input").value = m.spotifyUrl || "";
+    }
+    
+    const titleEl = document.getElementById("modal-marcha-title");
+    if (titleEl) titleEl.innerText = "Editar Marcha";
+    
+    const modal = document.getElementById("modal-marcha");
+    if (modal) modal.classList.add("active");
+}
+
+function setupMarchaModalEvents() {
+    const btnAdd = document.getElementById("btn-add-marcha");
+    const modal = document.getElementById("modal-marcha");
+    const btnClose = document.getElementById("btn-close-marcha-modal");
+    const btnCancel = document.getElementById("btn-cancel-marcha-modal");
+    const form = document.getElementById("form-marcha");
+
+    if (btnAdd) {
+        btnAdd.addEventListener("click", () => {
+            openAddMarchaModal();
+        });
+    }
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+        if (form) form.reset();
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (modal) {
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const id = document.getElementById("marcha-id").value;
+            const title = document.getElementById("marcha-title-input").value.trim();
+            const status = document.getElementById("marcha-status-input").value;
+            const difficulty = document.getElementById("marcha-difficulty-input").value;
+            const youtubeUrl = document.getElementById("marcha-audio-youtube-input") ? document.getElementById("marcha-audio-youtube-input").value.trim() : "";
+            const spotifyUrl = document.getElementById("marcha-audio-spotify-input") ? document.getElementById("marcha-audio-spotify-input").value.trim() : "";
+
+            if (!title) return;
+
+            if (id) {
+                const index = (state.marchas || []).findIndex(m => String(m.id) === String(id));
+                if (index !== -1) {
+                    state.marchas[index] = {
+                        ...state.marchas[index],
+                        title,
+                        status,
+                        difficulty,
+                        youtubeUrl,
+                        spotifyUrl
+                    };
+                    dbSaveMarcha(state.marchas[index]);
+                    showToast("Marcha actualizada", "success");
+                }
+            } else {
+                const newId = "marcha-" + Date.now();
+                const marchasYearSelect = document.getElementById("marchas-filter-year");
+                const addedInSeason = marchasYearSelect && marchasYearSelect.value ? marchasYearSelect.value : getCurrentSeasonLabel();
+                const newMarcha = {
+                    id: newId,
+                    title,
+                    status,
+                    difficulty,
+                    youtubeUrl,
+                    spotifyUrl,
+                    notes: "",
+                    addedInSeason
+                };
+                if (!state.marchas) state.marchas = [];
+                state.marchas.push(newMarcha);
+                dbSaveMarcha(newMarcha);
+                showToast(`Marcha añadida al repertorio de la temporada ${addedInSeason}`, "success");
+            }
+
+            saveStateToLocalStorage();
+            closeModal();
+
+            renderMarchasList();
+            renderComponentRepertorio();
+            renderRehearsalMarchasWidget();
+        });
+    }
+}
+
+function setupRepertoireLinksModalEvents() {
+    const modal = document.getElementById("modal-repertoire-links");
+    const btnEdit = document.getElementById("btn-edit-repertoire-links");
+    const btnClose = document.getElementById("btn-close-repertoire-links-modal");
+    const btnCancel = document.getElementById("btn-cancel-repertoire-links-modal");
+    const form = document.getElementById("form-repertoire-links");
+
+    const openModal = () => {
+        const links = state.repertoireLinks || { youtube: "", spotify: "" };
+        const youtubeInput = document.getElementById("repertoire-youtube-playlist-input");
+        const spotifyInput = document.getElementById("repertoire-spotify-playlist-input");
+        if (youtubeInput) youtubeInput.value = links.youtube || "";
+        if (spotifyInput) spotifyInput.value = links.spotify || "";
+        if (modal) modal.classList.add("active");
+    };
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnEdit) btnEdit.addEventListener("click", openModal);
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (modal) {
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    // Si el enlace todavía no está configurado, el propio botón abre el editor
+    const adminYoutubeLink = document.getElementById("admin-repertoire-youtube-link");
+    const adminSpotifyLink = document.getElementById("admin-repertoire-spotify-link");
+    [adminYoutubeLink, adminSpotifyLink].forEach(link => {
+        if (!link) return;
+        link.addEventListener("click", (e) => {
+            if (!link.getAttribute("href") || link.getAttribute("href") === "#") {
+                e.preventDefault();
+                openModal();
+            }
+        });
+    });
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const youtubeUrl = document.getElementById("repertoire-youtube-playlist-input").value.trim();
+            const spotifyUrl = document.getElementById("repertoire-spotify-playlist-input").value.trim();
+
+            dbSaveRepertoireLinks({ youtube: youtubeUrl, spotify: spotifyUrl });
+            showToast("Enlaces de playlists actualizados", "success");
+            closeModal();
+        });
+    }
+}
+
+function openMarchaAudioLinksModal(marchaId) {
+    const marcha = (state.marchas || []).find(m => String(m.id) === String(marchaId));
+    if (!marcha) return;
+
+    const modal = document.getElementById("modal-marcha-audio-links");
+    if (!modal) return;
+
+    const titleEl = document.getElementById("modal-audio-links-title");
+    const composerEl = document.getElementById("modal-audio-links-composer");
+    const container = document.getElementById("modal-audio-links-container");
+
+    if (titleEl) titleEl.innerText = `🎧 ${marcha.title}`;
+    if (composerEl) composerEl.innerText = marcha.composer || marcha.author || "Repertorio Oficial";
+
+    if (container) {
+        container.innerHTML = "";
+        const youtubeUrl = (marcha.youtubeUrl || "").trim();
+        const spotifyUrl = (marcha.spotifyUrl || "").trim();
+
+        const hasLinks = youtubeUrl || spotifyUrl;
+
+        if (!hasLinks) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 24px 14px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); border-radius: 10px;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">🎧</div>
+                    <p class="text-muted" style="margin: 0; font-size: 0.88rem; line-height: 1.4;">
+                        La directiva aún no ha añadido enlaces de audio para esta marcha.
+                    </p>
+                </div>
+            `;
+        } else {
+            if (youtubeUrl) {
+                const linkBtn = document.createElement("a");
+                linkBtn.href = youtubeUrl;
+                linkBtn.target = "_blank";
+                linkBtn.rel = "noopener noreferrer";
+                linkBtn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.35); border-radius: 10px; color: #ff4d4d; font-weight: 700; text-decoration: none; box-sizing: border-box; transition: transform 0.2s ease, background 0.2s ease;";
+                linkBtn.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="#FF0000" style="display: inline-block; vertical-align: middle; flex-shrink: 0;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        <span style="font-size: 0.92rem;">Escuchar en YouTube</span>
+                    </div>
+                    <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
+                `;
+                container.appendChild(linkBtn);
+            }
+
+            if (spotifyUrl) {
+                const linkBtn = document.createElement("a");
+                linkBtn.href = spotifyUrl;
+                linkBtn.target = "_blank";
+                linkBtn.rel = "noopener noreferrer";
+                linkBtn.style.cssText = "width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(29, 185, 84, 0.1); border: 1px solid rgba(29, 185, 84, 0.35); border-radius: 10px; color: #1db954; font-weight: 700; text-decoration: none; box-sizing: border-box; transition: transform 0.2s ease, background 0.2s ease;";
+                linkBtn.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="#1DB954" style="display: inline-block; vertical-align: middle; flex-shrink: 0;"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.38-1.32 9.78-.66 13.5 1.62.36.18.6.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                        <span style="font-size: 0.92rem;">Escuchar en Spotify</span>
+                    </div>
+                    <span style="font-size: 0.8rem; opacity: 0.85; display: inline-flex; align-items: center; gap: 4px;">Abrir ↗</span>
+                `;
+                container.appendChild(linkBtn);
+            }
+        }
+    }
+
+    modal.classList.add("active");
+}
+
+function setupMarchaAudioLinksModalEvents() {
+    const modal = document.getElementById("modal-marcha-audio-links");
+    if (!modal) return;
+
+    const btnClose = document.getElementById("btn-close-marcha-audio-links-modal");
+    const btnFooter = document.getElementById("btn-close-marcha-audio-links-footer");
+
+    const closeModal = () => {
+        modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnFooter) btnFooter.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
 }
 
 function logoutComponent() {
@@ -12391,9 +16119,16 @@ function logoutAdmin() {
 // PREAVISO (RSVP) PORTAL MÚSICOS
 // ==========================================================================
 function openPreavisoModal(date) {
+    const currentMusicianId = getAuthMusicianId();
+    const currentMusician = state.musicians.find(m => String(m.id) === String(currentMusicianId));
+    if (currentMusician && isMusicianOnLeaveOnDate(currentMusician, date)) {
+        showToast("Estás de baja temporal y no puedes registrar preavisos.", "error");
+        return;
+    }
+
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-    
+
     const eventDateObj = new Date(date + "T00:00:00");
     const todayDateObj = new Date(todayStr + "T00:00:00");
     const diffTime = eventDateObj.getTime() - todayDateObj.getTime();
@@ -12430,7 +16165,9 @@ function openPreavisoModal(date) {
         justifiedCheckbox.checked = true; // Default to true
     }
 
-    if (record) {
+    const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
+
+    if (isExplicitPreaviso) {
         if (record.status === "present") {
             setActiveRsvpButton("present");
         } else if (record.status === "absent") {
@@ -12587,16 +16324,23 @@ function setupPreavisoEvents() {
                 showToast("Sesión de músico no válida.", "error");
                 return;
             }
-            
+
             const date = state.currentPreavisoDate;
             if (!date) return;
-            
+
+            const savingMusician = state.musicians.find(m => String(m.id) === String(musicianId));
+            if (savingMusician && isMusicianOnLeaveOnDate(savingMusician, date)) {
+                showToast("Estás de baja temporal y no puedes registrar preavisos.", "error");
+                return;
+            }
+
             let recordObj = null;
             if (preavisoSelectedStatus === "present") {
                 recordObj = {
                     status: "present",
                     justified: false,
-                    reason: ""
+                    reason: "",
+                    preaviso: true
                 };
             } else {
                 const justifiedCheckbox = document.getElementById("preaviso-justified-checkbox");
@@ -12610,7 +16354,8 @@ function setupPreavisoEvents() {
                 recordObj = {
                     status: "absent",
                     justified: isJustified,
-                    reason: reason
+                    reason: reason,
+                    preaviso: true
                 };
             }
             
@@ -12720,6 +16465,1458 @@ function setupProfilePhotoEvents() {
     }
 }
 
+function setupMusicianDrawerAndSettingsEvents() {
+    const btnHamburger = document.getElementById("btn-musician-hamburger");
+    const modalDrawer = document.getElementById("modal-musician-drawer");
+    const btnCloseDrawer = document.getElementById("btn-close-musician-drawer");
+
+    const openDrawer = () => {
+        if (modalDrawer) modalDrawer.classList.add("active");
+        const currentSection = document.querySelector(".app-section.active");
+        const currentId = currentSection ? currentSection.id : null;
+        document.querySelectorAll(".drawer-item").forEach(d => {
+            d.classList.toggle("active", d.getAttribute("data-target") === currentId);
+        });
+    };
+
+    const closeDrawer = () => {
+        if (modalDrawer) modalDrawer.classList.remove("active");
+    };
+
+    if (btnHamburger) btnHamburger.addEventListener("click", openDrawer);
+    if (btnCloseDrawer) btnCloseDrawer.addEventListener("click", closeDrawer);
+
+    if (modalDrawer) {
+        modalDrawer.addEventListener("click", (e) => {
+            if (e.target === modalDrawer) closeDrawer();
+        });
+    }
+
+    // Enlaces dentro del menú drawer
+    document.querySelectorAll(".drawer-item").forEach(item => {
+        item.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetId = item.getAttribute("data-target");
+            closeDrawer();
+            if (!targetId) return;
+
+            document.querySelectorAll(".drawer-item").forEach(d => d.classList.remove("active"));
+            item.classList.add("active");
+
+            // Sincronizar también con los ítems de la barra inferior
+            document.querySelectorAll(".mobile-nav-item").forEach(nav => {
+                if (nav.getAttribute("data-target") === targetId) {
+                    nav.classList.add("active");
+                } else {
+                    nav.classList.remove("active");
+                }
+            });
+
+            renderActiveSection(targetId);
+        });
+    });
+
+    // Formulario de cambio de PIN en Ajustes
+    const formPin = document.getElementById("form-change-pin-ajustes");
+    if (formPin) {
+        formPin.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const musicianId = getAuthMusicianId();
+            if (!musicianId) {
+                showToast("Sesión de músico no válida", "error");
+                return;
+            }
+
+            const inputPin = document.getElementById("change-pin-new-ajustes");
+            const newPin = inputPin ? inputPin.value.trim() : "";
+
+            if (!/^\d{4}$/.test(newPin)) {
+                showToast("El PIN debe constar exactamente de 4 números.", "warning");
+                return;
+            }
+
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+            if (!musician) {
+                showToast("Músico no encontrado en la base de datos", "error");
+                return;
+            }
+
+            musician.pin = newPin;
+            saveStateToLocalStorage();
+            dbSaveMusician(musician);
+
+            if (inputPin) inputPin.value = "";
+            showToast("PIN de acceso actualizado correctamente", "success");
+        });
+    }
+
+    // Event listeners para botones de cerrar sesión del músico (.btn-logout-component)
+    // Se excluyen los de la barra inferior (.mobile-nav-item), que ya gestiona su propio handler genérico
+    document.querySelectorAll(".btn-logout-component:not(.mobile-nav-item)").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            logoutComponent();
+        });
+    });
+}
+
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+}
+
+const SUGGESTION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getSuggestionCooldownEnd(musicianId) {
+    if (!musicianId) return null;
+    const mySuggestions = (state.suggestions || []).filter(s => String(s.authorId) === String(musicianId));
+    let lastDate = mySuggestions.reduce((latest, s) => {
+        const t = new Date(s.date).getTime();
+        return (t && !isNaN(t) && t > latest) ? t : latest;
+    }, 0);
+
+    const storedLastDateStr = localStorage.getItem("yacente_last_suggestion_date_" + musicianId);
+    if (storedLastDateStr) {
+        const tStored = new Date(storedLastDateStr).getTime();
+        if (tStored && !isNaN(tStored) && tStored > lastDate) {
+            lastDate = tStored;
+        }
+    }
+
+    if (!lastDate) return null;
+    const cooldownEnd = lastDate + SUGGESTION_COOLDOWN_MS;
+    return cooldownEnd > Date.now() ? new Date(cooldownEnd) : null;
+}
+
+function renderComponentSugerenciasPage() {
+    const musicianId = getAuthMusicianId();
+    const form = document.getElementById("form-suggestion-mailbox");
+    const notice = document.getElementById("suggestion-limit-notice");
+    const noticeDate = document.getElementById("suggestion-limit-date");
+    if (!form || !notice) return;
+
+    const cooldownEnd = musicianId ? getSuggestionCooldownEnd(musicianId) : null;
+    if (cooldownEnd) {
+        form.classList.add("hidden");
+        notice.classList.remove("hidden");
+        if (noticeDate) {
+            noticeDate.innerText = cooldownEnd.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+    } else {
+        form.classList.remove("hidden");
+        notice.classList.add("hidden");
+    }
+}
+
+function renderMySuggestionHistory() {
+    const musicianId = getAuthMusicianId();
+    const container = document.getElementById("my-suggestions-history-list");
+    const emptyState = document.getElementById("my-suggestions-history-empty");
+    if (!container || !musicianId) return;
+
+    const getTimestamp = (d) => {
+        if (!d) return 0;
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+    };
+
+    const mine = (state.suggestions || [])
+        .filter(s => String(s.authorId) === String(musicianId) && !s.deletedByMusician)
+        .sort((a, b) => getTimestamp(b.date) - getTimestamp(a.date));
+
+    container.innerHTML = "";
+
+    if (mine.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    mine.forEach(sug => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "card-item";
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        `;
+
+        const anonymousTag = sug.anonymous ? `<span style="font-size: 0.68rem; color: var(--text-muted);">Enviada de forma anónima</span>` : "";
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(sug.date).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
+                <button type="button" class="btn-delete-my-suggestion" title="Eliminar sugerencia" aria-label="Eliminar sugerencia" style="background: none; border: none; cursor: pointer; color: var(--color-absent); padding: 2px; display: inline-flex; align-items: center;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: var(--text-color); white-space: pre-wrap;">${escapeHtml(sug.text)}</p>
+            ${anonymousTag}
+        `;
+
+        const deleteBtn = itemDiv.querySelector(".btn-delete-my-suggestion");
+        deleteBtn.addEventListener("click", () => {
+            if (!confirm("¿Estás seguro de que quieres eliminar esta sugerencia de tu historial? Esta acción no se puede deshacer.")) return;
+            dbDeleteSuggestionByMusician(sug)
+                .then(() => {
+                    showToast("Sugerencia eliminada de tu historial", "success");
+                    renderMySuggestionHistory();
+                    renderComponentSugerenciasPage();
+                    updateSuggestionsBadge();
+                })
+                .catch(() => {
+                    showToast("No se ha podido eliminar la sugerencia.", "error");
+                });
+        });
+
+        container.appendChild(itemDiv);
+    });
+}
+
+function setupSuggestionsMailboxEvents() {
+    // Formulario de envío de sugerencia (vista músico)
+    const formSuggestion = document.getElementById("form-suggestion-mailbox");
+    if (formSuggestion) {
+        formSuggestion.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const musicianId = getAuthMusicianId();
+            if (!musicianId) {
+                showToast("Sesión de músico no válida", "error");
+                return;
+            }
+            const cooldownEnd = getSuggestionCooldownEnd(musicianId);
+            if (cooldownEnd) {
+                showToast("Solo puedes enviar una sugerencia por semana.", "warning");
+                renderComponentSugerenciasPage();
+                return;
+            }
+
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+            const textInput = document.getElementById("suggestion-text");
+            const text = textInput ? textInput.value.trim() : "";
+            const anonymous = !!document.getElementById("suggestion-anonymous-toggle")?.checked;
+
+            if (!text) {
+                showToast("Escribe una sugerencia antes de enviarla.", "warning");
+                return;
+            }
+
+            const suggestionObj = {
+                id: "sug_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+                text: text,
+                authorId: musicianId,
+                authorName: musician ? musician.name : "Desconocido",
+                anonymous: anonymous,
+                date: new Date().toISOString(),
+                read: false
+            };
+
+            const submitBtn = formSuggestion.querySelector("button[type=submit]");
+            if (submitBtn) submitBtn.disabled = true;
+
+            dbSaveSuggestion(suggestionObj)
+                .then(() => {
+                    if (textInput) textInput.value = "";
+                    const toggle = document.getElementById("suggestion-anonymous-toggle");
+                    if (toggle) toggle.checked = false;
+                    showToast("Sugerencia enviada a la directiva. ¡Gracias!", "success");
+                    renderComponentSugerenciasPage();
+                    renderMySuggestionHistory();
+                })
+                .catch(() => {
+                    showToast("No se ha podido enviar la sugerencia. Comprueba tu conexión e inténtalo de nuevo.", "error");
+                })
+                .finally(() => {
+                    if (submitBtn) submitBtn.disabled = false;
+                });
+        });
+    }
+
+    // Tarjeta "Buzón de Sugerencias" dentro de Otros (vista admin)
+    document.querySelectorAll(".otros-nav-card").forEach(card => {
+        card.addEventListener("click", () => {
+            const targetId = card.getAttribute("data-target");
+            if (targetId) renderActiveSection(targetId);
+        });
+    });
+
+    // Enlace "Volver a Otros" dentro del detalle del buzón (vista admin)
+    document.querySelectorAll(".otros-back-link").forEach(link => {
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const targetId = link.getAttribute("data-target");
+            if (targetId) renderActiveSection(targetId);
+        });
+    });
+}
+
+// ==========================================================================
+// GESTIÓN DE LUGARES DE ENSAYO (DIRECTOR Y DESPLEGABLES)
+// ==========================================================================
+
+function dbSaveRehearsalLocations() {
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("settings").doc("rehearsalLocations").set({ list: state.rehearsalLocations || [] })
+            .catch(err => console.error("Error al guardar lugares de ensayo en la nube:", err));
+    }
+}
+
+function renderRehearsalLocationOptions() {
+    const rehearsalSelect = document.getElementById("rehearsal-location-input");
+    const quickSelect = document.getElementById("quick-session-location");
+
+    const locations = (state.rehearsalLocations && state.rehearsalLocations.length > 0)
+        ? state.rehearsalLocations
+        : [
+            { id: "loc_parking", name: "Parking", address: "Parking de la Sede" },
+            { id: "loc_arrabal", name: "Arrabal", address: "Arrabal" },
+            { id: "loc_sanblas", name: "San Blas", address: "San Blas" }
+        ];
+
+    let optionsHtml = locations.map(l => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join("");
+
+    if (rehearsalSelect) {
+        rehearsalSelect.innerHTML = optionsHtml;
+    }
+    if (quickSelect) {
+        quickSelect.innerHTML = optionsHtml;
+    }
+}
+
+function compressImageFile(file, maxWidth, maxHeight, callback) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth || height > maxHeight) {
+                if (width / height > maxWidth / maxHeight) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                } else {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+            callback(dataUrl);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderLocationMapContent(loc) {
+    if (!loc) return "";
+
+    if (loc.image) {
+        return `<img src="${loc.image}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="${escapeHtml(loc.name)}">`;
+    }
+
+    return `
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(212,175,55,0.18) 0%, rgba(15,15,15,0.92) 85%); color: var(--text-muted); text-align: center; padding: 20px; box-sizing: border-box;">
+            <span style="font-size: 3rem; margin-bottom: 8px; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.6));">📍</span>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${escapeHtml(loc.name || "Lugar de Ensayo")}</div>
+        </div>
+    `;
+}
+
+function renderAdminLugaresEnsayoList() {
+    const container = document.getElementById("admin-lugares-ensayo-list");
+    const emptyEl = document.getElementById("admin-lugares-ensayo-empty");
+    if (!container) return;
+
+    const locations = state.rehearsalLocations || [];
+
+    if (locations.length === 0) {
+        container.innerHTML = "";
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    container.innerHTML = locations.map(loc => `
+        <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--border-color); background: var(--bg-card);">
+            <!-- Marco Cuadrado para Foto o Mapa -->
+            <div style="width: 100%; aspect-ratio: 1 / 1; background: #000; border-bottom: 1px solid var(--border-color); position: relative; overflow: hidden;">
+                ${renderLocationMapContent(loc)}
+            </div>
+            
+            <!-- Detalles y Acciones -->
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: space-between;">
+                <div>
+                    <div style="font-weight: 700; font-size: 0.98rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span>📍</span> ${escapeHtml(loc.name)}
+                    </div>
+                    ${loc.mapsUrl ? `
+                        <a href="${escapeHtml(loc.mapsUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--color-gold); text-decoration: none; margin-top: 6px; font-weight: 600;">
+                            <span>🗺️</span> Enlace Google Maps
+                        </a>
+                    ` : ''}
+                </div>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+                    <button class="btn btn-secondary btn-sm edit-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn btn-secondary btn-sm delete-lugar-ensayo-btn" data-id="${loc.id}" style="padding: 6px 10px; font-size: 0.8rem; color: var(--color-absent);">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join("");
+
+    // Bind Edit
+    container.querySelectorAll(".edit-lugar-ensayo-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const locId = btn.dataset.id;
+            openLugarEnsayoModal(locId);
+        });
+    });
+
+    // Bind Delete
+    container.querySelectorAll(".delete-lugar-ensayo-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (state.pastLockEnabled) {
+                showToast("Bloqueo de pasado activado, no se pueden eliminar lugares de ensayo.", "warning");
+                return;
+            }
+            const locId = btn.dataset.id;
+            const loc = state.rehearsalLocations.find(l => l.id === locId);
+            if (!loc) return;
+            if (confirm(`¿Estás seguro de eliminar el lugar de ensayo "${loc.name}"?`)) {
+                state.rehearsalLocations = state.rehearsalLocations.filter(l => l.id !== locId);
+                dbSaveRehearsalLocations();
+                renderAdminLugaresEnsayoList();
+                renderRehearsalLocationOptions();
+                showToast("Lugar de ensayo eliminado", "info");
+            }
+        });
+    });
+}
+
+let currentLugarEnsayoImageDataUrl = "";
+
+let advancedStatsSelectedMusicianId = "";
+
+const MESES_CORTO_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function formatMonthShortLabelEs(monthStr) {
+    const [y, m] = monthStr.split("-");
+    return `${MESES_CORTO_ES[parseInt(m, 10) - 1]} ${y.slice(2)}`;
+}
+
+// ==========================================================================
+// TREEMAP POR VOZ/SECCIÓN (Estadísticas Avanzadas)
+// ==========================================================================
+// Algoritmo "squarified treemap" (Bruls, Huizing & van Wijk): coloca los rectángulos
+// en filas/columnas eligiendo en cada paso la orientación que mantiene los rectángulos
+// lo más cuadrados posible, en vez de simplemente repartir el ancho en proporción al valor.
+// Trabaja en un sistema de coordenadas normalizado (w × h) que luego se traduce a
+// porcentajes CSS, así que no depende del tamaño real en píxeles del contenedor.
+function squarifyTreemapLayout(items, x, y, w, h) {
+    const results = [];
+
+    function worstRatio(rowAreas, sideLength) {
+        const sum = rowAreas.reduce((a, b) => a + b, 0);
+        if (sum <= 0) return Infinity;
+        const maxA = Math.max(...rowAreas);
+        const minA = Math.min(...rowAreas);
+        const sideSq = sideLength * sideLength;
+        const sumSq = sum * sum;
+        return Math.max((sideSq * maxA) / sumSq, sumSq / (sideSq * minA));
+    }
+
+    function layout(items, x, y, w, h) {
+        if (items.length === 0 || w <= 0 || h <= 0) return;
+        if (items.length === 1) {
+            results.push({ item: items[0], x, y, w, h });
+            return;
+        }
+
+        const shortSide = Math.min(w, h);
+        let row = [items[0]];
+        let rowAreas = [items[0].area];
+        let i = 1;
+        while (i < items.length) {
+            const nextRowAreas = rowAreas.concat([items[i].area]);
+            if (worstRatio(nextRowAreas, shortSide) <= worstRatio(rowAreas, shortSide)) {
+                row.push(items[i]);
+                rowAreas = nextRowAreas;
+                i++;
+            } else {
+                break;
+            }
+        }
+
+        const rowAreaSum = rowAreas.reduce((a, b) => a + b, 0);
+        const remaining = items.slice(i);
+
+        if (w >= h) {
+            // Contenedor apaisado: el lado corto es la altura -> se apila una columna
+            // vertical a la izquierda que ocupa toda la altura disponible.
+            const colWidth = h > 0 ? rowAreaSum / h : 0;
+            let offsetY = y;
+            row.forEach((it, idx) => {
+                const itH = colWidth > 0 ? rowAreas[idx] / colWidth : 0;
+                results.push({ item: it, x, y: offsetY, w: colWidth, h: itH });
+                offsetY += itH;
+            });
+            layout(remaining, x + colWidth, y, w - colWidth, h);
+        } else {
+            // Contenedor apaisado en vertical: el lado corto es el ancho -> se apila una
+            // fila horizontal arriba que ocupa todo el ancho disponible.
+            const rowHeight = w > 0 ? rowAreaSum / w : 0;
+            let offsetX = x;
+            row.forEach((it, idx) => {
+                const itW = rowHeight > 0 ? rowAreas[idx] / rowHeight : 0;
+                results.push({ item: it, x: offsetX, y, w: itW, h: rowHeight });
+                offsetX += itW;
+            });
+            layout(remaining, x, y + rowHeight, w, h - rowHeight);
+        }
+    }
+
+    const total = items.reduce((s, it) => s + it.value, 0);
+    if (total <= 0) return [];
+    const scale = (w * h) / total;
+    const scaledItems = items.map(it => ({ ...it, area: it.value * scale }));
+    layout(scaledItems, x, y, w, h);
+    return results;
+}
+
+// Asistencia media histórica (todas las convocatorias concluidas, sin filtros) y
+// tamaño (nº de componentes activos) de cada sección, para el treemap.
+function computeSectionTreemapData() {
+    const sectionAttendance = {};
+    SECCIONES_ORDEN.forEach(sec => { sectionAttendance[sec] = { totalCheck: 0, presents: 0 }; });
+
+    const allDates = getAllSessionDatesCached();
+    allDates.forEach(date => {
+        if (!isSessionConcluded(date)) return;
+        const dayRecord = state.attendance[date] || {};
+        state.musicians.forEach(m => {
+            const record = dayRecord[m.id];
+            if (!record) return;
+            if (isMusicianOnLeaveOnDate(m, date)) return;
+            const bucket = sectionAttendance[m.instrument];
+            if (!bucket) return;
+            bucket.totalCheck++;
+            if (record.status === "present") bucket.presents++;
+        });
+    });
+
+    const sectionCounts = {};
+    (state.musicians || []).forEach(m => {
+        if (m.status === "inactive") return;
+        sectionCounts[m.instrument] = (sectionCounts[m.instrument] || 0) + 1;
+    });
+
+    return SECCIONES_ORDEN
+        .map(sec => {
+            const count = sectionCounts[sec] || 0;
+            const att = sectionAttendance[sec];
+            const pct = att.totalCheck > 0 ? Math.round((att.presents / att.totalCheck) * 100) : null;
+            return { section: sec, value: count, pct };
+        })
+        .filter(s => s.value > 0);
+}
+
+function renderStatsSectionTreemap() {
+    const container = document.getElementById("advanced-stats-treemap-container");
+    try {
+        renderStatsSectionTreemapUnsafe();
+    } catch (err) {
+        console.error("[Treemap secciones] Error al renderizar:", err);
+        if (container) {
+            container.classList.remove("hidden");
+            container.innerHTML = `<p class="text-muted" style="padding: 20px; color: var(--color-absent);">No se ha podido generar el treemap (${escapeHtml(err.message || String(err))}). Revisa la consola para más detalle.</p>`;
+        }
+        const emptyState = document.getElementById("advanced-stats-treemap-empty");
+        if (emptyState) emptyState.classList.add("hidden");
+    }
+}
+
+function renderStatsSectionTreemapUnsafe() {
+    const container = document.getElementById("advanced-stats-treemap-container");
+    const emptyState = document.getElementById("advanced-stats-treemap-empty");
+    if (!container) return;
+
+    const data = computeSectionTreemapData();
+
+    if (data.length === 0) {
+        container.innerHTML = "";
+        container.classList.add("hidden");
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+
+    // Coordenadas normalizadas: la relación 1000x460 aproxima el ancho/alto típico de la
+    // tarjeta para que los rectángulos salgan razonablemente cuadrados en escritorio.
+    const LAYOUT_W = 1000;
+    const LAYOUT_H = 460;
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+    const rects = squarifyTreemapLayout(sorted, 0, 0, LAYOUT_W, LAYOUT_H);
+
+    container.style.position = "relative";
+    container.style.width = "100%";
+    container.style.height = "380px";
+    container.innerHTML = "";
+
+    rects.forEach(r => {
+        const d = r.item;
+        let color = "rgba(255,255,255,0.12)";
+        let pctLabel = "Sin datos";
+        if (d.pct !== null) {
+            color = "var(--color-present)";
+            if (d.pct < 80) color = "var(--color-justified)";
+            if (d.pct < 50) color = "var(--color-absent)";
+            pctLabel = `${d.pct}% asistencia`;
+        }
+
+        const areaPx = (r.w / LAYOUT_W) * (r.h / LAYOUT_H); // fracción del área total (0-1)
+        const showSubtitle = areaPx > 0.02 && r.h > (LAYOUT_H * 0.09);
+        const fontSize = areaPx > 0.09 ? "0.95rem" : (areaPx > 0.035 ? "0.82rem" : "0.72rem");
+
+        const cell = document.createElement("div");
+        cell.title = `${d.section}: ${pctLabel} · ${d.value} componente${d.value === 1 ? '' : 's'}`;
+        cell.style.position = "absolute";
+        cell.style.left = `${(r.x / LAYOUT_W) * 100}%`;
+        cell.style.top = `${(r.y / LAYOUT_H) * 100}%`;
+        cell.style.width = `${(r.w / LAYOUT_W) * 100}%`;
+        cell.style.height = `${(r.h / LAYOUT_H) * 100}%`;
+        cell.style.boxSizing = "border-box";
+        cell.style.border = "2px solid var(--bg-primary)";
+        cell.style.background = color;
+        cell.style.color = "#FFF";
+        cell.style.display = "flex";
+        cell.style.flexDirection = "column";
+        cell.style.alignItems = "center";
+        cell.style.justifyContent = "center";
+        cell.style.textAlign = "center";
+        cell.style.padding = "4px";
+        cell.style.overflow = "hidden";
+        cell.style.cursor = "default";
+        cell.style.transition = "filter 0.15s ease";
+        cell.onmouseenter = () => { cell.style.filter = "brightness(1.12)"; };
+        cell.onmouseleave = () => { cell.style.filter = "none"; };
+
+        cell.innerHTML = `
+            <span style="font-weight: 700; font-size: ${fontSize}; line-height: 1.2; text-shadow: 0 1px 3px rgba(0,0,0,0.4); overflow-wrap: anywhere;">${d.section}</span>
+            ${showSubtitle ? `<span style="font-size: 0.78rem; opacity: 0.92; margin-top: 3px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4);">${pctLabel}</span>` : ''}
+        `;
+
+        container.appendChild(cell);
+    });
+}
+
+// ==========================================================================
+// SUNBURST DE MOTIVOS DE FALTA (Estadísticas Avanzadas)
+// ==========================================================================
+function hexToRgbParts(hex) {
+    const clean = hex.replace('#', '');
+    const bigint = parseInt(clean, 16);
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+// percent > 0 aclara hacia blanco, percent < 0 oscurece hacia negro (-100..100)
+function shadeHexColor(hex, percent) {
+    const { r, g, b } = hexToRgbParts(hex);
+    const target = percent < 0 ? 0 : 255;
+    const p = Math.min(Math.abs(percent), 100) / 100;
+    const nr = Math.round((target - r) * p + r);
+    const ng = Math.round((target - g) * p + g);
+    const nb = Math.round((target - b) * p + b);
+    return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+function polarToCartesian(cx, cy, r, angleDeg) {
+    const angleRad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+}
+
+// Genera el "d" de un anillo/gajo de donut entre dos radios y dos ángulos (grados, 0 = arriba,
+// sentido horario). Se recorta el tramo a un máximo de 359.9° para evitar el caso degenerado
+// de un arco SVG con el mismo punto de inicio y fin (círculo completo).
+function donutSlicePath(cx, cy, innerR, outerR, startAngle, endAngle) {
+    let end = endAngle;
+    if (end - startAngle >= 359.9) end = startAngle + 359.9;
+    const largeArc = (end - startAngle) > 180 ? 1 : 0;
+    const p1 = polarToCartesian(cx, cy, outerR, end);
+    const p2 = polarToCartesian(cx, cy, outerR, startAngle);
+    const p3 = polarToCartesian(cx, cy, innerR, startAngle);
+    const p4 = polarToCartesian(cx, cy, innerR, end);
+    return [
+        `M ${p1.x} ${p1.y}`,
+        `A ${outerR} ${outerR} 0 ${largeArc} 0 ${p2.x} ${p2.y}`,
+        `L ${p3.x} ${p3.y}`,
+        `A ${innerR} ${innerR} 0 ${largeArc} 1 ${p4.x} ${p4.y}`,
+        "Z"
+    ].join(" ");
+}
+
+// Recorta simétricamente un pequeño hueco angular entre gajos contiguos, salvo que el gajo
+// sea demasiado fino (en cuyo caso se dibuja sin hueco para no invertir el arco).
+function trimAngleGap(start, end, gapDeg) {
+    const span = end - start;
+    if (span <= gapDeg * 3) return { start, end };
+    return { start: start + gapDeg / 2, end: end - gapDeg / 2 };
+}
+
+// Todas las convocatorias históricas (concluidas, sin filtros), agrupadas por
+// asistió / falta justificada / falta no justificada. Dentro de "asistió" se subdivide
+// por si hubo o no preaviso explícito del músico (desde su portal); dentro de cada tipo
+// de falta se subdivide por el motivo exacto introducido.
+function computeAttendanceSunburstData() {
+    const groups = {
+        asistio: { total: 0, withPreaviso: 0 },
+        justificada: { total: 0, reasons: {} },
+        no_justificada: { total: 0, reasons: {} }
+    };
+
+    const allDates = getAllSessionDatesCached();
+    allDates.forEach(date => {
+        if (!isSessionConcluded(date)) return;
+        const dayRecord = state.attendance[date] || {};
+        state.musicians.forEach(m => {
+            const record = dayRecord[m.id];
+            if (!record) return;
+            if (isMusicianOnLeaveOnDate(m, date)) return;
+
+            if (record.status === "present") {
+                groups.asistio.total++;
+                if (record.preaviso === true) groups.asistio.withPreaviso++;
+                return;
+            }
+
+            const bucket = record.justified ? groups.justificada : groups.no_justificada;
+            bucket.total++;
+            const reason = (record.reason || "").trim() || "Sin especificar";
+            bucket.reasons[reason] = (bucket.reasons[reason] || 0) + 1;
+        });
+    });
+
+    return groups;
+}
+
+function renderStatsAttendanceSunburst() {
+    const container = document.getElementById("advanced-stats-sunburst-container");
+    try {
+        renderStatsAttendanceSunburstUnsafe();
+    } catch (err) {
+        console.error("[Sunburst asistencia] Error al renderizar:", err);
+        if (container) {
+            container.classList.remove("hidden");
+            container.innerHTML = `<p class="text-muted" style="padding: 20px; color: var(--color-absent);">No se ha podido generar el sunburst (${escapeHtml(err.message || String(err))}). Revisa la consola para más detalle.</p>`;
+        }
+        const emptyState = document.getElementById("advanced-stats-sunburst-empty");
+        if (emptyState) emptyState.classList.add("hidden");
+    }
+}
+
+function renderStatsAttendanceSunburstUnsafe() {
+    const container = document.getElementById("advanced-stats-sunburst-container");
+    const emptyState = document.getElementById("advanced-stats-sunburst-empty");
+    if (!container) return;
+
+    const groups = computeAttendanceSunburstData();
+    const totalRecords = groups.asistio.total + groups.justificada.total + groups.no_justificada.total;
+
+    container.innerHTML = "";
+
+    if (totalRecords === 0) {
+        container.classList.add("hidden");
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+
+    const CX = 200, CY = 200;
+    const INNER_R0 = 54, INNER_R1 = 106;
+    const OUTER_R0 = 110, OUTER_R1 = 174;
+    const GAP_DEG = 0.8;
+
+    const groupDefs = [
+        {
+            key: "asistio", label: "Asistió", baseColor: "#2ECC71", unit: "asistencia",
+            getEntries: grp => {
+                const withP = grp.withPreaviso;
+                const withoutP = grp.total - grp.withPreaviso;
+                const entries = [];
+                if (withP > 0) entries.push(["Con preaviso", withP]);
+                if (withoutP > 0) entries.push(["Sin preaviso", withoutP]);
+                return entries;
+            }
+        },
+        {
+            key: "justificada", label: "Falta justificada", baseColor: "#E67E22", unit: "falta",
+            getEntries: grp => Object.entries(grp.reasons).sort((a, b) => b[1] - a[1])
+        },
+        {
+            key: "no_justificada", label: "Falta no justificada", baseColor: "#E74C3C", unit: "falta",
+            getEntries: grp => Object.entries(grp.reasons).sort((a, b) => b[1] - a[1])
+        }
+    ];
+
+    let innerPaths = "";
+    let outerPaths = "";
+    const legendGroups = [];
+    let angleCursor = 0;
+
+    groupDefs.forEach(gd => {
+        const grp = groups[gd.key];
+        if (grp.total === 0) return;
+
+        const span = (grp.total / totalRecords) * 360;
+        const start = angleCursor;
+        const end = angleCursor + span;
+        const pct = Math.round((grp.total / totalRecords) * 100);
+
+        const innerTrim = trimAngleGap(start, end, GAP_DEG);
+        innerPaths += `<path d="${donutSlicePath(CX, CY, INNER_R0, INNER_R1, innerTrim.start, innerTrim.end)}" fill="${gd.baseColor}" stroke="var(--bg-primary)" stroke-width="1.5"><title>${gd.label}: ${grp.total} ${gd.unit}${grp.total === 1 ? '' : 's'} (${pct}%)</title></path>`;
+
+        const entries = gd.getEntries(grp);
+        const legendEntries = [];
+        let subCursor = start;
+        entries.forEach(([entryLabel, count], idx) => {
+            const subSpan = (count / grp.total) * span;
+            const subStart = subCursor;
+            const subEnd = subCursor + subSpan;
+            const shadePct = entries.length <= 1 ? 0 : -25 + (idx / (entries.length - 1)) * 55;
+            const color = shadeHexColor(gd.baseColor, shadePct);
+            const entryPct = Math.round((count / totalRecords) * 100);
+
+            const safeLabel = escapeHtml(entryLabel);
+            const outerTrim = trimAngleGap(subStart, subEnd, GAP_DEG);
+            outerPaths += `<path d="${donutSlicePath(CX, CY, OUTER_R0, OUTER_R1, outerTrim.start, outerTrim.end)}" fill="${color}" stroke="var(--bg-primary)" stroke-width="1.5"><title>${safeLabel} (${gd.label}): ${count} ${gd.unit}${count === 1 ? '' : 's'} (${entryPct}%)</title></path>`;
+
+            legendEntries.push({ label: safeLabel, count, color });
+            subCursor = subEnd;
+        });
+
+        legendGroups.push({ label: gd.label, color: gd.baseColor, total: grp.total, pct, entries: legendEntries });
+        angleCursor = end;
+    });
+
+    const svg = `
+        <svg viewBox="0 0 400 400" width="320" height="320" style="flex-shrink: 0;">
+            ${outerPaths}
+            ${innerPaths}
+            <circle cx="${CX}" cy="${CY}" r="${INNER_R0 - 4}" fill="var(--bg-card)" stroke="var(--border-color)" stroke-width="1"></circle>
+            <text x="${CX}" y="${CY - 6}" text-anchor="middle" style="font-family: 'Cinzel', serif; font-size: 28px; font-weight: 700; fill: var(--text-primary);">${totalRecords}</text>
+            <text x="${CX}" y="${CY + 16}" text-anchor="middle" style="font-size: 12px; fill: var(--text-muted);">registro${totalRecords === 1 ? '' : 's'}</text>
+        </svg>
+    `;
+
+    let legendHTML = `<div style="display: flex; flex-direction: column; gap: 18px; min-width: 220px; max-width: 320px;">`;
+    legendGroups.forEach(g => {
+        legendHTML += `
+            <div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <span style="width: 12px; height: 12px; border-radius: 3px; background: ${g.color}; display: inline-block; flex-shrink: 0;"></span>
+                    <strong style="font-size: 0.9rem; color: var(--text-primary);">${g.label}</strong>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${g.total} (${g.pct}%)</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px; padding-left: 20px;">
+                    ${g.entries.map(e => `
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-secondary);">
+                            <span style="width: 9px; height: 9px; border-radius: 2px; background: ${e.color}; display: inline-block; flex-shrink: 0;"></span>
+                            <span style="flex: 1; overflow-wrap: anywhere;">${e.label}</span>
+                            <span style="font-weight: 600; color: var(--text-primary);">${e.count}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+    legendHTML += `</div>`;
+
+    container.innerHTML = svg + legendHTML;
+}
+
+// ==========================================================================
+// CALENDAR HEATMAP ANUAL (Estadísticas Avanzadas)
+// ==========================================================================
+const MESES_CORTO_ES_HEATMAP = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+// Asistencia media (día completo, todas las convocatorias de ese día) por fecha de calendario
+// del año indicado. Varias sesiones el mismo día (p.ej. "2024-03-15" y "2024-03-15_actuacion")
+// se agregan en una sola celda.
+function computeSeasonAttendanceHeatmapData(seasonLabel) {
+    const dayBuckets = {};
+
+    const allDates = getAllSessionDatesCached();
+    allDates.forEach(dateKey => {
+        if (!isSessionConcluded(dateKey)) return;
+        const rawDate = dateKey.split("_")[0];
+        if (!isDateInSeason(rawDate, seasonLabel)) return;
+
+        const dayRecord = state.attendance[dateKey] || {};
+        state.musicians.forEach(m => {
+            const record = dayRecord[m.id];
+            if (!record) return;
+            if (isMusicianOnLeaveOnDate(m, dateKey)) return;
+
+            if (!dayBuckets[rawDate]) dayBuckets[rawDate] = { presents: 0, total: 0 };
+            dayBuckets[rawDate].total++;
+            if (record.status === "present") dayBuckets[rawDate].presents++;
+        });
+    });
+
+    return dayBuckets;
+}
+
+// Posiciona cada día de la temporada (1 sept. año1 -> 31 ago. año2) en la cuadrícula estilo
+// GitHub: filas = día de la semana (0 = lunes ... 6 = domingo), columnas = nº de semana desde
+// el lunes anterior (o igual) al 1 de septiembre, para que las columnas completas representen
+// semanas naturales.
+function computeSeasonHeatmapLayout(seasonLabel) {
+    const { year1, year2 } = getSeasonBounds(seasonLabel);
+    if (isNaN(year1) || isNaN(year2)) return [];
+
+    const seasonStart = new Date(year1, 8, 1); // 1 de septiembre
+    const seasonEnd = new Date(year2, 7, 31); // 31 de agosto
+    const mondayOffset = (seasonStart.getDay() + 6) % 7; // 0 si el 1 de septiembre ya es lunes
+    const gridStart = new Date(year1, 8, 1 - mondayOffset);
+
+    const days = [];
+    const cursor = new Date(gridStart);
+    let index = 0;
+    while (cursor <= seasonEnd) {
+        if (cursor >= seasonStart) {
+            const row = (cursor.getDay() + 6) % 7;
+            const col = Math.floor(index / 7);
+            const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+            days.push({ date: dateStr, row, col, month: cursor.getMonth() });
+        }
+        cursor.setDate(cursor.getDate() + 1);
+        index++;
+    }
+    return days;
+}
+
+// Mismo esquema semántico rojo/ámbar/verde que el resto de "Estadísticas Avanzadas", pero
+// con la opacidad graduada dentro de cada franja para lograr el efecto "heatmap".
+function getHeatmapDayColor(pct) {
+    if (pct === null) return "var(--bg-compact-card)";
+    let base, zoneMin, zoneMax;
+    if (pct >= 80) { base = "#2ECC71"; zoneMin = 80; zoneMax = 100; }
+    else if (pct >= 50) { base = "#E67E22"; zoneMin = 50; zoneMax = 79; }
+    else { base = "#E74C3C"; zoneMin = 0; zoneMax = 49; }
+
+    const t = zoneMax > zoneMin ? (pct - zoneMin) / (zoneMax - zoneMin) : 1;
+    const opacity = (0.45 + t * 0.55).toFixed(2);
+    const { r, g, b } = hexToRgbParts(base);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+function renderStatsCalendarHeatmap() {
+    const container = document.getElementById("advanced-stats-heatmap-container");
+    try {
+        renderStatsCalendarHeatmapUnsafe();
+    } catch (err) {
+        console.error("[Calendar heatmap] Error al renderizar:", err);
+        if (container) {
+            container.classList.remove("hidden");
+            container.innerHTML = `<p class="text-muted" style="padding: 20px; color: var(--color-absent);">No se ha podido generar el calendario (${escapeHtml(err.message || String(err))}). Revisa la consola para más detalle.</p>`;
+        }
+        const emptyState = document.getElementById("advanced-stats-heatmap-empty");
+        if (emptyState) emptyState.classList.add("hidden");
+    }
+}
+
+function renderStatsCalendarHeatmapUnsafe() {
+    const container = document.getElementById("advanced-stats-heatmap-container");
+    const emptyState = document.getElementById("advanced-stats-heatmap-empty");
+    const yearSelect = document.getElementById("advanced-stats-heatmap-year-select");
+    if (!container) return;
+
+    const allDates = getAllSessionDatesCached();
+    const seasons = Array.from(new Set(
+        allDates.map(d => getSeasonLabelForDate(d.split("_")[0])).filter(Boolean)
+    )).sort().reverse();
+
+    if (seasons.length === 0) {
+        container.innerHTML = "";
+        container.classList.add("hidden");
+        if (yearSelect) yearSelect.innerHTML = "";
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    container.classList.remove("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+
+    if (yearSelect) {
+        const wantedOptions = seasons;
+        const currentOptions = Array.from(yearSelect.options).map(o => o.value);
+        const optionsMatch = currentOptions.length === wantedOptions.length && currentOptions.every((v, i) => v === wantedOptions[i]);
+        if (!optionsMatch) {
+            yearSelect.innerHTML = "";
+            seasons.forEach(s => {
+                const opt = document.createElement("option");
+                opt.value = s;
+                opt.innerText = s;
+                yearSelect.appendChild(opt);
+            });
+        }
+        if (!state.statsHeatmapSelectedSeason || !seasons.includes(state.statsHeatmapSelectedSeason)) {
+            state.statsHeatmapSelectedSeason = seasons[0];
+        }
+        yearSelect.value = state.statsHeatmapSelectedSeason;
+    }
+
+    const season = yearSelect ? yearSelect.value : seasons[0];
+    const dayBuckets = computeSeasonAttendanceHeatmapData(season);
+    const layout = computeSeasonHeatmapLayout(season);
+
+    const CELL = 11, GAP = 3, STEP = CELL + GAP;
+    const LEFT_MARGIN = 26, TOP_MARGIN = 18;
+    const numCols = layout.reduce((max, d) => Math.max(max, d.col), 0) + 1;
+    const width = LEFT_MARGIN + numCols * STEP;
+    const height = TOP_MARGIN + 7 * STEP;
+
+    let cellsSVG = "";
+    layout.forEach(d => {
+        const bucket = dayBuckets[d.date];
+        const pct = bucket && bucket.total > 0 ? Math.round((bucket.presents / bucket.total) * 100) : null;
+        const color = getHeatmapDayColor(pct);
+        const x = LEFT_MARGIN + d.col * STEP;
+        const y = TOP_MARGIN + d.row * STEP;
+        const label = pct === null
+            ? `${formatDateSpanish(d.date)}: sin convocatoria`
+            : `${formatDateSpanish(d.date)}: ${pct}% asistencia (${bucket.presents}/${bucket.total})`;
+        cellsSVG += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}" rx="2.5" fill="${color}" stroke="var(--border-color)" stroke-width="0.5"><title>${label}</title></rect>`;
+    });
+
+    // Etiquetas de mes: se coloca cada una en la columna de su primer día dentro de la temporada (Sep -> Ago).
+    const SEASON_MONTH_ORDER_IDX = [8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7];
+    let monthLabelsSVG = "";
+    let lastLabelCol = -3;
+    SEASON_MONTH_ORDER_IDX.forEach(m => {
+        const firstDay = layout.find(d => d.month === m);
+        if (!firstDay) return;
+        if (firstDay.col - lastLabelCol < 2) return; // evita solapes en meses muy cortos
+        const x = LEFT_MARGIN + firstDay.col * STEP;
+        monthLabelsSVG += `<text x="${x}" y="${TOP_MARGIN - 6}" style="font-size: 10px; fill: var(--text-muted);">${MESES_CORTO_ES_HEATMAP[m]}</text>`;
+        lastLabelCol = firstDay.col;
+    });
+
+    // Etiquetas de día de la semana (solo Lun/Mié/Vie, como GitHub, para no saturar).
+    const dayLabels = [{ row: 0, label: "Lun" }, { row: 2, label: "Mié" }, { row: 4, label: "Vie" }];
+    let dayLabelsSVG = "";
+    dayLabels.forEach(dl => {
+        const y = TOP_MARGIN + dl.row * STEP + CELL - 1;
+        dayLabelsSVG += `<text x="0" y="${y}" style="font-size: 9px; fill: var(--text-muted);">${dl.label}</text>`;
+    });
+
+    container.innerHTML = `
+        <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="max-width: 100%;">
+            ${monthLabelsSVG}
+            ${dayLabelsSVG}
+            ${cellsSVG}
+        </svg>
+    `;
+}
+
+// Calcula, para cada uno de los últimos "maxMonths" meses con datos, la posición de cada
+// músico en el ranking de asistencia DE ESE MES (no acumulado), reutilizando la misma
+// función de métricas que el resto de la app mediante su filtro de fechas opcional.
+function getMonthlyRankingSeries(maxMonths = 6) {
+    const monthSet = new Set();
+    Object.keys(state.attendance || {}).forEach(dateKey => {
+        if (!isSessionConcluded(dateKey)) return;
+        monthSet.add(dateKey.split("_")[0].slice(0, 7));
+    });
+
+    let months = Array.from(monthSet).sort();
+    if (months.length > maxMonths) {
+        months = months.slice(-maxMonths);
+    }
+
+    const perMonthEntries = months.map(monthStr => {
+        const dateFilterFn = d => d.split("_")[0].slice(0, 7) === monthStr;
+        const entries = (state.musicians || []).map(m => {
+            const metrics = getMusicianAttendanceMetrics(m.id, dateFilterFn);
+            return { id: m.id, name: m.name, pct: metrics.attendancePct, attended: metrics.attended, total: metrics.totalConvocated };
+        }).filter(e => e.total > 0);
+
+        entries.sort((a, b) => {
+            const pctDiff = b.pct - a.pct;
+            if (Math.abs(pctDiff) > 0.0001) return pctDiff;
+            if (b.attended !== a.attended) return b.attended - a.attended;
+            return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+        });
+
+        const ranks = {};
+        entries.forEach((e, idx) => { ranks[e.id] = idx + 1; });
+        return { month: monthStr, ranks };
+    });
+
+    const series = (state.musicians || []).map(m => ({
+        id: m.id,
+        name: m.name,
+        ranks: perMonthEntries.map(pm => pm.ranks[m.id] || null)
+    })).filter(s => s.ranks.some(r => r !== null));
+
+    return { months, series };
+}
+
+function renderAdvancedStatsBumpChart() {
+    const container = document.getElementById("advanced-stats-bump-chart-container");
+    const emptyState = document.getElementById("advanced-stats-bump-empty");
+    const selectEl = document.getElementById("advanced-stats-musician-select");
+    if (!container) return;
+
+    if (selectEl && selectEl.dataset.populated !== "true") {
+        const sortedMusicians = [...(state.musicians || [])].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+        selectEl.innerHTML = `<option value="">Top 3 (por defecto)</option>` +
+            sortedMusicians.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join("");
+        selectEl.dataset.populated = "true";
+    }
+    if (selectEl) selectEl.value = advancedStatsSelectedMusicianId || "";
+
+    const { months, series } = getMonthlyRankingSeries(6);
+
+    if (months.length < 2 || series.length === 0) {
+        container.innerHTML = "";
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    let maxRank = 1;
+    series.forEach(s => {
+        s.ranks.forEach(r => { if (r && r > maxRank) maxRank = r; });
+    });
+
+    let top3Ids = [];
+    for (let idx = months.length - 1; idx >= 0; idx--) {
+        const rankedThisMonth = series
+            .filter(s => s.ranks[idx] !== null)
+            .sort((a, b) => a.ranks[idx] - b.ranks[idx]);
+        if (rankedThisMonth.length > 0) {
+            top3Ids = rankedThisMonth.slice(0, 3).map(s => s.id);
+            break;
+        }
+    }
+
+    const topColors = ["#D4AF37", "#C0C0C0", "#CD7F32"];
+    const selected = advancedStatsSelectedMusicianId;
+
+    const rowHeight = maxRank > 35 ? 11 : maxRank > 20 ? 14 : maxRank > 10 ? 18 : 24;
+    const leftPad = 34, rightPad = 140, topPad = 16, bottomPad = 34;
+    const chartWidth = 700;
+    const chartHeight = topPad + (maxRank - 1) * rowHeight + bottomPad;
+    const xStep = months.length > 1 ? (chartWidth - leftPad - rightPad) / (months.length - 1) : 0;
+
+    const xFor = idx => leftPad + idx * xStep;
+    const yFor = rank => topPad + (rank - 1) * rowHeight;
+
+    function buildSeriesMarkup(s, color, strokeWidth, labeled) {
+        const allPoints = [];
+        s.ranks.forEach((r, idx) => { if (r !== null) allPoints.push({ idx, r }); });
+
+        let markup = "";
+        let segStart = 0;
+        for (let i = 1; i <= allPoints.length; i++) {
+            const brokenHere = i === allPoints.length || allPoints[i].idx !== allPoints[i - 1].idx + 1;
+            if (brokenHere) {
+                const seg = allPoints.slice(segStart, i);
+                if (seg.length > 1) {
+                    const d = seg.map((p, j) => `${j === 0 ? "M" : "L"}${xFor(p.idx)},${yFor(p.r)}`).join(" ");
+                    markup += `<path d="${d}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;"/>`;
+                }
+                segStart = i;
+            }
+        }
+
+        allPoints.forEach(p => {
+            markup += `<circle cx="${xFor(p.idx)}" cy="${yFor(p.r)}" r="${labeled ? 3.5 : 2.5}" fill="${color}" style="pointer-events:none;"/>`;
+        });
+
+        const hitD = allPoints.map((p, i) => `${i === 0 ? "M" : "L"}${xFor(p.idx)},${yFor(p.r)}`).join(" ");
+        markup += `<path d="${hitD}" fill="none" stroke="transparent" stroke-width="14" data-musician-id="${s.id}"><title>${escapeHtml(s.name)}</title></path>`;
+
+        if (labeled && allPoints.length > 0) {
+            const last = allPoints[allPoints.length - 1];
+            markup += `<circle cx="${xFor(last.idx)}" cy="${yFor(last.r)}" r="6" fill="${color}" style="pointer-events:none;"/>`;
+            markup += `<text x="${xFor(last.idx) + 12}" y="${yFor(last.r) + 4}" font-size="12" fill="var(--text-primary)" style="pointer-events:none;">${escapeHtml(s.name)}</text>`;
+        }
+
+        return markup;
+    }
+
+    let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="${chartWidth}" height="${chartHeight}" style="width:100%; height:auto; min-width:560px; display:block;" role="img" aria-label="Evolución mensual de la posición en el ranking de asistencia">`;
+
+    const gridStep = Math.max(1, Math.round(maxRank / 12));
+    for (let r = 1; r <= maxRank; r += gridStep) {
+        svg += `<line x1="${leftPad - 8}" y1="${yFor(r)}" x2="${chartWidth - rightPad + 8}" y2="${yFor(r)}" stroke="var(--text-muted)" stroke-opacity="0.08" stroke-width="1"/>`;
+    }
+    months.forEach((m, idx) => {
+        svg += `<text x="${xFor(idx)}" y="${chartHeight - 12}" text-anchor="middle" font-size="11" fill="var(--text-muted)">${formatMonthShortLabelEs(m)}</text>`;
+    });
+
+    const backgroundSeries = series.filter(s => selected ? s.id !== selected : !top3Ids.includes(s.id));
+    backgroundSeries.forEach(s => {
+        svg += buildSeriesMarkup(s, "var(--text-muted)", 1.5, false);
+    });
+
+    if (selected) {
+        const s = series.find(x => x.id === selected);
+        if (s) svg += buildSeriesMarkup(s, "#D4AF37", 3, true);
+    } else {
+        top3Ids.forEach((id, i) => {
+            const s = series.find(x => x.id === id);
+            if (s) svg += buildSeriesMarkup(s, topColors[i], 2.5, true);
+        });
+    }
+
+    svg += `</svg>`;
+    container.innerHTML = svg;
+
+    container.querySelectorAll("[data-musician-id]").forEach(el => {
+        el.style.cursor = "pointer";
+        el.addEventListener("click", () => {
+            const id = el.getAttribute("data-musician-id");
+            advancedStatsSelectedMusicianId = (advancedStatsSelectedMusicianId === id) ? "" : id;
+            renderAdvancedStatsBumpChart();
+        });
+    });
+}
+
+function setupAdvancedStatsEvents() {
+    const selectEl = document.getElementById("advanced-stats-musician-select");
+    if (selectEl) {
+        selectEl.addEventListener("change", () => {
+            advancedStatsSelectedMusicianId = selectEl.value || "";
+            renderAdvancedStatsBumpChart();
+        });
+    }
+}
+
+function updateLugarEnsayoImagePreview() {
+    const placeholder = document.getElementById("lugar-ensayo-image-placeholder");
+    const img = document.getElementById("lugar-ensayo-image-img");
+    const btnRemove = document.getElementById("btn-remove-lugar-ensayo-image");
+
+    if (currentLugarEnsayoImageDataUrl) {
+        if (img) {
+            img.src = currentLugarEnsayoImageDataUrl;
+            img.classList.remove("hidden");
+        }
+        if (placeholder) placeholder.classList.add("hidden");
+        if (btnRemove) btnRemove.classList.remove("hidden");
+    } else {
+        if (img) {
+            img.src = "";
+            img.classList.add("hidden");
+        }
+        if (placeholder) placeholder.classList.remove("hidden");
+        if (btnRemove) btnRemove.classList.add("hidden");
+    }
+}
+
+function openLugarEnsayoModal(id = null) {
+    const modal = document.getElementById("modal-lugar-ensayo");
+    const titleEl = document.getElementById("modal-lugar-ensayo-title");
+    const idInput = document.getElementById("lugar-ensayo-id");
+    const nameInput = document.getElementById("lugar-ensayo-nombre-input");
+    const mapsUrlInput = document.getElementById("lugar-ensayo-maps-url-input");
+
+    if (!modal) return;
+
+    if (id) {
+        const loc = (state.rehearsalLocations || []).find(l => l.id === id);
+        if (loc) {
+            if (titleEl) titleEl.innerText = "Editar Lugar de Ensayo";
+            if (idInput) idInput.value = loc.id;
+            if (nameInput) nameInput.value = loc.name || "";
+            if (mapsUrlInput) mapsUrlInput.value = loc.mapsUrl || "";
+            currentLugarEnsayoImageDataUrl = loc.image || "";
+        }
+    } else {
+        if (titleEl) titleEl.innerText = "Añadir Lugar de Ensayo";
+        if (idInput) idInput.value = "";
+        if (nameInput) nameInput.value = "";
+        if (mapsUrlInput) mapsUrlInput.value = "";
+        currentLugarEnsayoImageDataUrl = "";
+    }
+
+    updateLugarEnsayoImagePreview();
+    modal.classList.add("active");
+}
+
+function setupLugaresEnsayoEvents() {
+    const btnAdd = document.getElementById("btn-add-lugar-ensayo");
+    if (btnAdd) {
+        btnAdd.addEventListener("click", () => openLugarEnsayoModal());
+    }
+
+    const modal = document.getElementById("modal-lugar-ensayo");
+    const btnClose = document.getElementById("btn-close-lugar-ensayo-modal");
+    const btnCancel = document.getElementById("btn-cancel-lugar-ensayo-modal");
+    const form = document.getElementById("form-lugar-ensayo");
+
+    const btnUploadImg = document.getElementById("btn-upload-lugar-ensayo-image");
+    const fileInputImg = document.getElementById("lugar-ensayo-image-file");
+    const btnRemoveImg = document.getElementById("btn-remove-lugar-ensayo-image");
+
+    if (btnUploadImg && fileInputImg) {
+        btnUploadImg.addEventListener("click", () => fileInputImg.click());
+    }
+
+    if (fileInputImg) {
+        fileInputImg.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            compressImageFile(file, 800, 800, (dataUrl) => {
+                currentLugarEnsayoImageDataUrl = dataUrl;
+                updateLugarEnsayoImagePreview();
+            });
+        });
+    }
+
+    if (btnRemoveImg) {
+        btnRemoveImg.addEventListener("click", () => {
+            currentLugarEnsayoImageDataUrl = "";
+            if (fileInputImg) fileInputImg.value = "";
+            updateLugarEnsayoImagePreview();
+        });
+    }
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const id = document.getElementById("lugar-ensayo-id").value;
+            const name = document.getElementById("lugar-ensayo-nombre-input").value.trim();
+            const mapsUrlInput = document.getElementById("lugar-ensayo-maps-url-input");
+            const mapsUrl = mapsUrlInput ? mapsUrlInput.value.trim() : "";
+
+            if (!name) {
+                showToast("Por favor introduce el nombre del lugar", "error");
+                return;
+            }
+
+            if (!state.rehearsalLocations) state.rehearsalLocations = [];
+
+            if (id) {
+                const idx = state.rehearsalLocations.findIndex(l => l.id === id);
+                if (idx !== -1) {
+                    state.rehearsalLocations[idx].name = name;
+                    state.rehearsalLocations[idx].mapsUrl = mapsUrl;
+                    state.rehearsalLocations[idx].image = currentLugarEnsayoImageDataUrl;
+                }
+            } else {
+                const newLoc = {
+                    id: "loc_" + Date.now(),
+                    name: name,
+                    mapsUrl: mapsUrl,
+                    image: currentLugarEnsayoImageDataUrl
+                };
+                state.rehearsalLocations.push(newLoc);
+            }
+
+            dbSaveRehearsalLocations();
+            renderAdminLugaresEnsayoList();
+            renderRehearsalLocationOptions();
+            closeModal();
+            showToast("Lugar de ensayo guardado correctamente", "success");
+        });
+    }
+}
+
+function renderAdminSuggestionsList() {
+    const container = document.getElementById("admin-suggestions-list");
+    const emptyState = document.getElementById("admin-suggestions-empty");
+    if (!container) return;
+
+    const visibleSuggestions = (state.suggestions || []).filter(s => !s.deletedByAdmin);
+    container.innerHTML = "";
+
+    if (visibleSuggestions.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    const getTimestamp = (d) => {
+        if (!d) return 0;
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+    };
+
+    const sorted = [...visibleSuggestions].sort((a, b) => getTimestamp(b.date) - getTimestamp(a.date));
+
+    sorted.forEach(sug => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "card-item";
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        `;
+
+        const authorLabel = sug.anonymous ? "Anónimo" : escapeHtml(sug.authorName || "Desconocido");
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <span style="font-size: 0.85rem; font-weight: 700; color: var(--color-gold);">${authorLabel}</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(sug.date).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
+                    <button type="button" class="btn-delete-suggestion" title="Eliminar sugerencia" aria-label="Eliminar sugerencia" style="background: none; border: none; cursor: pointer; color: var(--color-absent); padding: 2px; display: inline-flex; align-items: center;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: var(--text-color); white-space: pre-wrap;">${escapeHtml(sug.text)}</p>
+        `;
+
+        const deleteBtn = itemDiv.querySelector(".btn-delete-suggestion");
+        deleteBtn.addEventListener("click", () => {
+            if (!confirm("¿Estás seguro de que quieres eliminar esta sugerencia? Esta acción no se puede deshacer.")) return;
+            dbDeleteSuggestionByAdmin(sug)
+                .then(() => {
+                    showToast("Sugerencia eliminada", "success");
+                    renderAdminSuggestionsList();
+                    updateSuggestionsBadge();
+                })
+                .catch(() => {
+                    showToast("No se ha podido eliminar la sugerencia.", "error");
+                });
+        });
+
+        container.appendChild(itemDiv);
+    });
+}
+
 function renderGeneralOverviewChart() {
     const container = document.getElementById("stats-ov-chart-container");
     if (!container) return;
@@ -12727,39 +17924,15 @@ function renderGeneralOverviewChart() {
     // 1. Gather all rehearsal sessions (only past ones, matching other stats)
     const rehearsalDates = Object.keys(state.attendance).filter(dateKey => {
         const session = state.sessionTypes[dateKey];
-        const d = new Date();
-        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const isPast = dateKey <= todayStr;
+        const isPast = isSessionConcluded(dateKey);
         return isPast && (!session || session.type === "ensayo");
     });
 
     // 2. Dynamic Season Dropdown Population
-    const uniqueSeasons = Array.from(new Set(rehearsalDates.map(date => {
-        const parts = date.split("-");
-        const y = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-        return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
-    }))).sort((a,b) => b.localeCompare(a));
-
     const ovYearSelect = document.getElementById("stats-ov-year-select");
     if (ovYearSelect) {
-        const currentOptions = Array.from(ovYearSelect.options).map(o => o.value);
-        const optionsMatch = currentOptions.length === uniqueSeasons.length && currentOptions.every((val, index) => val === uniqueSeasons[index]);
-        if (!optionsMatch) {
-            ovYearSelect.innerHTML = "";
-            uniqueSeasons.forEach(season => {
-                const opt = document.createElement("option");
-                opt.value = season;
-                opt.innerText = season;
-                ovYearSelect.appendChild(opt);
-            });
-            if (uniqueSeasons.length > 0) {
-                if (!uniqueSeasons.includes(state.statsOvSelectedSeason)) {
-                    state.statsOvSelectedSeason = uniqueSeasons[0];
-                }
-                ovYearSelect.value = state.statsOvSelectedSeason;
-            }
-        }
+        populateSeasonSelect(ovYearSelect, rehearsalDates, false, state.statsOvSelectedSeason);
+        state.statsOvSelectedSeason = ovYearSelect.value;
     }
 
     if (rehearsalDates.length === 0) {
@@ -12771,61 +17944,44 @@ function renderGeneralOverviewChart() {
         return;
     }
 
+    if (state.statsOvMode === "sessions") {
+        renderOverviewSessionsChart(container, rehearsalDates);
+        return;
+    }
+
     let chartData = []; // Array of { label: string, pct: number, count: number }
 
     if (state.statsOvMode === "years") {
-        const yearsData = {};
+        const seasonsData = {};
         rehearsalDates.forEach(date => {
-            const year = date.split("-")[0];
-            if (!yearsData[year]) {
-                yearsData[year] = { presents: 0, total: 0, count: 0 };
+            const season = getSeasonLabelForDate(date);
+            if (!seasonsData[season]) {
+                seasonsData[season] = { presents: 0, total: 0, count: 0 };
             }
-            
+
             const dayRecord = state.attendance[date];
             state.musicians.forEach(m => {
+                if (isMusicianOnLeaveOnDate(m, date)) return;
                 const r = dayRecord[m.id];
                 if (r) {
-                    yearsData[year].total++;
+                    seasonsData[season].total++;
                     if (r.status === "present") {
-                        yearsData[year].presents++;
+                        seasonsData[season].presents++;
                     }
                 }
             });
-            yearsData[year].count++;
+            seasonsData[season].count++;
         });
 
-        const sortedYears = Object.keys(yearsData).sort((a,b) => a.localeCompare(b));
-        sortedYears.forEach(year => {
-            const data = yearsData[year];
+        const sortedSeasons = Object.keys(seasonsData).sort((a,b) => a.localeCompare(b));
+        sortedSeasons.forEach(season => {
+            const data = seasonsData[season];
             const pct = data.total > 0 ? Math.round((data.presents / data.total) * 100) : 0;
-            chartData.push({ label: year, pct: pct, count: data.count });
+            chartData.push({ label: season, pct: pct, count: data.count });
         });
     } else {
-        const selectedSeason = state.statsOvSelectedSeason || (() => {
-            const today = new Date();
-            const y = today.getFullYear();
-            const m = today.getMonth() + 1;
-            return m >= 9 ? `${y}-${y+1}` : `${y-1}-${y}`;
-        })();
-        
-        const seasonParts = selectedSeason.split("-");
-        const year1 = seasonParts[0];
-        const year2 = seasonParts[1];
-
-        const seasonMonths = [
-            { label: "Sep", monthNum: 9, year: year1 },
-            { label: "Oct", monthNum: 10, year: year1 },
-            { label: "Nov", monthNum: 11, year: year1 },
-            { label: "Dic", monthNum: 12, year: year1 },
-            { label: "Ene", monthNum: 1, year: year2 },
-            { label: "Feb", monthNum: 2, year: year2 },
-            { label: "Mar", monthNum: 3, year: year2 },
-            { label: "Abr", monthNum: 4, year: year2 },
-            { label: "May", monthNum: 5, year: year2 },
-            { label: "Jun", monthNum: 6, year: year2 },
-            { label: "Jul", monthNum: 7, year: year2 },
-            { label: "Ago", monthNum: 8, year: year2 }
-        ];
+        const selectedSeason = state.statsOvSelectedSeason || getCurrentSeasonLabel();
+        const seasonMonths = getSeasonMonthsArray(selectedSeason);
 
         const monthsData = Array.from({ length: 12 }, () => ({ presents: 0, total: 0, count: 0 }));
         
@@ -12838,6 +17994,7 @@ function renderGeneralOverviewChart() {
             if (idx !== -1) {
                 const dayRecord = state.attendance[date];
                 state.musicians.forEach(m => {
+                    if (isMusicianOnLeaveOnDate(m, date)) return;
                     const r = dayRecord[m.id];
                     if (r) {
                         monthsData[idx].total++;
@@ -12857,14 +18014,16 @@ function renderGeneralOverviewChart() {
         });
     }
 
+    const barMaxWidth = state.statsOvMode === "years" ? "96px" : "60px";
+
     let barsHTML = "";
     chartData.forEach(item => {
         const heightPct = item.pct;
         const tooltip = `${item.label}: ${item.pct}% asistencia (${item.count} ensayo${item.count !== 1 ? 's' : ''})`;
         const displayValue = item.count > 0 ? `${item.pct}%` : "-";
-        
+
         barsHTML += `
-            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: 60px; height: 100%; justify-content: flex-end; position: relative;">
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: ${barMaxWidth}; height: 100%; justify-content: flex-end; position: relative;">
                 <span class="bar-value" style="font-size: 0.72rem; font-weight: 700; color: var(--color-gold); margin-bottom: 6px; z-index: 2; transition: opacity 0.2s;">
                     ${displayValue}
                 </span>
@@ -12906,354 +18065,75 @@ function renderGeneralOverviewChart() {
     `;
 }
 
-const SECTION_CHART_COLORS = {
-    "Trompetas 1ª": "#f39c12",
-    "Fliscornos": "#2ecc71",
-    "Trompetas 2ª": "#e67e22",
-    "Trompetas 3ª": "#d35400",
-    "Trompas": "#1abc9c",
-    "Trombones": "#3498db",
-    "Bombardinos": "#9b59b6",
-    "Tubas": "#607d8b",
-    "Cornetas": "#e74c3c",
-    "Tambores": "#00bcd4",
-    "Bombos": "#8e44ad",
-    "Platos": "#ff4081"
-};
+// Vista "Ensayos" de Visión General: un punto de asistencia % por cada ensayo de la temporada
+// seleccionada, unidos por una línea, para ver la evolución ensayo a ensayo (no por período).
+function renderOverviewSessionsChart(container, rehearsalDates) {
+    const selectedSeason = state.statsOvSelectedSeason || getCurrentSeasonLabel();
 
-function renderSectionAttendanceComparisonChart() {
-    const container = document.getElementById("stats-section-line-chart-container");
-    const pillsContainer = document.getElementById("stats-section-pills-container");
-    const summaryGrid = document.getElementById("stats-section-summary-grid");
-    if (!container || !pillsContainer) return;
-
-    if (!window.statsSectionChartEventsBound) {
-        window.statsSectionChartEventsBound = true;
-        const btnAll = document.getElementById("btn-stats-sec-select-all");
-        const btnMetals = document.getElementById("btn-stats-sec-select-metals");
-        const btnPerc = document.getElementById("btn-stats-sec-select-percussion");
-        const btnClear = document.getElementById("btn-stats-sec-clear-all");
-        const timeSelect = document.getElementById("stats-section-time-select");
-
-        if (btnAll) btnAll.addEventListener("click", () => {
-            state.selectedSectionsForChart = SECCIONES_ORDEN.filter(s => s !== "Dirección");
-            renderSectionAttendanceComparisonChart();
-        });
-
-        if (btnMetals) btnMetals.addEventListener("click", () => {
-            state.selectedSectionsForChart = ["Trompetas 1ª", "Fliscornos", "Trompetas 2ª", "Trompetas 3ª", "Trompas", "Trombones", "Bombardinos", "Tubas", "Cornetas"];
-            renderSectionAttendanceComparisonChart();
-        });
-
-        if (btnPerc) btnPerc.addEventListener("click", () => {
-            state.selectedSectionsForChart = ["Tambores", "Bombos", "Platos"];
-            renderSectionAttendanceComparisonChart();
-        });
-
-        if (btnClear) btnClear.addEventListener("click", () => {
-            state.selectedSectionsForChart = [];
-            renderSectionAttendanceComparisonChart();
-        });
-
-        if (timeSelect) timeSelect.addEventListener("change", () => {
-            renderSectionAttendanceComparisonChart();
-        });
-    }
-
-    // Default selected sections if empty
-    if (!state.selectedSectionsForChart) {
-        state.selectedSectionsForChart = ["Trompetas 1ª", "Cornetas", "Trombones", "Tambores"];
-    }
-
-    const timeFilter = document.getElementById("stats-section-time-select") ? document.getElementById("stats-section-time-select").value : "season";
-
-    // Filter past dates
-    const dNow = new Date();
-    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-    
-    let allDates = Object.keys(state.attendance).filter(dateKey => dateKey <= todayStr).sort((a, b) => a.localeCompare(b));
-
-    // Time filtering
-    if (timeFilter === "last3m") {
-        const d3m = new Date();
-        d3m.setMonth(d3m.getMonth() - 3);
-        const minStr = `${d3m.getFullYear()}-${String(d3m.getMonth() + 1).padStart(2, '0')}-01`;
-        allDates = allDates.filter(d => d >= minStr);
-    } else if (timeFilter === "last6m") {
-        const d6m = new Date();
-        d6m.setMonth(d6m.getMonth() - 6);
-        const minStr = `${d6m.getFullYear()}-${String(d6m.getMonth() + 1).padStart(2, '0')}-01`;
-        allDates = allDates.filter(d => d >= minStr);
-    } else if (timeFilter === "season") {
-        const currYear = dNow.getFullYear();
-        const currMonth = dNow.getMonth() + 1;
-        const seasonStartYear = currMonth >= 9 ? currYear : currYear - 1;
-        const minStr = `${seasonStartYear}-09-01`;
-        allDates = allDates.filter(d => d >= minStr);
-    }
-
-    // Group dates by Month
-    const monthGroups = {};
-    const monthsAbbr = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
-
-    allDates.forEach(date => {
-        const parts = date.split("-");
-        const monthKey = `${parts[0]}-${parts[1]}`;
-        if (!monthGroups[monthKey]) {
-            const mIdx = parseInt(parts[1], 10) - 1;
-            monthGroups[monthKey] = {
-                key: monthKey,
-                label: `${monthsAbbr[mIdx]} '${parts[0].slice(2)}`,
-                dates: []
-            };
-        }
-        monthGroups[monthKey].dates.push(date);
-    });
-
-    const sortedMonthKeys = Object.keys(monthGroups).sort((a, b) => a.localeCompare(b));
-
-    // Valid sections excluding Dirección
-    const validSections = SECCIONES_ORDEN.filter(sec => sec !== "Dirección");
-
-    // Compute monthly attendance % per section
-    const sectionMonthlyData = {};
-    const sectionOverallStats = {};
-
-    validSections.forEach(sec => {
-        sectionMonthlyData[sec] = [];
-        sectionOverallStats[sec] = { totalPresents: 0, totalConvocated: 0, bestMonthPct: 0 };
-
-        // Musicians in this section
-        const secMusicians = state.musicians.filter(m => m.instrument === sec);
-
-        sortedMonthKeys.forEach(mKey => {
-            const mData = monthGroups[mKey];
-            let secTotalConvocated = 0;
-            let secPresents = 0;
-
-            mData.dates.forEach(date => {
-                const dayRecord = state.attendance[date] || {};
-                const sessionInfo = state.sessionTypes[date];
-                const isSpecial = sessionInfo && sessionInfo.type === "ensayo" && sessionInfo.subtype !== "general" && sessionInfo.convocatedVoices && sessionInfo.convocatedVoices.length > 0;
-                
-                if (isSpecial && !sessionInfo.convocatedVoices.includes(sec)) {
-                    return;
+    const points = rehearsalDates
+        .filter(date => isDateInSeason(date, selectedSeason))
+        .sort((a, b) => a.localeCompare(b))
+        .map(date => {
+            let presents = 0;
+            let total = 0;
+            const dayRecord = state.attendance[date];
+            state.musicians.forEach(m => {
+                if (isMusicianOnLeaveOnDate(m, date)) return;
+                const r = dayRecord[m.id];
+                if (r) {
+                    total++;
+                    if (r.status === "present") presents++;
                 }
-
-                secMusicians.forEach(m => {
-                    const r = dayRecord[m.id];
-                    if (r) {
-                        secTotalConvocated++;
-                        if (r.status === "present") {
-                            secPresents++;
-                        }
-                    }
-                });
             });
+            const pct = total > 0 ? Math.round((presents / total) * 100) : null;
+            return { date, pct, presents, total };
+        })
+        .filter(p => p.pct !== null);
 
-            const pct = secTotalConvocated > 0 ? Math.round((secPresents / secTotalConvocated) * 100) : null;
-            sectionMonthlyData[sec].push({
-                monthKey: mKey,
-                label: mData.label,
-                pct: pct,
-                presents: secPresents,
-                total: secTotalConvocated
-            });
-
-            if (pct !== null) {
-                sectionOverallStats[sec].totalPresents += secPresents;
-                sectionOverallStats[sec].totalConvocated += secTotalConvocated;
-                if (pct > sectionOverallStats[sec].bestMonthPct) {
-                    sectionOverallStats[sec].bestMonthPct = pct;
-                }
-            }
-        });
-    });
-
-    // 1. Render Selector Pills
-    pillsContainer.innerHTML = "";
-    validSections.forEach(sec => {
-        const musCount = state.musicians.filter(m => m.instrument === sec).length;
-        if (musCount === 0) return; // Skip sections with no musicians
-
-        const stats = sectionOverallStats[sec];
-        const overallPct = stats.totalConvocated > 0 ? Math.round((stats.totalPresents / stats.totalConvocated) * 100) : 0;
-        const isActive = state.selectedSectionsForChart.includes(sec);
-        const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
-
-        const pill = document.createElement("button");
-        pill.type = "button";
-        pill.className = `quick-sec-chart-pill ${isActive ? 'active' : ''}`;
-        pill.style.cssText = `
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 16px;
-            font-size: 0.76rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: ${isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)'};
-            border: 1px solid ${isActive ? color : 'var(--border-color)'};
-            color: ${isActive ? '#FFF' : 'var(--text-muted)'};
-            opacity: ${isActive ? '1' : '0.6'};
-            box-shadow: ${isActive ? `0 0 10px ${color}33` : 'none'};
-        `;
-
-        pill.innerHTML = `
-            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color}; display: inline-block;"></span>
-            <span>${sec}</span>
-            <span style="font-size: 0.7rem; font-weight: 700; color: ${color}; margin-left: 2px;">${overallPct}%</span>
-        `;
-
-        pill.addEventListener("click", () => {
-            if (isActive) {
-                state.selectedSectionsForChart = state.selectedSectionsForChart.filter(s => s !== sec);
-            } else {
-                state.selectedSectionsForChart.push(sec);
-            }
-            renderSectionAttendanceComparisonChart();
-        });
-
-        pillsContainer.appendChild(pill);
-    });
-
-    // 2. Render SVG Line Chart
-    if (sortedMonthKeys.length === 0 || state.selectedSectionsForChart.length === 0) {
+    if (points.length === 0) {
         container.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: center; height: 260px; text-align: center; color: var(--text-muted); border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); font-size: 0.88rem;">
-                ${state.selectedSectionsForChart.length === 0 ? 'Selecciona al menos una cuerda para comparar.' : 'No hay datos de sesiones para el período seleccionado.'}
+            <div class="empty-state" style="padding: 30px 10px; text-align: center; border-left: 2px solid var(--border-color); border-bottom: 2px solid var(--border-color); box-sizing: border-box; min-height: 200px; display: flex; align-items: center; justify-content: center;">
+                <p class="text-muted" style="margin: 0; font-size: 0.88rem;">No hay ensayos registrados en la temporada ${selectedSeason}.</p>
             </div>
         `;
-        if (summaryGrid) summaryGrid.innerHTML = "";
         return;
     }
 
-    const svgWidth = 800;
-    const svgHeight = 280;
-    const paddingLeft = 45;
-    const paddingRight = 25;
-    const paddingTop = 25;
-    const paddingBottom = 40;
-    const chartWidth = svgWidth - paddingLeft - paddingRight;
-    const chartHeight = svgHeight - paddingTop - paddingBottom;
+    const plotHeight = 250, topMargin = 20, bottomMargin = 34, leftMargin = 42, stepX = 46, rightPad = 20;
+    const width = leftMargin + Math.max(points.length - 1, 0) * stepX + rightPad;
+    const svgHeight = topMargin + plotHeight + bottomMargin;
+    const yForPct = pct => topMargin + plotHeight - (pct / 100) * plotHeight;
 
-    const numMonths = sortedMonthKeys.length;
-    const stepX = numMonths > 1 ? chartWidth / (numMonths - 1) : chartWidth / 2;
-
-    // Build SVG Y Gridlines
     let gridLinesSVG = "";
-    [100, 75, 50, 25, 0].forEach(val => {
-        const y = paddingTop + (1 - val / 100) * chartHeight;
-        gridLinesSVG += `
-            <line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - paddingRight}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4,4" stroke-width="1" />
-            <text x="${paddingLeft - 8}" y="${y + 4}" fill="var(--text-muted)" font-size="10" text-anchor="end" font-family="'Outfit', sans-serif">${val}%</text>
-        `;
+    [0, 25, 50, 75, 100].forEach(mark => {
+        const y = yForPct(mark);
+        gridLinesSVG += `<line x1="${leftMargin}" y1="${y}" x2="${width - rightPad + 10}" y2="${y}" stroke="${mark === 0 ? "var(--border-color)" : "rgba(255,255,255,0.06)"}" stroke-width="1" stroke-dasharray="${mark === 0 ? "0" : "3,3"}" />`;
+        gridLinesSVG += `<text x="${leftMargin - 8}" y="${y + 3}" text-anchor="end" style="font-size: 9px; fill: var(--text-muted);">${mark}%</text>`;
     });
 
-    // Build SVG X Labels
+    const coords = points.map((p, i) => ({ ...p, x: leftMargin + i * stepX, y: yForPct(p.pct) }));
+    const polylinePoints = coords.map(c => `${c.x},${c.y}`).join(" ");
+
+    let dotsSVG = "";
     let xLabelsSVG = "";
-    sortedMonthKeys.forEach((mKey, idx) => {
-        const x = numMonths > 1 ? paddingLeft + idx * stepX : paddingLeft + chartWidth / 2;
-        const label = monthGroups[mKey].label;
-        xLabelsSVG += `
-            <text x="${x}" y="${svgHeight - 12}" fill="var(--text-color)" font-size="11" font-weight="600" text-anchor="middle" font-family="'Outfit', sans-serif">${label}</text>
-        `;
-    });
-
-    // Build Polylines & Nodes per selected section
-    let pathsSVG = "";
-    let nodesSVG = "";
-
-    state.selectedSectionsForChart.forEach(sec => {
-        const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
-        const mList = sectionMonthlyData[sec] || [];
-        const points = [];
-
-        mList.forEach((item, idx) => {
-            if (item.pct !== null) {
-                const x = numMonths > 1 ? paddingLeft + idx * stepX : paddingLeft + chartWidth / 2;
-                const y = paddingTop + (1 - item.pct / 100) * chartHeight;
-                points.push({ x, y, pct: item.pct, label: item.label, presents: item.presents, total: item.total, sec });
-            }
-        });
-
-        if (points.length > 0) {
-            // Path stroke
-            if (points.length === 1) {
-                pathsSVG += `<circle cx="${points[0].x}" cy="${points[0].y}" r="5" fill="${color}" />`;
-            } else {
-                const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(" ");
-                pathsSVG += `
-                    <path d="${pathD}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 6px ${color}66);" />
-                `;
-            }
-
-            // Interactive Circle Nodes
-            points.forEach(p => {
-                const tooltipText = `${sec} (${p.label}): ${p.pct}% (${p.presents}/${p.total})`;
-                nodesSVG += `
-                    <circle class="chart-line-node" cx="${p.x}" cy="${p.y}" r="5.5" fill="var(--bg-card)" stroke="${color}" stroke-width="3" style="cursor: pointer; transition: transform 0.2s;" data-tooltip="${tooltipText}">
-                        <title>${tooltipText}</title>
-                    </circle>
-                `;
-            });
-        }
+    coords.forEach(c => {
+        const dateParts = c.date.split("-");
+        const shortLabel = `${dateParts[2]}/${dateParts[1]}`;
+        const tooltip = `${formatDateSpanish(c.date)}: ${c.pct}% asistencia (${c.presents}/${c.total})`;
+        dotsSVG += `<circle cx="${c.x}" cy="${c.y}" r="4" fill="var(--color-gold)" stroke="var(--bg-card)" stroke-width="1.5" style="cursor: help;"><title>${tooltip}</title></circle>`;
+        xLabelsSVG += `<text x="${c.x}" y="${topMargin + plotHeight + 18}" text-anchor="middle" style="font-size: 9px; fill: var(--text-color); font-weight: 600;">${shortLabel}</text>`;
     });
 
     container.innerHTML = `
-        <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width: 100%; height: 100%; overflow: visible; font-family: 'Outfit', sans-serif;">
-            ${gridLinesSVG}
-            ${xLabelsSVG}
-            ${pathsSVG}
-            ${nodesSVG}
-        </svg>
+        <div style="overflow-x: auto; width: 100%;">
+            <svg viewBox="0 0 ${width} ${svgHeight}" width="${width}" height="${svgHeight}" style="min-width: ${width}px; font-family: 'Outfit', sans-serif;">
+                ${gridLinesSVG}
+                <polyline points="${polylinePoints}" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                ${dotsSVG}
+                ${xLabelsSVG}
+            </svg>
+        </div>
     `;
-
-    // 3. Render Summary Grid
-    if (summaryGrid) {
-        summaryGrid.innerHTML = "";
-        state.selectedSectionsForChart.forEach(sec => {
-            const stats = sectionOverallStats[sec];
-            if (!stats) return;
-            const avgPct = stats.totalConvocated > 0 ? Math.round((stats.totalPresents / stats.totalConvocated) * 100) : 0;
-            const color = SECTION_CHART_COLORS[sec] || "#D4AF37";
-
-            let statusLabel = "Excelente";
-            let statusColor = "var(--color-present)";
-            if (avgPct < 70) {
-                statusLabel = "Atención";
-                statusColor = "var(--color-absent)";
-            } else if (avgPct < 85) {
-                statusLabel = "Aceptable";
-                statusColor = "var(--color-justified)";
-            }
-
-            const card = document.createElement("div");
-            card.style.cssText = `
-                background: var(--bg-card);
-                border: 1px solid var(--border-color);
-                border-left: 4px solid ${color};
-                border-radius: 8px;
-                padding: 10px 12px;
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            `;
-
-            card.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${sec}</span>
-                    <span style="font-size: 0.65rem; font-weight: 700; color: ${statusColor}; border: 1px solid ${statusColor}44; background: ${statusColor}15; padding: 1px 5px; border-radius: 4px;">${statusLabel}</span>
-                </div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: ${color}; font-family: 'Outfit', sans-serif;">${avgPct}%</div>
-                <div style="font-size: 0.7rem; color: var(--text-muted);">Máx. Mes: <strong style="color: var(--text-color);">${stats.bestMonthPct}%</strong> | ${stats.totalPresents}/${stats.totalConvocated} asis.</div>
-            `;
-
-            summaryGrid.appendChild(card);
-        });
-    }
 }
 
 function getRehearsalSubtypeText(sub) {
@@ -13296,16 +18176,35 @@ function sendBrowserNotification(title, body) {
 
 
 
+function purgeExpiredNotifications(notifs) {
+    if (!Array.isArray(notifs)) return [];
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (1 semana)
+    const now = Date.now();
+    const clearedAtTime = state.notificationsClearedAt ? new Date(state.notificationsClearedAt).getTime() : null;
+    return notifs.filter(n => {
+        if (!n) return false;
+        if (!n.date) return true;
+        const notifTime = new Date(n.date).getTime();
+        if (isNaN(notifTime)) return true;
+        if (clearedAtTime && !isNaN(clearedAtTime) && notifTime <= clearedAtTime) return false;
+        return (now - notifTime) <= ONE_WEEK_MS;
+    });
+}
+
 function updateNotificationsBadge() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
     
     const deletedIds = getDeletedNotificationIds(musicianId);
     let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-    if (deletedIds.length > 0) {
-        notifs = notifs.filter(n => !deletedIds.includes(n.id));
+    
+    // Purga de notificaciones mayores a 7 días y filtro de eliminadas
+    const validNotifs = purgeExpiredNotifications(notifs).filter(n => !deletedIds.includes(n.id));
+    if (validNotifs.length !== notifs.length) {
+        localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(validNotifs));
     }
-    const unseenCount = notifs.filter(n => !n.seen).length;
+
+    const unseenCount = validNotifs.filter(n => !n.seen).length;
     
     const badge = document.getElementById("comp-notifications-badge-count");
     if (badge) {
@@ -13318,19 +18217,143 @@ function updateNotificationsBadge() {
     }
 }
 
+function formatNotificationTimestamp(dateInput) {
+    if (!dateInput) return "";
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "";
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+    const timeStr = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+
+    if (d >= todayStart) {
+        return `Hoy, ${timeStr}`;
+    } else if (d >= yesterdayStart) {
+        return `Ayer, ${timeStr}`;
+    } else {
+        const day = d.getDate();
+        const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        const month = months[d.getMonth()];
+        return `${day} ${month}, ${timeStr}`;
+    }
+}
+
+function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, isUpdate = false, isDeleted = false) {
+    if (!sessionData) return;
+
+    const rawDate = sessionKey.split("_")[0];
+    const formattedDate = formatDateShortSpanish(rawDate);
+    let title;
+    if (isDeleted) {
+        title = sessionData.type === "actuacion" ? "Actuación Eliminada" : "Ensayo Eliminado";
+    } else if (isUpdate) {
+        title = sessionData.type === "actuacion" ? "Actuación Actualizada" : "Ensayo Actualizado";
+    } else {
+        title = sessionData.type === "actuacion" ? "Nueva Actuación Creada" : "Nuevo Ensayo Creado";
+    }
+    let body = "";
+    if (sessionData.type === "ensayo") {
+        const subtypeText = getRehearsalSubtypeText(sessionData.subtype);
+        const locationVal = sessionData.location || "Parking";
+        const timeStr = sessionData.time ? ` ${sessionData.time}` : "";
+        body = `${subtypeText}${timeStr} - ${formattedDate} (${locationVal})`;
+    } else {
+        body = `${sessionData.name || "Actuación"} - ${formattedDate}`;
+    }
+
+    // El borrado usa un id distinto al de creación/actualización para que aparezca como un aviso
+    // nuevo aparte, en vez de sobrescribir (y hacer desaparecer) el aviso original de "Ensayo Creado".
+    const notifId = isDeleted ? `session_${sessionKey}_${sessionData.type}_deleted` : `session_${sessionKey}_${sessionData.type}`;
+    // En una actualización o un borrado se usa la fecha actual (no la de creación original) para que
+    // la notificación resurja como reciente en vez de quedar enterrada u ordenada por su antigüedad.
+    const creationDate = (isUpdate || isDeleted) ? new Date().toISOString() : (sessionData.createdAt || sessionData.date || new Date().toISOString());
+
+    const musicians = state.musicians || [];
+    musicians.forEach(m => {
+        if (!m || !m.id) return;
+        if (isMusicianConvocated(m.id, sessionData)) {
+            const key = "yacente_notifications_" + m.id;
+            const deletedIds = getDeletedNotificationIds(m.id);
+            if (deletedIds.includes(notifId)) return;
+
+            let notifs = JSON.parse(localStorage.getItem(key) || "[]");
+            notifs = purgeExpiredNotifications(notifs);
+
+            const existingIdx = notifs.findIndex(n => n.id === notifId);
+            const notifObj = {
+                id: notifId,
+                title: title,
+                body: body,
+                date: creationDate,
+                // Una actualización real (lugar/hora) o un borrado deben volver a aparecer como no
+                // leídos, aunque el músico ya hubiera visto el aviso original de creación.
+                seen: (isUpdate || isDeleted) ? false : (existingIdx !== -1 ? (notifs[existingIdx].seen || false) : false),
+                type: sessionData.type
+            };
+
+            if (existingIdx !== -1) {
+                notifs[existingIdx] = notifObj;
+            } else {
+                notifs.unshift(notifObj);
+            }
+
+            // Ordenamiento cronológico inverso por fecha de creación
+            notifs.sort((a, b) => {
+                const tA = a.date ? new Date(a.date).getTime() : 0;
+                const tB = b.date ? new Date(b.date).getTime() : 0;
+                return tB - tA;
+            });
+
+            localStorage.setItem(key, JSON.stringify(notifs));
+        }
+    });
+
+    updateNotificationsBadge();
+    if (document.body.classList.contains("component-portal")) {
+        if (!isSilent) {
+            sendBrowserNotification(title, body);
+        }
+        renderComponentNotificationsList();
+    }
+}
+
+function syncAllSessionNotifications() {
+    if (!state.sessionTypes) return;
+    const keys = Object.keys(state.sessionTypes);
+    keys.forEach(key => {
+        const sessionData = state.sessionTypes[key];
+        if (sessionData) {
+            dispatchSessionNotification(key, sessionData, true);
+        }
+    });
+}
+
 function renderComponentNotificationsList() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
 
     const deletedIds = getDeletedNotificationIds(musicianId);
     let notifs = JSON.parse(localStorage.getItem("yacente_notifications_" + musicianId) || "[]");
-    if (deletedIds.length > 0) {
-        const filtered = notifs.filter(n => !deletedIds.includes(n.id));
-        if (filtered.length !== notifs.length) {
-            notifs = filtered;
-            localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
-        }
+    
+    // Purga de notificaciones mayores a 7 días y filtro de eliminadas
+    const validNotifs = purgeExpiredNotifications(notifs).filter(n => !deletedIds.includes(n.id));
+    if (validNotifs.length !== notifs.length) {
+        notifs = validNotifs;
+    } else {
+        notifs = validNotifs;
     }
+
+    // Ordenamiento cronológico inverso estricto por fecha de emisión
+    notifs.sort((a, b) => {
+        const tA = a.date ? new Date(a.date).getTime() : 0;
+        const tB = b.date ? new Date(b.date).getTime() : 0;
+        return tB - tA;
+    });
+
+    localStorage.setItem("yacente_notifications_" + musicianId, JSON.stringify(notifs));
 
     const container = document.getElementById("comp-notif-list-container");
     const countLabel = document.getElementById("comp-notif-count-label");
@@ -13381,21 +18404,25 @@ function renderComponentNotificationsList() {
             ${announcementBadge}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; pointer-events: none;">
                 <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: ${notif.seen ? 'var(--text-primary)' : 'var(--color-gold)'};">${notif.title}</h4>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">${new Date(notif.date).toLocaleDateString('es-ES', {hour: '2-digit', minute:'2-digit'})}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">${formatNotificationTimestamp(notif.date)}</span>
             </div>
             <p style="margin: 0; font-size: 0.8rem; color: var(--text-color); pointer-events: none;">${notif.body}</p>
         `;
 
         // Swipe-to-delete gestures
         let startX = 0;
+        let startY = 0;
         let currentX = 0;
         let isDragging = false;
         let hasMoved = false;
+        let gestureDirection = null;
 
-        const handleStart = (clientX) => {
+        const handleStart = (clientX, clientY) => {
             startX = clientX;
+            startY = clientY;
             isDragging = true;
             hasMoved = false;
+            gestureDirection = null;
             itemDiv.style.transition = 'none';
         };
 
@@ -13451,14 +18478,29 @@ function renderComponentNotificationsList() {
         };
 
         itemDiv.addEventListener("touchstart", (e) => {
-            handleStart(e.touches[0].clientX);
+            handleStart(e.touches[0].clientX, e.touches[0].clientY);
         }, { passive: true });
-        
+
         itemDiv.addEventListener("touchmove", (e) => {
-            if (isDragging) {
-                if (e.cancelable) e.preventDefault();
-                handleMove(e.touches[0].clientX);
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+
+            if (gestureDirection === null) {
+                if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
+                gestureDirection = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+                if (gestureDirection === "vertical") {
+                    // Gesto vertical: se aborta el swipe-to-delete y se deja hacer scroll nativo a la página
+                    isDragging = false;
+                    itemDiv.style.transform = "translateX(0)";
+                    itemDiv.style.opacity = "1";
+                    return;
+                }
             }
+
+            if (e.cancelable) e.preventDefault();
+            handleMove(touch.clientX);
         }, { passive: false });
         
         itemDiv.addEventListener("touchend", handleEnd);
@@ -13466,7 +18508,7 @@ function renderComponentNotificationsList() {
 
         itemDiv.addEventListener("mousedown", (e) => {
             e.preventDefault(); // Prevent text selection and drag start
-            handleStart(e.clientX);
+            handleStart(e.clientX, e.clientY);
             const onMouseMove = (moveEvent) => handleMove(moveEvent.clientX);
             const onMouseUp = () => {
                 handleEnd();
@@ -13511,6 +18553,7 @@ function setupAnnouncementEvents() {
 
     const btnClose = document.getElementById("btn-close-announcement-modal");
     const btnCancel = document.getElementById("btn-cancel-announcement-modal");
+    const btnClearAllNotifications = document.getElementById("btn-clear-all-notifications");
     const form = document.getElementById("form-send-announcement");
     const titleInput = document.getElementById("announcement-title-input");
     const bodyInput = document.getElementById("announcement-body-input");
@@ -13535,6 +18578,14 @@ function setupAnnouncementEvents() {
     if (btnOpen) btnOpen.addEventListener("click", openModal);
     if (btnClose) btnClose.addEventListener("click", closeModal);
     if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (btnClearAllNotifications) {
+        btnClearAllNotifications.addEventListener("click", () => {
+            if (confirm("¿Vaciar el buzón de notificaciones de TODOS los músicos? Se borrarán los comunicados guardados y se ocultarán los avisos de ensayos/actuaciones anteriores a este momento en cualquier dispositivo. Esto no afecta a la asistencia, el repertorio ni al resto de datos de la banda.")) {
+                clearAllMusicianNotifications();
+            }
+        });
+    }
 
     quickPills.forEach(pill => {
         pill.addEventListener("click", () => {
@@ -13603,6 +18654,289 @@ function setupAnnouncementEvents() {
             renderComponentNotificationsList();
         });
     }
+}
+
+// ==========================================================================
+// GRÁFICO DE BARRAS DE ASISTENCIA POR DÍAS DE LA SEMANA (ESTILO VISIÓN GENERAL)
+// ==========================================================================
+function renderDayHeatmap(filteredDates) {
+    const container = document.getElementById("stats-day-heatmap-container");
+    if (!container) return;
+
+    if (!filteredDates || filteredDates.length === 0 || !state.musicians || state.musicians.length === 0) {
+        container.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0;">No hay datos de convocatorias para generar el gráfico de barras por días de la semana en este período.</p>`;
+        return;
+    }
+
+    const dayNames = [
+        { name: "Lunes", short: "Lun" },
+        { name: "Martes", short: "Mar" },
+        { name: "Miércoles", short: "Mié" },
+        { name: "Jueves", short: "Jue" },
+        { name: "Viernes", short: "Vie" },
+        { name: "Sábado", short: "Sáb" },
+        { name: "Domingo", short: "Dom" }
+    ];
+
+    const dayStats = Array.from({ length: 7 }, (_, i) => ({
+        index: i,
+        name: dayNames[i].name,
+        short: dayNames[i].short,
+        sessionsCount: 0,
+        totalPossible: 0,
+        totalPresents: 0,
+        avgPct: 0
+    }));
+
+    filteredDates.forEach(dateStr => {
+        // dateStr puede llevar sufijo (p.ej. "2026-05-01_1" o "2026-05-01_trompetas1" para sesiones
+        // múltiples/especiales el mismo día); hay que quedarse solo con la fecha real antes de parsear,
+        // si no new Date(...) da Invalid Date y dayIdx sale NaN.
+        const rawDateStr = dateStr.split("_")[0];
+        const dateObj = new Date(rawDateStr.replace(/-/g, "/"));
+        const jsDay = dateObj.getDay(); // 0 = Domingo, 1 = Lunes, ...
+        if (isNaN(jsDay)) return;
+        const dayIdx = jsDay === 0 ? 6 : jsDay - 1; // 0 = Lunes ... 6 = Domingo
+        if (!dayStats[dayIdx]) return;
+
+        const attendanceForDay = state.attendance[dateStr] || {};
+        let dayPresents = 0;
+        let dayPossible = 0;
+
+        state.musicians.forEach(m => {
+            if (m.status === "inactive") return;
+            dayPossible++;
+            const rec = attendanceForDay[m.id];
+            if (rec && rec.status === "present") {
+                dayPresents++;
+            }
+        });
+
+        if (dayPossible > 0) {
+            dayStats[dayIdx].sessionsCount++;
+            dayStats[dayIdx].totalPossible += dayPossible;
+            dayStats[dayIdx].totalPresents += dayPresents;
+        }
+    });
+
+    let bestDay = null;
+    let worstDay = null;
+    let maxPct = -1;
+    let minPct = 101;
+
+    dayStats.forEach(stat => {
+        if (stat.totalPossible > 0) {
+            stat.avgPct = Math.round((stat.totalPresents / stat.totalPossible) * 100);
+            if (stat.avgPct > maxPct) {
+                maxPct = stat.avgPct;
+                bestDay = stat;
+            }
+            if (stat.avgPct < minPct) {
+                minPct = stat.avgPct;
+                worstDay = stat;
+            }
+        }
+    });
+
+    let barsHTML = "";
+    dayStats.forEach(stat => {
+        const hasData = stat.sessionsCount > 0;
+        const heightPct = hasData ? stat.avgPct : 0;
+        const displayValue = hasData ? `${stat.avgPct}%` : "-";
+        const tooltip = `${stat.name}: ${hasData ? stat.avgPct + '%' : 'Sin convocatorias'} (${stat.sessionsCount} convocatoria${stat.sessionsCount !== 1 ? 's' : ''})`;
+
+        let barGradient = "linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 100%)";
+        let valColor = "var(--text-muted)";
+
+        if (hasData) {
+            if (stat.avgPct >= 80) {
+                barGradient = "linear-gradient(180deg, #2ecc71 0%, rgba(46, 204, 113, 0.35) 100%)";
+                valColor = "#2ecc71";
+            } else if (stat.avgPct >= 60) {
+                barGradient = "linear-gradient(180deg, var(--color-gold) 0%, rgba(212, 175, 55, 0.35) 100%)";
+                valColor = "var(--color-gold)";
+            } else {
+                barGradient = "linear-gradient(180deg, #e74c3c 0%, rgba(231, 76, 60, 0.35) 100%)";
+                valColor = "#e74c3c";
+            }
+        }
+
+        barsHTML += `
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: 60px; height: 100%; justify-content: flex-end; position: relative;">
+                <span class="bar-value" style="font-size: 0.75rem; font-weight: 700; color: ${valColor}; margin-bottom: 6px; z-index: 2; transition: opacity 0.2s;">
+                    ${displayValue}
+                </span>
+                <div class="bar-fill" style="width: 55%; height: ${heightPct}%; background: ${barGradient}; border-radius: 4px 4px 0 0; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: help; min-height: ${hasData ? '4px' : '0px'}" title="${tooltip}"></div>
+                <span class="bar-label" style="position: absolute; bottom: -24px; font-size: 0.75rem; color: var(--text-color); font-weight: 600; white-space: nowrap;">
+                    ${stat.short}
+                </span>
+            </div>
+        `;
+    });
+
+    let insightsHTML = "";
+    if (bestDay && bestDay.avgPct > 0) {
+        let insightText = `El día preferido y con mayor asistencia media del grupo es el <strong>${bestDay.name}</strong> con un <strong>${bestDay.avgPct}%</strong> (${bestDay.sessionsCount} ${bestDay.sessionsCount === 1 ? 'convocatoria' : 'convocatorias'}).`;
+        if (worstDay && worstDay.sessionsCount > 0 && worstDay.name !== bestDay.name) {
+            insightText += ` El día con menor concurrencia es el <strong>${worstDay.name}</strong> (<strong>${worstDay.avgPct}%</strong>).`;
+        }
+        insightsHTML = `
+            <div class="day-heatmap-insight-box" style="margin-top: 28px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.2rem;">💡</span>
+                    <span style="font-size: 0.88rem; color: var(--text-primary);">${insightText}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="custom-vertical-chart" style="display: flex; height: 260px; width: 100%; border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); position: relative; padding: 20px 10px 0 45px; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+            <div class="y-axis" style="position: absolute; left: 0; top: 0; bottom: 30px; width: 35px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 0.72rem; color: var(--text-muted); padding-right: 6px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+            
+            <div class="grid-lines" style="position: absolute; left: 35px; right: 0; top: 0; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px solid var(--border-color); width: 100%;"></div>
+            </div>
+
+            <div class="bars-container" style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 30px; box-sizing: border-box; gap: 8px;">
+                ${barsHTML}
+            </div>
+        </div>
+        ${insightsHTML}
+    `;
+}
+
+// ==========================================================================
+// GRÁFICO DE EVOLUCIÓN TEMPORAL MENSUAL INDIVIDUAL
+// ==========================================================================
+function renderMusicianMonthlyEvolution(musicianId) {
+    const container = document.getElementById("detail-monthly-chart-container");
+    if (!container) return;
+
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return;
+
+    const yearFilter = document.getElementById("detail-filter-year").value;
+    const typeFilter = document.getElementById("detail-filter-type").value;
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const seasonMonths = getSeasonMonthsArray(yearFilter === "all" ? getCurrentSeasonLabel() : yearFilter);
+
+    let maxMonthPct = -1;
+    let bestMonth = null;
+
+    const monthsData = seasonMonths.map(sm => {
+        let presents = 0;
+        let total = 0;
+
+        Object.keys(state.attendance).forEach(dateStr => {
+            if (!isSessionConcluded(dateStr)) return;
+            const dateParts = dateStr.split("-");
+            const y = dateParts[0];
+            const m = parseInt(dateParts[1], 10);
+
+            if (y === sm.year && m === sm.monthNum) {
+                const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
+                if (typeFilter !== "all" && sessionType !== typeFilter) return;
+
+                const rec = state.attendance[dateStr] ? state.attendance[dateStr][musicianId] : null;
+                if (rec) {
+                    total++;
+                    if (rec.status === "present") presents++;
+                }
+            }
+        });
+
+        const pct = total > 0 ? Math.round((presents / total) * 100) : null;
+        if (pct !== null && pct > maxMonthPct) {
+            maxMonthPct = pct;
+            bestMonth = sm.label;
+        }
+        return { label: sm.label, monthNum: sm.monthNum, year: sm.year, presents, total, pct };
+    });
+
+    let barsHTML = "";
+    monthsData.forEach(item => {
+        const hasData = item.pct !== null;
+        const heightPct = hasData ? item.pct : 0;
+        const displayValue = hasData ? `${item.pct}%` : "-";
+        const tooltip = `${item.label} ${item.year}: ${hasData ? item.pct + '%' : 'Sin datos'} (${item.presents} de ${item.total} convocatorias)`;
+
+        let barGradient = "linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%)";
+        let valColor = "var(--text-muted)";
+
+        if (hasData) {
+            if (item.pct >= 80) {
+                barGradient = "linear-gradient(180deg, #2ecc71 0%, rgba(46, 204, 113, 0.35) 100%)";
+                valColor = "#2ecc71";
+            } else if (item.pct >= 60) {
+                barGradient = "linear-gradient(180deg, var(--color-gold) 0%, rgba(212, 175, 55, 0.35) 100%)";
+                valColor = "var(--color-gold)";
+            } else {
+                barGradient = "linear-gradient(180deg, #e74c3c 0%, rgba(231, 76, 60, 0.35) 100%)";
+                valColor = "#e74c3c";
+            }
+        }
+
+        barsHTML += `
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 20px; max-width: 40px; height: 100%; justify-content: flex-end; position: relative;">
+                <span class="bar-value" style="font-size: 0.65rem; font-weight: 700; color: ${valColor}; margin-bottom: 4px; z-index: 2;">
+                    ${displayValue}
+                </span>
+                <div class="bar-fill" style="width: 55%; height: ${heightPct}%; background: ${barGradient}; border-radius: 3px 3px 0 0; transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: help; min-height: ${hasData ? '3px' : '0px'}" title="${tooltip}"></div>
+                <span class="bar-label" style="position: absolute; bottom: -22px; font-size: 0.65rem; color: var(--text-color); font-weight: 600; white-space: nowrap;">
+                    ${item.label}
+                </span>
+            </div>
+        `;
+    });
+
+    let trendNote = "";
+    if (bestMonth && maxMonthPct >= 0) {
+        trendNote = `
+            <div style="margin-top: 24px; font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; background: rgba(212, 175, 55, 0.06); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(212, 175, 55, 0.15);">
+                <span>💡</span>
+                <span>Pico máximo del período: <strong>${bestMonth} (${maxMonthPct}%)</strong>.</span>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="custom-vertical-chart" style="display: flex; height: 180px; width: 100%; border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); position: relative; padding: 15px 5px 0 35px; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+            <div class="y-axis" style="position: absolute; left: 0; top: 0; bottom: 26px; width: 28px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 0.65rem; color: var(--text-muted); padding-right: 4px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+            
+            <div class="grid-lines" style="position: absolute; left: 28px; right: 0; top: 0; bottom: 26px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px solid var(--border-color); width: 100%;"></div>
+            </div>
+
+            <div class="bars-container" style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 26px; box-sizing: border-box; gap: 4px;">
+                ${barsHTML}
+            </div>
+        </div>
+        ${trendNote}
+    `;
 }
 
 

@@ -95,12 +95,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=348">
+    <link rel="stylesheet" href="style.css?v=520">
     
     <!-- Firebase SDK Compat -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
 </head>
 <body class="mobile-simplified-active">
     <!-- Pantalla de Bloqueo: Contraseña de Directiva -->
@@ -235,6 +235,15 @@
                     </svg>
                     <span>Ajustes</span>
                 </a>
+                <a href="#" class="nav-item" data-target="section-otros" style="position: relative;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="19" cy="12" r="1"></circle>
+                        <circle cx="5" cy="12" r="1"></circle>
+                    </svg>
+                    <span>Otros</span>
+                    <span class="suggestions-unread-badge hidden" style="position: absolute; top: 6px; left: 30px; background-color: var(--color-absent); color: white; border-radius: 50%; min-width: 16px; height: 16px; padding: 0 3px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
+                </a>
                 <a href="#" class="nav-item" id="btn-logout-nav-admin" style="color: var(--color-absent);">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -272,11 +281,18 @@
         <main class="main-content">
             <!-- Header -->
             <header class="content-header">
-                <div class="header-title-container" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <div class="header-title-container" style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
                     <button id="btn-toggle-mobile-sidebar" class="btn-mobile-menu-toggle" aria-label="Abrir Menú">
                         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
+                    <button id="btn-musician-hamburger" class="btn-musician-hamburger" title="Menú de Ajustes" aria-label="Abrir Menú de Ajustes">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round">
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
@@ -332,9 +348,6 @@
                         </svg>
                         <input type="date" id="attendance-date" class="date-input">
                     </div>
-                    <select id="attendance-session-select" class="filter-select hidden" style="height: 38px; border-radius: 6px; border-color: var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); font-size: 0.8rem; padding: 0 10px; width: auto; max-width: 160px; margin: 0; outline: none; box-shadow: var(--shadow-sm); cursor: pointer;">
-                        <!-- Populated dynamically by JS -->
-                    </select>
                     <span id="attendance-session-badge" style="padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; height: 38px; border: 1px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); box-sizing: border-box; transition: all 0.2s ease;">
                         Cargando...
                     </span>
@@ -481,11 +494,9 @@
                     </div>
                     <div class="filter-controls">
                         <div class="filter-control-group">
-                            <label for="rehearsals-filter-year">Año</label>
+                            <label for="rehearsals-filter-year">Temporada</label>
                             <select id="rehearsals-filter-year" class="filter-select">
-                                <option value="all">Todos</option>
-                                <option value="2025">2025</option>
-                                <option value="2026" selected>2026</option>
+                                <option value="all" selected>Todas</option>
                             </select>
                         </div>
                         <div class="filter-control-group">
@@ -558,11 +569,9 @@
                     </div>
                     <div class="filter-controls">
                         <div class="filter-control-group">
-                            <label for="actuaciones-filter-year">Año</label>
+                            <label for="actuaciones-filter-year">Temporada</label>
                             <select id="actuaciones-filter-year" class="filter-select">
-                                <option value="all">Todos</option>
-                                <option value="2025">2025</option>
-                                <option value="2026" selected>2026</option>
+                                <option value="all" selected>Todas</option>
                             </select>
                         </div>
                         <div class="filter-control-group">
@@ -688,6 +697,50 @@
                     </div>
                 </div>
 
+                <!-- Filtros de Repertorio -->
+                <div class="period-filter-card" style="margin-bottom: 16px;">
+                    <div class="filter-header">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        <span>Filtros</span>
+                    </div>
+                    <div class="filter-controls">
+                        <div class="filter-control-group">
+                            <label for="marchas-filter-year">Temporada</label>
+                            <select id="marchas-filter-year" class="filter-select">
+                                <!-- Populated dynamically: siempre una temporada concreta seleccionada -->
+                            </select>
+                            <button type="button" id="btn-download-repertorio-season-pdf" class="btn btn-secondary btn-icon" style="padding: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="Descargar repertorio de esta temporada (PDF)">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Playlists del repertorio completo -->
+                <div class="card" style="padding: 12px 16px; margin-bottom: 12px; display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch;">
+                    <a href="#" id="admin-repertoire-youtube-link" target="_blank" rel="noopener noreferrer" style="flex: 1; min-width: 160px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.35); border-radius: 10px; color: #ff4d4d; font-weight: 700; text-decoration: none; box-sizing: border-box;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF0000" style="flex-shrink: 0;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        <span id="admin-repertoire-youtube-label" style="font-size: 0.85rem;">Sin playlist de YouTube configurada</span>
+                    </a>
+                    <a href="#" id="admin-repertoire-spotify-link" target="_blank" rel="noopener noreferrer" style="flex: 1; min-width: 160px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; background: rgba(29, 185, 84, 0.1); border: 1px solid rgba(29, 185, 84, 0.35); border-radius: 10px; color: #1db954; font-weight: 700; text-decoration: none; box-sizing: border-box;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954" style="flex-shrink: 0;"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.486.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.38-1.32 9.78-.66 13.5 1.62.36.18.6.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                        <span id="admin-repertoire-spotify-label" style="font-size: 0.85rem;">Sin playlist de Spotify configurada</span>
+                    </a>
+                    <button type="button" id="btn-edit-repertoire-links" class="btn btn-secondary" title="Editar enlaces de las playlists" style="height: auto; margin: 0; display: flex; align-items: center; gap: 6px; padding: 0 14px;">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span>Editar</span>
+                    </button>
+                </div>
+
                 <div class="card" style="padding: 12px 16px;">
                     <div id="marchas-grid-container" class="marchas-grid">
                         <!-- Populated dynamically by app.js -->
@@ -753,8 +806,31 @@
 
             <!-- Section: Estadísticas -->
             <section id="section-estadisticas" class="app-section">
+                <!-- Acceso Rápido a Paneles de Estadísticas -->
+                <div class="stats-quick-nav-card">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 0.78rem; font-weight: 700; color: var(--color-gold); text-transform: uppercase; letter-spacing: 0.6px; display: flex; align-items: center; gap: 6px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            Acceso Rápido a Paneles
+                        </span>
+                    </div>
+                    <div class="stats-quick-nav-pills" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-vision-general">📈 Visión General</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-secciones">🥁 Secciones</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-componentes">👤 Asistencia individual</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-rachas">🔥 Rachas</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-ranking">🏆 Ranking</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-alertas">⚠️ Alertas</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-marchas">🎺 Más Ensayadas</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-marchas-actuacion">🎭 Más Tocadas</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-marchas-olvidadas">🎼 Más Olvidadas</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-ensayos">🎶 Ensayos</button>
+                        <button type="button" class="btn-stats-quick-link" data-target="card-stats-direccion">🎙️ Dirección</button>
+                    </div>
+                </div>
+
                 <!-- Period Filter Bar -->
-                <div class="period-filter-card" style="padding: 10px 18px; margin-bottom: 16px;">
+                <div class="period-filter-card">
                     <div class="filter-header">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
@@ -763,10 +839,9 @@
                     </div>
                     <div class="filter-controls">
                         <div class="filter-control-group">
-                            <label for="filter-year">Año</label>
+                            <label for="filter-year">Temporada</label>
                             <select id="filter-year" class="filter-select">
-                                <option value="all">Todos los años</option>
-                                <option value="2026" selected>2026</option>
+                                <option value="all" selected>Todas</option>
                             </select>
                         </div>
                         <div class="filter-control-group">
@@ -799,7 +874,7 @@
                 </div>
 
                 <!-- Summary cards -->
-                <div class="stats-overview-grid">
+                <div class="stats-overview-grid" id="stats-overview-grid">
                     <div class="card stat-overview-card">
                         <h3>Asistencia Promedio</h3>
                         <div class="huge-number" id="stats-avg-attendance">0%</div>
@@ -817,8 +892,61 @@
                     </div>
                 </div>
 
+                <!-- Visión General (Gráfico de barras) -->
+                <div class="card-collapsible" id="card-stats-vision-general" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <h3>Visión General</h3>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <!-- Chart controls -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <button id="btn-stats-ov-years" class="btn btn-primary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; cursor: pointer;">Temporada</button>
+                                <button id="btn-stats-ov-months" class="btn btn-secondary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Meses</button>
+                                <button id="btn-stats-ov-sessions" class="btn btn-secondary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Ensayos</button>
+                            </div>
+                            <div id="stats-ov-month-filter-container" class="hidden" style="display: flex; align-items: center; gap: 8px;">
+                                <label for="stats-ov-year-select" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; margin: 0;">Seleccionar Temporada:</label>
+                                <select id="stats-ov-year-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; width: auto; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
+                                    <!-- Populated dynamically -->
+                                </select>
+                                <button id="btn-download-season-report" class="btn btn-secondary btn-icon" style="padding: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="Descargar Informe de Temporada (PDF)">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Bar Chart Container -->
+                        <div id="stats-ov-chart-container" style="position: relative; width: 100%; min-height: 280px; margin-top: 10px; display: flex; flex-direction: column;">
+                            <!-- Dynamic chart output -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Barras por Días de la Semana -->
+                <div class="card-collapsible" id="card-stats-day-heatmap" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <h3>📊 Asistencia por Días de la Semana</h3>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div id="stats-day-heatmap-container">
+                            <!-- Renderizado dinámico del Mapa de Calor desde JS -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Breakdown Cards -->
-                <div class="card-collapsible" style="margin-bottom: 24px;">
+                <div class="card-collapsible" id="card-stats-secciones" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
                         <h3>Asistencia por secciones</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
@@ -833,9 +961,9 @@
                 </div>
 
                 <!-- Circular Progress Ring Grid for EACH component -->
-                <div class="card-collapsible" style="margin-bottom: 24px;">
+                <div class="card-collapsible" id="card-stats-componentes" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
-                        <h3>Asistencia de los Componentes</h3>
+                        <h3>Asistencia individual</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
@@ -857,7 +985,7 @@
                 </div>
 
                 <!-- Racha de Asistencia -->
-                <div class="card-collapsible" style="margin-bottom: 24px;">
+                <div class="card-collapsible" id="card-stats-rachas" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
                         <h3>Racha de Asistencia</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
@@ -872,8 +1000,27 @@
                     </div>
                 </div>
 
+                <!-- Ranking de Asistencia -->
+                <div class="card-collapsible" id="card-stats-ranking" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="margin: 0;">Ranking de asistencia</h3>
+                            <button id="btn-toggle-all-ranking-asistencia" class="btn btn-secondary btn-sm" title="Ver todos los componentes" style="padding: 2px 8px; font-size: 0.85rem; font-weight: bold; border-radius: 4px; z-index: 10; line-height: 1.2;">+</button>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <p class="text-muted" style="margin-bottom: 16px; font-size: 0.85rem;">Clasificación de los componentes por porcentaje de asistencia y racha en el período seleccionado.</p>
+                        <div id="stats-ranking-container" style="display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Rendered dynamically by app.js -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- High Absence Alert List -->
-                <div class="card-collapsible alert-card" style="margin-bottom: 24px;">
+                <div class="card-collapsible alert-card" id="card-stats-alertas" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
                         <h3>Alertas de Asistencia (<50% en el período)</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
@@ -941,6 +1088,38 @@
                     </div>
                 </div>
 
+                <!-- Marchas más tocadas en actuación -->
+                <div class="card-collapsible" id="card-stats-marchas-actuacion" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <h3 style="margin: 0;">Marchas más tocadas en actuación</h3>
+                            <button id="btn-toggle-all-marchas-actuacion" class="btn btn-secondary btn-sm" title="Ver todas las marchas" style="padding: 2px 8px; font-size: 0.85rem; font-weight: bold; border-radius: 4px; z-index: 10; line-height: 1.2;">+</button>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <p class="text-muted" style="margin-bottom: 12px; font-size: 0.85rem;">Pulsa una marcha para ver en qué actuaciones se ha tocado.</p>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 60px;">Top</th>
+                                        <th>Nombre de la Marcha</th>
+                                        <th style="width: 130px;">Veces Tocada</th>
+                                        <th>Dificultad</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stats-marchas-actuacion-table-body">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Marchas más olvidadas -->
                 <div class="card-collapsible" id="card-stats-marchas-olvidadas" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
@@ -969,98 +1148,97 @@
                                 </tbody>
                             </table>
                         </div>
-                    </div>
                 </div>
 
-                <!-- Visión General (Gráfico de barras) -->
-                <div class="card-collapsible" style="margin-bottom: 24px;">
+                <!-- Estadística de Ensayos -->
+                <div class="card-collapsible" id="card-stats-ensayos" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
-                        <h3>Visión General</h3>
+                        <h3>🎶 Estadística de ensayos</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
                     <div class="card-collapsible-content">
-                        <!-- Chart controls -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                            <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 6px; border: 1px solid var(--border-color);">
-                                <button id="btn-stats-ov-years" class="btn btn-primary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; cursor: pointer;">Años</button>
-                                <button id="btn-stats-ov-months" class="btn btn-secondary btn-sm" style="padding: 6px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; border: none; outline: none; background: transparent; color: var(--text-secondary); cursor: pointer;">Meses</button>
+                        <!-- Summary KPI Grid -->
+                        <div class="stats-overview-grid" style="margin-bottom: 20px;">
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos Realizados</h3>
+                                <div class="huge-number" id="stats-rehearsals-total-count" style="font-size: 2rem;">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Generales y por Voz</p>
                             </div>
-                            <div id="stats-ov-month-filter-container" class="hidden" style="display: flex; align-items: center; gap: 8px;">
-                                <label for="stats-ov-year-select" style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; margin: 0;">Seleccionar Temporada:</label>
-                                <select id="stats-ov-year-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; width: auto; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
-                                    <!-- Populated dynamically -->
-                                </select>
-                                <button id="btn-download-season-report" class="btn btn-secondary btn-icon" style="padding: 6px; background-color: rgba(212, 175, 55, 0.1); border-color: rgba(212, 175, 55, 0.3); color: #D4AF37; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;" title="Descargar Informe de Temporada (PDF)">
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                        <polyline points="7 10 12 15 17 10"></polyline>
-                                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                                    </svg>
-                                </button>
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos Generales</h3>
+                                <div class="huge-number" id="stats-rehearsals-general-count" style="font-size: 2rem; color: var(--color-gold);">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Toda la plantilla convocada</p>
+                            </div>
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Ensayos por Voz</h3>
+                                <div class="huge-number" id="stats-rehearsals-voice-count" style="font-size: 2rem; color: #3b82f6;">0</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Secciones específicas</p>
+                            </div>
+                            <div class="card stat-overview-card" style="padding: 16px;">
+                                <h3 style="font-size: 0.85rem; color: var(--text-muted);">Horas Ensayadas</h3>
+                                <div class="huge-number" id="stats-rehearsals-total-hours" style="font-size: 2rem; color: var(--color-present);">0 h</div>
+                                <p class="text-muted" style="font-size: 0.78rem;">Basado en hora inicio y fin</p>
                             </div>
                         </div>
 
-                        <!-- Bar Chart Container -->
-                        <div id="stats-ov-chart-container" style="position: relative; width: 100%; min-height: 280px; margin-top: 10px; display: flex; flex-direction: column;">
-                            <!-- Dynamic chart output -->
+                        <!-- Breakdown Table -->
+                        <h4 style="font-size: 0.92rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                            Desglose por Tipo de Ensayo y Secciones Convocadas
+                        </h4>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo / Sección de Ensayo</th>
+                                        <th style="text-align: center;">Nº Ensayos</th>
+                                        <th style="text-align: center;">% del Total</th>
+                                        <th style="text-align: right; padding-right: 15px;">Horas Ensayadas</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stats-rehearsals-breakdown-body">
+                                    <!-- Dynamic rows rendered in JS -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- Comparativa de Asistencia por Cuerdas (Gráfico interactivo) -->
-                <div class="card-collapsible" style="margin-bottom: 24px;" id="card-stats-section-comparison">
+                <div class="card-collapsible" id="card-stats-direccion" style="margin-bottom: 24px;">
                     <div class="card-collapsible-header">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="font-size: 1.1rem;">📈</span>
-                            <h3 style="margin: 0;">Comparativa de Asistencia por Cuerdas</h3>
-                        </div>
+                        <h3>🎙️ Estadísticas de dirección</h3>
                         <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </div>
                     <div class="card-collapsible-content">
-                        <!-- Subtitle & Controls -->
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-                            <div>
-                                <p class="text-muted" style="margin: 0; font-size: 0.84rem;">Evolución del porcentaje de asistencia comparado entre las cuerdas de la banda.</p>
-                            </div>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-                                <label for="stats-section-time-select" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; margin: 0;">Periodo:</label>
-                                <select id="stats-section-time-select" class="filter-select" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #FFF;">
-                                    <option value="season" selected>Temporada Actual</option>
-                                    <option value="last6m">Últimos 6 Meses</option>
-                                    <option value="last3m">Últimos 3 Meses</option>
-                                    <option value="all">Todo el Histórico</option>
-                                </select>
-                            </div>
-                        </div>
+                        <p class="text-muted" style="margin-bottom: 20px; font-size: 0.85rem;">Ensayos dirigidos por cada responsable en el período seleccionado.</p>
 
-                        <!-- Selector de Secciones (Pills / Badges) -->
-                        <div style="margin-bottom: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
-                                <span style="font-size: 0.78rem; font-weight: 700; color: var(--color-gold); text-transform: uppercase; letter-spacing: 0.5px;">Seleccionar Cuerdas a Mostrar</span>
-                                <div style="display: flex; gap: 6px;">
-                                    <button type="button" id="btn-stats-sec-select-all" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Todas</button>
-                                    <button type="button" id="btn-stats-sec-select-metals" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Metales</button>
-                                    <button type="button" id="btn-stats-sec-select-percussion" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Percusión</button>
-                                    <button type="button" id="btn-stats-sec-clear-all" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.72rem; border-radius: 4px;">Ninguna</button>
-                                </div>
-                            </div>
-                            <div id="stats-section-pills-container" style="display: flex; flex-wrap: wrap; gap: 6px;">
-                                <!-- Dynamic pills populated by JS -->
-                            </div>
-                        </div>
+                        <!-- Gráfico de tarta: ensayos dirigidos por responsable -->
+                        <h4 style="font-size: 0.92rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                            Ensayos Dirigidos por Responsable
+                        </h4>
+                        <div id="stats-direccion-piechart-container" style="margin-bottom: 24px;"></div>
 
-                        <!-- Line Chart Container -->
-                        <div id="stats-section-line-chart-container" style="position: relative; width: 100%; min-height: 320px; margin-top: 10px; box-sizing: border-box;">
-                            <!-- Dynamic SVG chart populated by JS -->
-                        </div>
-
-                        <!-- Summary grid below chart -->
-                        <div id="stats-section-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 20px;">
-                            <!-- Dynamic summary cards populated by JS -->
+                        <!-- Breakdown Table -->
+                        <h4 style="font-size: 0.92rem; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">
+                            Desglose por Responsable
+                        </h4>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Responsable</th>
+                                        <th style="text-align: center;">Nº Ensayos Dirigidos</th>
+                                        <th style="text-align: center;">% del Total</th>
+                                        <th>Tipos de Ensayo Dirigidos</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stats-direccion-breakdown-body">
+                                    <!-- Dynamic rows rendered in JS -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1105,12 +1283,9 @@
                                 <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">Establece las marchas del repertorio como objetivo de ensayo para cada semana del año.</p>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <label for="weekly-goals-year-select" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Seleccionar Año:</label>
-                                <select id="weekly-goals-year-select" class="filter-select" style="padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; width: 100px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
-                                    <option value="2024">2024</option>
-                                    <option value="2025">2025</option>
-                                    <option value="2026" selected>2026</option>
-                                    <option value="2027">2027</option>
+                                <label for="weekly-goals-year-select" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Seleccionar Temporada:</label>
+                                <select id="weekly-goals-year-select" class="filter-select" style="padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; width: 140px; background-color: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
+                                    <!-- Populated dynamically -->
                                 </select>
                             </div>
                         </div>
@@ -1219,10 +1394,203 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Sección: Otros (funciones adicionales) -->
+            <section id="section-otros" class="app-section">
+                <div class="settings-grid">
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-sugerencias" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                            </svg>
+                            Buzón de Sugerencias
+                            <span class="suggestions-unread-badge hidden" style="background-color: var(--color-absent); color: white; border-radius: 50%; min-width: 18px; height: 18px; padding: 0 4px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center;">0</span>
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Consulta las propuestas enviadas por los músicos de la banda.</p>
+                    </div>
+
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-lugares-ensayo" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                            Lugares de Ensayo
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Gestiona los locales y ubicaciones para indicar a los músicos cómo llegar en Google Maps.</p>
+                    </div>
+
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-estadisticas-avanzadas" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                            Estadísticas avanzadas (prueba)
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Gráficos detallados para analizar la evolución de la banda en profundidad.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Buzón de Sugerencias (detalle admin) -->
+            <section id="section-otros-sugerencias" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+                <div id="admin-suggestions-list" class="vertical-cards-list"></div>
+                <div id="admin-suggestions-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                    <span style="font-size: 2rem; display: block; margin-bottom: 10px;">📭</span>
+                    Aún no se ha recibido ninguna sugerencia.
+                </div>
+            </section>
+
+            <!-- Sección: Lugares de Ensayo (gestión admin) -->
+            <section id="section-otros-lugares-ensayo" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+                <div class="card" style="padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                                📍 Lugares de Ensayo
+                            </h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Define las ubicaciones para que los músicos puedan abrir la ruta en Google Maps.
+                            </p>
+                        </div>
+                        <button id="btn-add-lugar-ensayo" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <span>➕</span> Añadir Lugar
+                        </button>
+                    </div>
+
+                    <div id="admin-lugares-ensayo-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;"></div>
+                    <div id="admin-lugares-ensayo-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
+                        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📍</span>
+                        No hay lugares de ensayo configurados todavía.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Estadísticas Avanzadas (admin) -->
+            <section id="section-otros-estadisticas-avanzadas" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+
+                <div class="card-collapsible collapsed" id="card-advstats-treemap" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">🌳 Treemap por voz/sección</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Rectángulos proporcionales al tamaño de cada sección, coloreados por su asistencia media. Un vistazo te dice qué sección va peor sin leer una sola tabla.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div id="advanced-stats-treemap-container" style="margin-top: 10px;"></div>
+                        <div id="advanced-stats-treemap-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🌳</span>
+                            Todavía no hay datos de asistencia registrados para generar el treemap.
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 0.78rem; color: var(--text-muted);">
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-present); display: inline-block;"></span>≥ 80% asistencia</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-justified); display: inline-block;"></span>50–79% asistencia</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-absent); display: inline-block;"></span>&lt; 50% asistencia</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-collapsible collapsed" id="card-advstats-sunburst" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">☀️ Sunburst de asistencia</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Anillo interior: asistió, falta justificada o falta no justificada. Anillo exterior: dentro de "asistió", si hubo preaviso del músico; dentro de cada falta, el motivo concreto.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div id="advanced-stats-sunburst-container" style="margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 24px;"></div>
+                        <div id="advanced-stats-sunburst-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">☀️</span>
+                            Todavía no hay convocatorias registradas para generar el sunburst.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-collapsible collapsed" id="card-advstats-heatmap" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">🗓️ Calendar heatmap</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Una temporada entera (septiembre-agosto) de un vistazo, cada día coloreado según la asistencia general de ese día. Ideal para detectar rachas y patrones estacionales.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                            <select id="advanced-stats-heatmap-year-select" style="min-width: 160px;"></select>
+                        </div>
+                        <div id="advanced-stats-heatmap-container" style="margin-top: 10px; overflow-x: auto;"></div>
+                        <div id="advanced-stats-heatmap-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🗓️</span>
+                            Todavía no hay convocatorias registradas para generar el calendario.
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 14px; font-size: 0.78rem; color: var(--text-muted);">
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--bg-compact-card); border: 1px solid var(--border-color); display: inline-block;"></span>Sin convocatoria</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-absent); display: inline-block;"></span>&lt; 50%</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-justified); display: inline-block;"></span>50–79%</span>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 3px; background: var(--color-present); display: inline-block;"></span>≥ 80%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-collapsible collapsed" id="card-advstats-ranking-evolution" style="margin-bottom: 24px;">
+                    <div class="card-collapsible-header">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">Evolución del ranking de asistencia</h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Posición mensual de cada músico. Por defecto se resalta el Top 3 actual; selecciona a cualquier músico para ver solo su evolución.
+                            </p>
+                        </div>
+                        <svg class="collapse-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="card-collapsible-content">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 6px;">
+                            <select id="advanced-stats-musician-select" style="min-width: 220px;"></select>
+                        </div>
+
+                        <div id="advanced-stats-bump-chart-container" style="margin-top: 10px; overflow-x: auto;"></div>
+                        <div id="advanced-stats-bump-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                            <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📈</span>
+                            Todavía no hay suficientes meses con asistencia registrada para mostrar una evolución.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- =============================================================== -->
             <!-- SECCIONES PARA COMPONENTES (MÚSICOS) -->
             <!-- =============================================================== -->
-            
+
             <!-- Sección: Mi Ficha (Estadísticas e Insignias) -->
             <section id="section-componente-ficha" class="app-section">
                 <!-- Debug Box -->
@@ -1259,6 +1627,10 @@
                                 <span id="comp-notifications-badge-count" class="badge-red hidden" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-absent); color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--bg-card);">0</span>
                             </button>
                         </div>
+                    </div>
+                    <div id="comp-baja-banner" class="hidden" style="margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: rgba(160, 160, 160, 0.14); border: 1px solid rgba(160, 160, 160, 0.4); color: #c9c9c9; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1rem;">🚫</span>
+                        <span>Estás de baja temporal. Mientras dure tu baja no cuentas para las estadísticas ni puedes enviar preavisos.</span>
                     </div>
                 </div>
 
@@ -1308,7 +1680,7 @@
                     <div style="display: flex; flex-direction: column; gap: 25px;">
                         <!-- Categoría: Asistencia -->
                         <div>
-                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                                 📅 Asistencia
                             </h4>
                             <div class="medals-grid">
@@ -1357,7 +1729,7 @@
                                     <div class="medal-icon-wrapper">👑</div>
                                     <div class="medal-info">
                                         <div class="medal-title">Alma de la banda</div>
-                                        <div class="medal-desc">Asiste a todos los ensayos durante 1 año.</div>
+                                        <div class="medal-desc">Asiste a todos los ensayos durante 1 mes (1⭐), 6 meses (2⭐) o 1 año (3⭐).</div>
                                         <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
                                         <div class="medal-progress-text">Progreso</div>
                                     </div>
@@ -1367,9 +1739,19 @@
                                     <div class="medal-icon-wrapper">🛡️</div>
                                     <div class="medal-info">
                                         <div class="medal-title">Titular indiscutible</div>
-                                        <div class="medal-desc">Asiste a actuaciones en un año: >90% (1⭐), >95% (2⭐) o 100% (3⭐).</div>
+                                        <div class="medal-desc">Asiste a actuaciones en un año (mínimo 3 actuaciones): >90% (1⭐), >95% (2⭐) o 100% (3⭐).</div>
                                         <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
                                         <div class="medal-progress-text">Progreso</div>
+                                    </div>
+                                </div>
+                                <!-- Top -->
+                                <div class="medal-card locked" id="medal-top">
+                                    <div class="medal-icon-wrapper">🥇</div>
+                                    <div class="medal-info">
+                                        <div class="medal-title">Top</div>
+                                        <div class="medal-desc">Entra en el Top 25, Top 10 o Top 5 de asistencia de la banda para conseguir 1, 2 o 3 estrellas.</div>
+                                        <div class="medal-progress-bar"><div class="progress" style="width: 0%;"></div></div>
+                                        <div class="medal-progress-text">Posición no disponible</div>
                                     </div>
                                 </div>
                                 <!-- Capitán -->
@@ -1397,7 +1779,7 @@
 
                         <!-- Categoría: Legado -->
                         <div>
-                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                                 📜 Legado
                             </h4>
                             <div class="medals-grid">
@@ -1456,7 +1838,7 @@
 
                         <!-- Categoría: Especiales -->
                         <div>
-                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.25); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                            <h4 style="margin-top: 10px; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--color-gold); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                                 ✨ Especiales
                             </h4>
                             <div class="medals-grid">
@@ -1553,19 +1935,6 @@
                         <!-- Populate dynamically -->
                     </div>
                 </div>
-
-                <!-- Formulario de Cambio de PIN -->
-                <div class="card" style="margin-top: 20px; padding: 20px;">
-                    <h3 style="margin-top: 0; margin-bottom: 15px; font-family: 'Cinzel', serif; font-size: 1.15rem; color: #D4AF37;">Cambiar PIN de Acceso</h3>
-                    <form id="form-change-pin">
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <div class="form-group" style="flex: 1; min-width: 150px; margin: 0;">
-                                <input type="password" id="change-pin-new" maxlength="4" placeholder="Nuevo PIN (4 dígitos)" style="width: 100%; text-align: center; font-size: 1.1rem; border-color: rgba(212,175,55,0.4);" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #D4AF37, #AA7C11); border: none; font-weight: 600; padding: 10px 24px;">Guardar PIN</button>
-                        </div>
-                    </form>
-                </div>
             </section>
 
             <!-- Sección: Eventos Programados (Futuros) -->
@@ -1577,9 +1946,9 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px;">
                         <h3 id="comp-calendar-month-year" style="margin: 0; font-family: inherit; font-size: 1.1rem; color: var(--color-gold);">Julio 2026</h3>
                         <div style="display: flex; gap: 6px;">
-                            <button id="btn-comp-calendar-prev" class="btn btn-secondary btn-sm" style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Ant.</button>
+                            <button id="btn-comp-calendar-prev" class="btn btn-secondary btn-sm" style="padding: 4px 12px; border-radius: 4px; font-size: 0.9rem; font-weight: 700;" title="Mes anterior">&lt;</button>
                             <button id="btn-comp-calendar-today" class="btn btn-secondary btn-sm" style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Hoy</button>
-                            <button id="btn-comp-calendar-next" class="btn btn-secondary btn-sm" style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;">Sig.</button>
+                            <button id="btn-comp-calendar-next" class="btn btn-secondary btn-sm" style="padding: 4px 12px; border-radius: 4px; font-size: 0.9rem; font-weight: 700;" title="Mes siguiente">&gt;</button>
                         </div>
                     </div>
                     
@@ -1662,9 +2031,117 @@
                     <input type="text" id="search-comp-marcha" placeholder="Buscar marcha por título o autor..." style="width: 100%; padding: 10px; border-radius: 4px; background-color: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-color);">
                 </div>
 
+                <!-- Playlists del repertorio completo -->
+                <div id="repertoire-playlists-comp-container" class="hidden" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+                    <a href="#" id="comp-repertoire-youtube-link" target="_blank" rel="noopener noreferrer" class="hidden" style="flex: 1; min-width: 160px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 14px; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.35); border-radius: 10px; color: #ff4d4d; font-weight: 700; text-decoration: none; box-sizing: border-box;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF0000" style="flex-shrink: 0;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        <span style="font-size: 0.88rem;">Playlist YouTube</span>
+                    </a>
+                    <a href="#" id="comp-repertoire-spotify-link" target="_blank" rel="noopener noreferrer" class="hidden" style="flex: 1; min-width: 160px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 14px; background: rgba(29, 185, 84, 0.1); border: 1px solid rgba(29, 185, 84, 0.35); border-radius: 10px; color: #1db954; font-weight: 700; text-decoration: none; box-sizing: border-box;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#1DB954" style="flex-shrink: 0;"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.486.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.38-1.32 9.78-.66 13.5 1.62.36.18.6.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                        <span style="font-size: 0.88rem;">Playlist Spotify</span>
+                    </a>
+                </div>
+
                 <!-- Repertorio List Container -->
                 <div class="vertical-cards-list" id="componente-repertorio-lista">
                     <!-- Filas de repertorio dinámicas -->
+                </div>
+            </section>
+
+            <!-- Sección: Buzón de Sugerencias del Músico -->
+            <section id="section-componente-sugerencias" class="app-section">
+                <div class="card" style="padding: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 8px; font-family: 'Cinzel', serif; font-size: 1.2rem; color: #D4AF37; display: flex; align-items: center; gap: 8px;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+                        Buzón de Sugerencias
+                    </h3>
+                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        Escribe aquí tu propuesta o idea y hazla llegar directamente a la directiva.
+                    </p>
+
+                    <div id="suggestion-limit-notice" class="hidden" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+                        <span style="font-size: 1.5rem; display: block; margin-bottom: 8px;">🕓</span>
+                        Ya has enviado una sugerencia esta semana.<br>
+                        Podrás enviar la siguiente a partir del <strong id="suggestion-limit-date"></strong>.
+                    </div>
+
+                    <form id="form-suggestion-mailbox">
+                        <div class="form-group">
+                            <textarea id="suggestion-text" rows="5" maxlength="1000" placeholder="Escribe tu sugerencia..." style="width: 100%; resize: vertical; font-family: inherit;" required></textarea>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 16px 0;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <label class="switch" title="Enviar de forma anónima">
+                                    <input type="checkbox" id="suggestion-anonymous-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">Enviar de forma anónima</span>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #D4AF37, #AA7C11); border: none; font-weight: 600; padding: 10px 20px;">Enviar Sugerencia</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card" style="padding: 20px; margin-top: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 8px; font-family: 'Cinzel', serif; font-size: 1.1rem; color: #D4AF37; display: flex; align-items: center; gap: 8px;">
+                        <span>🕓</span> Historial de mis Sugerencias
+                    </h3>
+                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        Sugerencias que has enviado a la directiva.
+                    </p>
+                    <div id="my-suggestions-history-list" class="vertical-cards-list"></div>
+                    <div id="my-suggestions-history-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
+                        <span style="font-size: 1.8rem; display: block; margin-bottom: 8px;">📭</span>
+                        No has enviado ninguna sugerencia todavía.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Ajustes del Músico -->
+            <section id="section-componente-ajustes" class="app-section">
+                <div class="card" style="padding: 20px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 8px; font-family: 'Cinzel', serif; font-size: 1.2rem; color: #D4AF37; display: flex; align-items: center; gap: 8px;">
+                        <span>⚙️</span> Ajustes de la Cuenta
+                    </h3>
+                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        Gestiona la seguridad y sesión de tu perfil en la agrupación.
+                    </p>
+
+                    <!-- Formulario de Cambio de PIN -->
+                    <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 0.95rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                            <span>🔑</span> Cambiar PIN de Acceso
+                        </h4>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4;">
+                            Establece un nuevo PIN personal de 4 dígitos para acceder a la aplicación.
+                        </p>
+                        <form id="form-change-pin-ajustes">
+                            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 160px; margin: 0;">
+                                    <input type="password" id="change-pin-new-ajustes" maxlength="4" inputmode="numeric" placeholder="Nuevo PIN (4 dígitos)" style="width: 100%; text-align: center; font-size: 1.1rem; border-color: rgba(212,175,55,0.4);" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #D4AF37, #AA7C11); border: none; font-weight: 600; padding: 10px 20px;">Guardar PIN</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Botón Cerrar Sesión -->
+                    <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 0.95rem; font-weight: 700; color: var(--color-absent); display: flex; align-items: center; gap: 8px;">
+                            <span>🚪</span> Cerrar Sesión
+                        </h4>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4;">
+                            Cierra tu sesión en este dispositivo. Deberás ingresar tu PIN nuevamente para volver a acceder.
+                        </p>
+                        <button type="button" class="btn btn-danger btn-logout-component" style="width: 100%; justify-content: center; padding: 10px 16px; font-weight: 600;">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            Cerrar Sesión
+                        </button>
                 </div>
             </section>
         </main>
@@ -1685,8 +2162,12 @@
             <form id="form-musician">
                 <input type="hidden" id="musician-id">
                 <div class="form-group">
-                    <label for="musician-name">Nombre Completo</label>
-                    <input type="text" id="musician-name" required placeholder="Ej. Juan Manuel Gómez">
+                    <label for="musician-name">Apodo</label>
+                    <input type="text" id="musician-name" required placeholder="Ej. Juanito">
+                </div>
+                <div class="form-group">
+                    <label for="musician-fullname">Nombre Completo</label>
+                    <input type="text" id="musician-fullname" placeholder="Ej. Juan Manuel Gómez">
                 </div>
                 <div class="form-group">
                     <label for="musician-instrument">Instrumento / Sección</label>
@@ -1711,10 +2192,18 @@
                     <label for="musician-role">Rol</label>
                     <select id="musician-role" style="width: 100%;">
                         <option value="Dirección">Dirección</option>
-                        <option value="Ayud. Dirección">Ayud. Dirección</option>
-                        <option value="Responsable Voz">Responsable Voz</option>
+                        <option value="A.Dirección">A.Dirección</option>
+                        <option value="Resp. Voz">Resp. Voz</option>
                         <option value="Músico" selected>Músico</option>
                     </select>
+                </div>
+
+                <div class="form-group" style="margin-top: 14px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <label for="musician-is-baja" style="display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; color: var(--text-color); margin: 0;">
+                        <input type="checkbox" id="musician-is-baja" style="width: 18px; height: 18px; accent-color: var(--color-gold); cursor: pointer;">
+                        <span>Dar de baja temporal</span>
+                    </label>
+                    <p class="text-muted" style="font-size: 0.78rem; margin: 4px 0 0 28px;">El músico no influirá en las estadísticas de la banda durante su período de baja.</p>
                 </div>
 
                 <div class="modal-actions">
@@ -1761,6 +2250,27 @@
                         <option value="5">Nivel 5</option>
                     </select>
                 </div>
+                <div class="form-group" style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                    <label style="font-size: 0.85rem; font-weight: 700; color: var(--color-gold); display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                        <span>🎧</span> Enlaces de Audio para Escuchar (Opcional)
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div>
+                            <label for="marcha-audio-youtube-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF0000" style="display: inline-block; vertical-align: middle; flex-shrink: 0;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                                <span>Enlace a YouTube / Vídeo</span>
+                            </label>
+                            <input type="url" id="marcha-audio-youtube-input" placeholder="https://www.youtube.com/watch?v=..." style="width: 100%; font-size: 0.82rem;">
+                        </div>
+                        <div>
+                            <label for="marcha-audio-spotify-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954" style="display: inline-block; vertical-align: middle; flex-shrink: 0;"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.486.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.38-1.32 9.78-.66 13.5 1.62.36.18.6.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                                <span>Enlace a Spotify / Álbum</span>
+                            </label>
+                            <input type="url" id="marcha-audio-spotify-input" placeholder="https://open.spotify.com/track/..." style="width: 100%; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-marcha-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar Marcha</button>
@@ -1769,11 +2279,49 @@
         </div>
     </div>
 
-    <!-- Modal: Historial de Ensayos de una Marcha -->
-    <div id="modal-marcha-history" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px;">
+    <!-- Modal: Editar Enlaces de Playlists del Repertorio Completo -->
+    <div id="modal-repertoire-links" class="modal-overlay">
+        <div class="modal-card" style="max-width: 420px;">
             <div class="modal-header">
-                <h3 id="marcha-history-title">Historial de Ensayos</h3>
+                <h3>Playlists del Repertorio Completo</h3>
+                <button class="modal-close" id="btn-close-repertoire-links-modal">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="form-repertoire-links">
+                <p class="text-muted" style="margin: 0 0 14px 0; font-size: 0.82rem;">
+                    Enlaces a listas de reproducción con todo el repertorio, visibles para los músicos en la página de Repertorio.
+                </p>
+                <div class="form-group">
+                    <label for="repertoire-youtube-playlist-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF0000" style="flex-shrink: 0;"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                        <span>Playlist de YouTube</span>
+                    </label>
+                    <input type="url" id="repertoire-youtube-playlist-input" placeholder="https://youtube.com/playlist?list=..." style="width: 100%; font-size: 0.82rem;">
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label for="repertoire-spotify-playlist-input" style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="#1DB954" style="flex-shrink: 0;"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.486.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 4.38-1.32 9.78-.66 13.5 1.62.36.18.6.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                        <span>Playlist de Spotify</span>
+                    </label>
+                    <input type="url" id="repertoire-spotify-playlist-input" placeholder="https://open.spotify.com/playlist/..." style="width: 100%; font-size: 0.82rem;">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-repertoire-links-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Enlaces</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Historial de una Marcha (ensayos + actuaciones) -->
+    <div id="modal-marcha-history" class="modal-overlay">
+        <div class="modal-card" style="max-width: 520px; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <h3 id="marcha-history-title">Historial de la Marcha</h3>
                 <button class="modal-close" id="btn-close-marcha-history-modal">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1781,9 +2329,14 @@
                     </svg>
                 </button>
             </div>
-            <div style="padding: 16px 0;">
+            <div style="padding: 16px 20px; overflow-y: auto; flex: 1;">
                 <div id="marcha-history-repertoire-info" style="margin-bottom: 16px; font-weight: 600; color: var(--color-gold); font-size: 1rem;"></div>
-                <div class="card-table" style="max-height: 300px; overflow-y: auto;">
+
+                <!-- Apartado: Ensayos -->
+                <h4 style="margin: 0 0 8px 0; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">
+                    Veces Ensayada <span id="marcha-history-ensayos-count"></span>
+                </h4>
+                <div class="card-table" style="max-height: 220px; overflow-y: auto; margin-bottom: 20px;">
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
@@ -1799,8 +2352,31 @@
                         </table>
                     </div>
                 </div>
-                <div id="marcha-history-empty" class="empty-state hidden" style="padding: 20px 0;">
+                <div id="marcha-history-empty" class="empty-state hidden" style="padding: 10px 0 20px;">
                     <p class="text-muted" style="text-align: center; margin: 0;">Esta marcha no se ha tocado en ningún ensayo todavía.</p>
+                </div>
+
+                <!-- Apartado: Actuaciones -->
+                <h4 style="margin: 0 0 8px 0; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">
+                    Veces Tocada <span id="marcha-actuaciones-history-count"></span>
+                </h4>
+                <div class="card-table" style="max-height: 220px; overflow-y: auto;">
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Actuación</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody id="marcha-actuaciones-history-table-body">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="marcha-actuaciones-history-empty" class="empty-state hidden" style="padding: 10px 0;">
+                    <p class="text-muted" style="text-align: center; margin: 0;">Esta marcha no se ha tocado en ninguna actuación todavía.</p>
                 </div>
             </div>
         </div>
@@ -1831,18 +2407,41 @@
         </div>
     </div>
 
+    <!-- Modal: Escuchar Enlaces de Audio de una Marcha (Portal Músicos) -->
+    <div id="modal-marcha-audio-links" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px; width: 90%;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <h3 id="modal-audio-links-title" style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                        <span>🎧</span> Marcha
+                    </h3>
+                    <span id="modal-audio-links-composer" class="text-muted" style="font-size: 0.82rem; font-weight: 500;"></span>
+                </div>
+                <button class="modal-close" id="btn-close-marcha-audio-links-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; padding: 4px 0 10px 0;">
+                <div id="modal-audio-links-container" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Audio links populating here -->
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top: 6px; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="btn-close-marcha-audio-links-footer">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Explicación de Racha de Asistencia -->
     <div id="modal-streak-info" class="modal-overlay">
-        <div class="modal-card" style="max-width: 400px; text-align: center; padding: 24px 20px;">
+        <div class="modal-card modal-card-standard-size" style="text-align: center;">
             <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                 <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">
                     <span>🔥</span> Racha de Asistencia
                 </h3>
                 <button class="modal-close" id="btn-close-streak-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;">
                 <!-- Indicador Racha en Grande -->
-                <div style="margin: 10px 0 16px 0;">
+                <div style="margin: 6px 0 14px 0;">
                     <div style="font-size: 3.5rem; font-weight: 800; font-family: 'Cinzel', serif; color: #E67E22; line-height: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
                         <span>🔥</span>
                         <span id="modal-streak-count-big">0</span>
@@ -1853,12 +2452,12 @@
                 </div>
 
                 <!-- Mensaje Motivacional Dinámico -->
-                <div id="modal-streak-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 18px; text-align: center;">
+                <div id="modal-streak-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 16px; text-align: center;">
                     Cargando mensaje...
                 </div>
 
                 <!-- Récord Personal de Racha -->
-                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.88rem; color: var(--color-gold); font-weight: 600; background: rgba(212, 175, 55, 0.1); padding: 9px 12px; border-radius: 8px; margin-bottom: 14px;">
                     <span>🏆</span> Récord Personal: <span id="modal-streak-best-val" style="font-weight: 700;">0</span> ensayos seguidos
                 </div>
             </div>
@@ -1868,9 +2467,91 @@
         </div>
     </div>
 
+    <!-- Modal de Explicación de Insignias del Músico -->
+    <div id="modal-insignias-info" class="modal-overlay">
+        <div class="modal-card modal-card-standard-size" style="text-align: center;">
+            <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-family: 'Cinzel', serif;">Mis insignias</h3>
+                <button class="modal-close" id="btn-close-insignias-modal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto;">
+                <!-- Indicador Insignias en Grande -->
+                <div style="margin: 6px 0 14px 0;">
+                    <div style="font-size: 3.5rem; font-weight: 800; font-family: 'Cinzel', serif; color: var(--color-gold); line-height: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span id="modal-insignias-icon-big">🏅</span>
+                        <span id="modal-insignias-count-big">0</span>
+                    </div>
+                    <div id="modal-insignias-subtitle" style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-top: 6px;">
+                        Insignias Desbloqueadas
+                    </div>
+                </div>
+
+                <!-- Mensaje Motivacional / Explicativo Dinámico -->
+                <div id="modal-insignias-message" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; line-height: 1.5; color: var(--text-primary); margin-bottom: 16px; text-align: center;">
+                    Cargando información...
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 8px;">
+                <button class="btn btn-primary" id="btn-insignias-modal-ok" style="width: 100%; justify-content: center; padding: 10px 16px;">¡Entendido!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle de Insignia Individual -->
+    <div id="modal-single-insignia-detail" class="modal-overlay">
+        <div class="modal-card" style="max-width: 380px; width: 90%; max-height: 90vh; padding: 16px 18px; text-align: center; display: flex; flex-direction: column; height: auto; align-self: center;">
+            <div class="modal-header" style="justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 12px; flex-shrink: 0;">
+                <h3 id="modal-insignia-detail-title" style="margin: 0; font-size: 1.1rem; color: var(--text-primary); font-family: 'Cinzel', serif;">
+                    Detalle de Insignia
+                </h3>
+                <button class="modal-close" id="btn-close-insignia-detail-modal" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 2px;">
+                <!-- Icono Grande Circunscrito y Estado -->
+                <div style="display: flex; flex-direction: column; align-items: center; margin: 4px 0 10px 0;">
+                    <div id="modal-insignia-detail-icon-wrapper" class="medal-icon-wrapper" style="width: 60px; height: 60px; font-size: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; transition: all 0.25s ease;">
+                        <span id="modal-insignia-detail-icon">🏅</span>
+                    </div>
+                    <div id="modal-insignia-detail-status-badge" style="display: inline-block; font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Bloqueada
+                    </div>
+                </div>
+
+                <!-- Descripción General -->
+                <div id="modal-insignia-detail-desc" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 12px; font-size: 0.85rem; line-height: 1.4; color: var(--text-primary); margin-bottom: 12px; text-align: center;">
+                    Cargando información...
+                </div>
+
+                <!-- Barra de Progreso y Texto de Progreso -->
+                <div id="modal-insignia-detail-progress-box" style="margin-bottom: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px 12px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">
+                        <span>Progreso Actual</span>
+                        <span id="modal-insignia-detail-progress-text" style="color: var(--text-primary); font-weight: 700;">0/0</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; overflow: hidden;">
+                        <div id="modal-insignia-detail-progress-bar" style="width: 0%; height: 100%; background: var(--color-gold); transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Requisitos y Niveles (Bronce, Plata, Oro) - Solo para insignias con sistema de estrellas -->
+                <div id="modal-insignia-detail-tiers-section" style="display: none; text-align: left; margin-bottom: 8px;">
+                    <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+                        Requisitos y Niveles
+                    </div>
+                    <div id="modal-insignia-detail-tiers-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Filas dinámicas -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: center; margin-top: 8px; flex-shrink: 0;">
+                <button class="btn btn-primary" id="btn-insignia-detail-modal-ok" style="width: 100%; justify-content: center; padding: 8px 14px; font-size: 0.9rem;">¡Entendido!</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Flotante de Notificaciones del Músico -->
     <div id="modal-component-notifications" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box;">
+        <div class="modal-card modal-card-standard-size">
             <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 14px;">
                 <h3 style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <span>🔔</span> Notificaciones
@@ -1891,7 +2572,7 @@
 
     <!-- Modal: Enviar Comunicado / Notificación a la Banda (Directiva) -->
     <div id="modal-send-announcement" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-card" style="max-width: 486px;">
             <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                 <h3 style="margin: 0; font-size: 1.15rem; font-family: 'Cinzel', serif; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
                     <span>📢</span> Enviar Comunicado a la Banda
@@ -1939,25 +2620,36 @@
                     <textarea id="announcement-body-input" required placeholder="Escribe aquí el mensaje detallado para la banda..." style="width: 100%; height: 110px; resize: vertical; padding: 10px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-family: inherit; font-size: 0.88rem; box-sizing: border-box;"></textarea>
                 </div>
 
-                <div class="modal-actions" style="margin-top: 0;">
-                    <button type="button" class="btn btn-secondary" id="btn-cancel-announcement-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; font-weight: 700;">📢 Enviar Notificación</button>
+                <div class="modal-actions" style="margin-top: 0; flex-wrap: nowrap; gap: 6px;">
+                    <button type="button" id="btn-clear-all-notifications" class="btn btn-danger" title="Vaciar notificaciones de todos los músicos" style="margin-right: auto; padding: 9px 12px; font-size: 0.77rem; white-space: nowrap;">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px; vertical-align: middle;">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Vaciar notificaciones
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-announcement-modal" style="padding: 9px 12px; font-size: 0.77rem; white-space: nowrap;">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; font-weight: 700; padding: 9px 12px; font-size: 0.77rem; white-space: nowrap;">📢 Enviar Notificación</button>
                 </div>
             </form>
         </div>
     </div>
 
 
-    <!-- Modal: Crear Ensayo -->
+    <!-- Modal: Crear / Editar Ensayo -->
     <div id="modal-rehearsal" class="modal-overlay">
-        <div class="modal-card" style="max-width: 380px;">
+        <div class="modal-card" style="max-width: 400px;">
             <div class="modal-header">
-                <h3>Nuevo Ensayo</h3>
+                <h3 id="modal-rehearsal-title">Nuevo Ensayo</h3>
                 <button class="modal-close" id="btn-close-rehearsal-modal">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
             </div>
             <form id="form-rehearsal">
+                <input type="hidden" id="rehearsal-editing-key" value="">
                 <div class="form-group">
                     <label for="rehearsal-date-input">Selecciona la Fecha del Ensayo</label>
                     <input type="date" id="rehearsal-date-input" required style="width: 100%;">
@@ -1982,12 +2674,83 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="rehearsal-time-input">Hora del Ensayo</label>
-                    <input type="text" id="rehearsal-time-input" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
+                    <label for="rehearsal-responsable-input">Responsable <span class="text-muted" style="font-weight: 400; font-size: 0.78rem;">(puedes seleccionar varios)</span></label>
+                    <input type="text" id="rehearsal-responsable-input" placeholder="Nombre del responsable" style="width: 100%;">
+                    <div style="display: flex; gap: 6px; margin-top: 6px;">
+                        <button type="button" class="btn btn-secondary btn-sm rehearsal-responsable-quick-btn" data-value="Iván">Iván</button>
+                        <button type="button" class="btn btn-secondary btn-sm rehearsal-responsable-quick-btn" data-value="Oscar">Oscar</button>
+                        <button type="button" class="btn btn-secondary btn-sm rehearsal-responsable-quick-btn" data-value="Alberto">Alberto</button>
+                    </div>
                 </div>
-                <div class="modal-actions">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Inicio</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <select id="rehearsal-start-hour-input" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                <option value="">--</option>
+                                <option value="08">08</option>
+                                <option value="09">09</option>
+                                <option value="10">10</option>
+                                <option value="11">11</option>
+                                <option value="12">12</option>
+                                <option value="13">13</option>
+                                <option value="14">14</option>
+                                <option value="15">15</option>
+                                <option value="16">16</option>
+                                <option value="17">17</option>
+                                <option value="18">18</option>
+                                <option value="19">19</option>
+                                <option value="20">20</option>
+                                <option value="21">21</option>
+                                <option value="22">22</option>
+                                <option value="23">23</option>
+                                <option value="24">24</option>
+                            </select>
+                            <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                            <select id="rehearsal-start-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                <option value="00" selected>00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Fin</label>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <select id="rehearsal-end-hour-input" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                <option value="">--</option>
+                                <option value="08">08</option>
+                                <option value="09">09</option>
+                                <option value="10">10</option>
+                                <option value="11">11</option>
+                                <option value="12">12</option>
+                                <option value="13">13</option>
+                                <option value="14">14</option>
+                                <option value="15">15</option>
+                                <option value="16">16</option>
+                                <option value="17">17</option>
+                                <option value="18">18</option>
+                                <option value="19">19</option>
+                                <option value="20">20</option>
+                                <option value="21">21</option>
+                                <option value="22">22</option>
+                                <option value="23">23</option>
+                                <option value="24">24</option>
+                            </select>
+                            <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                            <select id="rehearsal-end-min-input" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                <option value="00" selected>00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-rehearsal-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Crear Ensayo</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-rehearsal-modal">Crear Ensayo</button>
                 </div>
             </form>
         </div>
@@ -2009,6 +2772,12 @@
                 </button>
             </div>
             <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Responsable del Ensayo -->
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.92rem;">
+                    <span style="font-weight: 700; color: var(--color-gold);">Responsable</span>
+                    <span id="rehearsal-detail-responsable" style="font-weight: 600;">Sin asignar</span>
+                </div>
+
                 <!-- Marchas Ensayadas Section -->
                 <div>
                     <h4 style="margin: 0 0 10px 0; font-family: inherit; font-size: 0.95rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
@@ -2124,18 +2893,18 @@
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
-                    Pasar Lista / Editar
+                    Pasar Lista
                 </button>
                 <button class="btn btn-secondary" id="btn-close-rehearsal-detail-footer">Cerrar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Crear Actuación -->
+    <!-- Modal: Crear / Editar Actuación -->
     <div id="modal-actuacion" class="modal-overlay">
         <div class="modal-card" style="max-width: 420px;">
             <div class="modal-header">
-                <h3>Nueva Actuación</h3>
+                <h3 id="modal-actuacion-title">Nueva Actuación</h3>
                 <button class="modal-close" id="btn-close-actuacion-modal">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -2144,6 +2913,7 @@
                 </button>
             </div>
             <form id="form-actuacion">
+                <input type="hidden" id="actuacion-editing-key" value="">
                 <div class="form-group">
                     <label for="actuacion-name-input">Nombre de la Actuación</label>
                     <input type="text" id="actuacion-name-input" placeholder="Ej: Domingo de Ramos, Madrugá..." required style="width: 100%;">
@@ -2152,13 +2922,62 @@
                     <label for="actuacion-date-input">Fecha de la Actuación</label>
                     <input type="date" id="actuacion-date-input" required style="width: 100%;">
                 </div>
+                <div class="form-group">
+                    <label for="actuacion-location-input">Lugar / Ubicación de la Actuación</label>
+                    <input type="text" id="actuacion-location-input" placeholder="Ej: Cabra (Córdoba), Iglesia de San Juan..." style="width: 100%;">
+                </div>
                 <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                     <input type="checkbox" id="actuacion-trip-input" style="width: auto; margin: 0;">
                     <label for="actuacion-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
                 </div>
-                <div class="modal-actions">
+                <div class="modal-actions" style="flex-wrap: wrap; gap: 8px;">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-actuacion-modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Crear Actuación</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-actuacion-modal">Crear Actuación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir/Editar Lugar de Ensayo -->
+    <div id="modal-lugar-ensayo" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 id="modal-lugar-ensayo-title">Añadir Lugar de Ensayo</h3>
+                <button class="modal-close" id="btn-close-lugar-ensayo-modal">&times;</button>
+            </div>
+            <form id="form-lugar-ensayo">
+                <input type="hidden" id="lugar-ensayo-id">
+                <div class="form-group">
+                    <label for="lugar-ensayo-nombre-input">Nombre del Lugar / Local</label>
+                    <input type="text" id="lugar-ensayo-nombre-input" required placeholder="Ej. Local de Ensayo Principal, Pabellón Municipal..." style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="lugar-ensayo-maps-url-input">Enlace de Google Maps</label>
+                    <input type="url" id="lugar-ensayo-maps-url-input" placeholder="Ej. https://maps.app.goo.gl/... o https://google.com/maps/..." style="width: 100%;">
+                    <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">Pega aquí el enlace de Google Maps para que la opción "Cómo llegar" lleve directamente a los músicos.</p>
+                </div>
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600;">Imagen del Lugar de Ensayo (Opcional)</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div id="lugar-ensayo-image-preview" style="width: 80px; height: 80px; border-radius: 10px; border: 1px dashed var(--border-color); background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative;">
+                            <span id="lugar-ensayo-image-placeholder" style="font-size: 1.8rem; opacity: 0.5;">🖼️</span>
+                            <img id="lugar-ensayo-image-img" class="hidden" style="width: 100%; height: 100%; object-fit: cover;" alt="Vista previa">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <input type="file" id="lugar-ensayo-image-file" accept="image/*" style="display: none;">
+                            <button type="button" id="btn-upload-lugar-ensayo-image" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>📷</span> Subir Imagen
+                            </button>
+                            <button type="button" id="btn-remove-lugar-ensayo-image" class="btn btn-secondary btn-sm hidden" style="color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>🗑️</span> Quitar Imagen
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size: 0.74rem; margin-top: 6px; line-height: 1.35;">Sube una imagen o mapa del local para mostrar a los músicos.</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-lugar-ensayo-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Lugar</button>
                 </div>
             </form>
         </div>
@@ -2325,14 +3144,82 @@
                 
                 <!-- Group: Rehearsal Time -->
                 <div class="form-group" id="quick-session-time-group" style="margin-top: 15px;">
-                    <label for="quick-session-time">Hora del Ensayo</label>
-                    <input type="text" id="quick-session-time" placeholder="Ej: 21h o 20:30h" style="width: 100%;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Inicio</label>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <select id="quick-session-start-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                    <option value="">--</option>
+                                    <option value="08">08</option>
+                                    <option value="09">09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                    <option value="21">21</option>
+                                    <option value="22">22</option>
+                                    <option value="23">23</option>
+                                    <option value="24">24</option>
+                                </select>
+                                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                                <select id="quick-session-start-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                    <option value="00" selected>00</option>
+                                    <option value="15">15</option>
+                                    <option value="30">30</option>
+                                    <option value="45">45</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Fin</label>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <select id="quick-session-end-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
+                                    <option value="">--</option>
+                                    <option value="08">08</option>
+                                    <option value="09">09</option>
+                                    <option value="10">10</option>
+                                    <option value="11">11</option>
+                                    <option value="12">12</option>
+                                    <option value="13">13</option>
+                                    <option value="14">14</option>
+                                    <option value="15">15</option>
+                                    <option value="16">16</option>
+                                    <option value="17">17</option>
+                                    <option value="18">18</option>
+                                    <option value="19">19</option>
+                                    <option value="20">20</option>
+                                    <option value="21">21</option>
+                                    <option value="22">22</option>
+                                    <option value="23">23</option>
+                                    <option value="24">24</option>
+                                </select>
+                                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
+                                <select id="quick-session-end-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
+                                    <option value="00" selected>00</option>
+                                    <option value="15">15</option>
+                                    <option value="30">30</option>
+                                    <option value="45">45</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                  
                 <!-- Group: Performance Name (hidden by default) -->
                 <div class="form-group hidden" id="quick-session-actuacion-group" style="margin-top: 15px;">
                     <label for="quick-session-actuacion-name">Nombre de la Actuación</label>
                     <input type="text" id="quick-session-actuacion-name" placeholder="Ej: Domingo de Ramos, Concierto..." style="width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+                        <input type="checkbox" id="quick-session-trip-input" style="width: auto; margin: 0;">
+                        <label for="quick-session-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
+                    </div>
                 </div>
 
                 <div class="modal-actions" style="margin-top: 20px;">
@@ -2359,18 +3246,28 @@
                 </button>
             </div>
             <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
-                <!-- Marchas Tocadas Section -->
+                <!-- Repertorio Section -->
                 <div>
-                    <h4 style="margin: 0 0 10px 0; font-family: inherit; font-size: 0.95rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 18V5l12-2v13"></path>
-                            <circle cx="6" cy="18" r="3"></circle>
-                            <circle cx="18" cy="16" r="3"></circle>
-                        </svg>
-                        Marchas Tocadas
-                    </h4>
-                    <div id="actuacion-detail-marchas" style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                        <!-- Marcha badges populating here -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+                        <h4 style="margin: 0; font-family: inherit; font-size: 0.95rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            Repertorio
+                        </h4>
+                        <button type="button" id="btn-open-actuacion-repertoire" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 0.78rem; font-weight: 600; border-radius: 6px; cursor: pointer; background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.3); color: var(--color-gold);">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            <span id="btn-open-actuacion-repertoire-label">Repertorio</span>
+                        </button>
                     </div>
                 </div>
 
@@ -2466,16 +3363,56 @@
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
-                    Pasar Lista / Editar
+                    Pasar Lista
                 </button>
                 <button class="btn btn-secondary" id="btn-close-actuacion-detail-footer">Cerrar</button>
             </div>
         </div>
     </div>
 
+    <!-- Modal: Repertorio de Actuación -->
+    <div id="modal-actuacion-repertoire" class="modal-overlay">
+        <div class="modal-card" style="max-width: 780px; width: 94vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+            <div class="modal-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+                <div>
+                    <h3 id="actuacion-repertoire-title" style="margin: 0; font-size: 1.05rem;">Repertorio de la Actuación</h3>
+                    <p id="actuacion-repertoire-subtitle" class="text-muted" style="margin: 2px 0 0; font-size: 0.78rem;"></p>
+                </div>
+                <button class="modal-close" id="btn-close-actuacion-repertoire">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 12px 16px; overflow: hidden; flex: 1; min-height: 0; display: flex; gap: 10px; box-sizing: border-box;">
+                <!-- Columna 1: banco de marchas -->
+                <div style="flex: 0 0 170px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
+                    <h4 style="margin: 0; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Banco de Marchas</h4>
+                    <input type="text" id="actuacion-repertoire-search" placeholder="Buscar..." style="width: 100%; box-sizing: border-box; padding: 5px 7px; font-size: 0.75rem; border-radius: 5px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary);">
+                    <div id="actuacion-repertoire-search-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 3px;">
+                        <!-- Marchas disponibles, arrastrables -->
+                    </div>
+                </div>
+                <!-- Columnas 2 y 3: repertorio ordenado, con scroll vertical compartido -->
+                <div style="flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
+                    <h4 style="margin: 0; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Orden del Repertorio</h4>
+                    <div style="flex: 1; min-height: 0; overflow-y: auto; display: flex; gap: 8px; border: 1px dashed var(--border-color); border-radius: 6px; padding: 6px; box-sizing: border-box;">
+                        <div id="actuacion-repertoire-ordered-list-col1" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;"></div>
+                        <div id="actuacion-repertoire-ordered-list-col2" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 10px 16px; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
+                <span class="text-muted" style="font-size: 0.72rem;">Los cambios se guardan automáticamente.</span>
+                <button class="btn btn-secondary" id="btn-close-actuacion-repertoire-footer">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Configuración de Firebase -->
     <div id="modal-firebase-config" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-card" style="max-width: 486px;">
             <div class="modal-header">
                 <h3>Configuración de Firebase</h3>
                 <button class="modal-close" id="btn-close-firebase-modal">
@@ -2547,12 +3484,9 @@
             <div class="period-filter-card" style="margin: 0 0 16px; padding: 12px 16px;">
                 <div class="filter-controls" style="gap: 10px;">
                     <div class="filter-control-group">
-                        <label for="detail-filter-year">Año</label>
+                        <label for="detail-filter-year">Temporada</label>
                         <select id="detail-filter-year" class="filter-select">
-                            <option value="all">Todos</option>
-                            <option value="2025">2025</option>
-                            <option value="2026" selected>2026</option>
-                            <option value="2027">2027</option>
+                            <option value="all" selected>Todas</option>
                         </select>
                     </div>
                     <div class="filter-control-group">
@@ -2616,6 +3550,26 @@
                 </div>
                 <div id="detail-breakdown" style="flex: 1; font-size: 0.9rem; line-height: 1.8;">
                     <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Gráfico de Evolución Temporal Mensual -->
+            <div class="card" style="padding: 16px; margin-bottom: 16px;">
+                <h3 style="font-size: 0.95rem; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px;">
+                    📈 Evolución Temporal Mensual
+                </h3>
+                <div id="detail-monthly-chart-container" style="width: 100%;">
+                    <!-- Renderizado dinámico desde JS -->
+                </div>
+            </div>
+
+            <!-- Panel de Períodos de Baja -->
+            <div class="card" id="detail-musician-leaves-card" style="padding: 16px; margin-bottom: 16px;">
+                <h3 style="font-size: 0.95rem; margin: 0 0 14px 0; display: flex; align-items: center; gap: 8px; color: var(--text-color);">
+                    <span>🗓️</span> Períodos de baja
+                </h3>
+                <div id="detail-musician-leaves-container" style="width: 100%;">
+                    <!-- Renderizado dinámico desde JS -->
                 </div>
             </div>
 
@@ -2776,12 +3730,9 @@
             <div class="period-filter-card" style="margin: 0 0 16px; padding: 12px 16px;">
                 <div class="filter-controls" style="gap: 10px;">
                     <div class="filter-control-group">
-                        <label for="voice-filter-year">Año</label>
+                        <label for="voice-filter-year">Temporada</label>
                         <select id="voice-filter-year" class="filter-select">
-                            <option value="all">Todos</option>
-                            <option value="2025">2025</option>
-                            <option value="2026" selected>2026</option>
-                            <option value="2027">2027</option>
+                            <option value="all" selected>Todas</option>
                         </select>
                     </div>
                     <div class="filter-control-group">
@@ -2987,6 +3938,48 @@
             </div>
         </div>
     </div>
+    <!-- Modal: Detalle de un Compañero (desde Top 25 Asistencia) -->
+    <div id="modal-peer-detail" class="modal-overlay">
+        <div class="modal-card" style="max-width: 420px; width: 92%; text-align: center; padding: 24px; position: relative;">
+            <button class="modal-close" id="btn-close-peer-detail" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <div id="peer-detail-avatar" class="profile-avatar" style="margin: 0 auto 14px auto; cursor: pointer;" title="Ver foto en grande">
+                <span id="peer-detail-avatar-letters">--</span>
+                <img id="peer-detail-avatar-img" src="" alt="Foto de perfil" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+            </div>
+
+            <h3 id="peer-detail-name" style="margin: 0 0 4px 0; color: var(--text-primary); font-size: 1.15rem;">Nombre del Músico</h3>
+            <p id="peer-detail-instrument" class="text-muted" style="margin: 0 0 18px 0; font-size: 0.85rem;">Instrumento • Rol</p>
+
+            <div class="stat-circle-progress" id="peer-detail-progress-circle" style="margin: 0 auto 14px auto;">
+                <svg viewBox="0 0 36 36" class="circular-chart gold">
+                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path class="circle" id="peer-detail-progress-path" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <text x="18" y="20.35" class="percentage" id="peer-detail-percentage-text">0%</text>
+                </svg>
+            </div>
+            <div class="text-muted" style="font-size: 0.8rem; margin-bottom: 16px;">Asistencia General</div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <span style="font-size: 1.3rem;">🔥</span>
+                    <span id="peer-detail-streak" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">0</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">Racha</span>
+                </div>
+                <div style="flex: 1; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <span style="font-size: 1.3rem;">🏅</span>
+                    <span id="peer-detail-badges" style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">0</span>
+                    <span class="text-muted" style="font-size: 0.72rem;">Insignias</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Detalle de Ensayo / Actuación para Músicos -->
     <div id="modal-comp-rehearsal-detail" class="modal-overlay">
         <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 90vh; overflow-y: auto;">
@@ -3013,12 +4006,12 @@
                     </div>
                 </div>
 
-                <!-- Sección de Marchas Tocadas -->
+                <!-- Sección de Marchas Tocadas / Repertorio -->
                 <div>
-                    <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; font-family: 'Outfit', sans-serif; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                        <span>🎶</span> Marchas Ensayadas / Tocadas
+                    <h4 id="comp-rehearsal-detail-marchas-title" style="margin: 0 0 10px 0; font-size: 0.95rem; font-family: 'Outfit', sans-serif; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <span>🎶</span> <span id="comp-rehearsal-detail-marchas-label">Marchas Ensayadas / Tocadas</span>
                     </h4>
-                    <div id="comp-rehearsal-detail-marchas" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div id="comp-rehearsal-detail-marchas" style="display: flex; flex-direction: column; gap: 5px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
                         <!-- Rellenado dinámicamente por JS -->
                     </div>
                 </div>
@@ -3032,7 +4025,7 @@
 
     <!-- Modal: Detalle de Próximo Evento para Músicos -->
     <div id="modal-comp-upcoming-event-detail" class="modal-overlay">
-        <div class="modal-card" style="max-width: 480px; width: 92%; padding: 24px; position: relative;">
+        <div class="modal-card" style="max-width: 460px; width: 92%; max-height: 90vh; overflow-y: auto; padding: 20px; position: relative;">
             <button class="modal-close" id="btn-close-upcoming-event-detail" style="position: absolute; top: 16px; right: 16px;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -3041,32 +4034,43 @@
             </button>
             
             <!-- 1. Título del Ensayo / Evento -->
-            <h3 id="upcoming-event-detail-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.3rem; line-height: 1.25;">Ensayo de Banda</h3>
+            <h3 id="upcoming-event-detail-title" style="margin: 0 0 14px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.25rem; line-height: 1.25;">Ensayo de Banda</h3>
             
             <!-- 2. Especificaciones del Evento (Fecha, Hora, Lugar, Convocados) -->
-            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px;">
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📅</div>
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">📅</div>
                     <div>
-                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Fecha</div>
-                        <div id="upcoming-event-detail-date" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Viernes, 14 de Marzo de 2026</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Fecha</div>
+                        <div id="upcoming-event-detail-date" style="font-size: 0.92rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Viernes, 14 de Marzo de 2026</div>
                     </div>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">⏰</div>
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">⏰</div>
                     <div>
-                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Hora</div>
-                        <div id="upcoming-event-detail-time" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">21:00 h</div>
+                        <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Hora</div>
+                        <div id="upcoming-event-detail-time" style="font-size: 0.92rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">21:00 h</div>
                     </div>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">📍</div>
-                    <div>
-                        <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Lugar</div>
-                        <div id="upcoming-event-detail-location" style="font-size: 0.95rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Parking de la Sede</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">📍</div>
+                        <div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Lugar</div>
+                            <div id="upcoming-event-detail-location" style="font-size: 0.92rem; color: var(--text-primary); font-weight: 600; margin-top: 1px;">Parking de la Sede</div>
+                        </div>
                     </div>
+                    <a id="upcoming-event-detail-maps-btn" href="#" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-secondary); font-size: 0.76rem; font-weight: 600; text-decoration: none; transition: all 0.2s ease;" title="Abrir ubicación en Google Maps">
+                        <span>🗺️</span>
+                        <span>Cómo llegar</span>
+                    </a>
+                </div>
+
+                <!-- Previsualización de Imagen del Lugar de Ensayo (Centrada y Compacta) -->
+                <div id="upcoming-event-detail-map-box" class="hidden" style="width: 100%; display: flex; justify-content: center; margin: 4px 0 2px 0;">
+                    <div id="upcoming-event-detail-map-content" style="width: 140px; height: 140px; border-radius: 14px; overflow: hidden; border: 2px solid var(--color-gold); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); background: rgba(0, 0, 0, 0.4); flex-shrink: 0;"></div>
                 </div>
 
                 <div id="upcoming-event-detail-convocated-box" class="hidden" style="display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
@@ -3097,7 +4101,7 @@
 
     <!-- Modal: Seleccionar Evento cuando hay Múltiples el mismo día -->
     <div id="modal-comp-multi-event-select" class="modal-overlay">
-        <div class="modal-card" style="max-width: 440px; width: 92%; padding: 24px; position: relative;">
+        <div class="modal-card" style="max-width: 440px; width: 92%; padding: 22px 18px; position: relative; box-sizing: border-box;">
             <button class="modal-close" id="btn-close-multi-event-select" style="position: absolute; top: 16px; right: 16px;">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -3106,7 +4110,7 @@
             </button>
             
             <h3 style="margin: 0 0 6px 0; font-family: 'Cinzel', serif; color: var(--color-gold); font-size: 1.25rem;">Eventos de este día</h3>
-            <p id="multi-event-select-date-subtitle" style="margin: 0 0 16px 0; font-size: 0.84rem; color: var(--text-muted);">Selecciona el evento que deseas consultar:</p>
+            <p id="multi-event-select-date-subtitle" style="margin: 0 0 16px 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.4; word-break: break-word;">Selecciona el evento que deseas consultar:</p>
             
             <div id="multi-event-select-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
                 <!-- Inyectado dinámicamente -->
@@ -3212,6 +4216,7 @@
             </svg>
             <span>Repertorio</span>
         </a>
+
         <a href="#" class="mobile-nav-item btn-logout-component" style="color: var(--color-absent);">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -3222,13 +4227,44 @@
         </a>
     </nav>
 
-    <script src="app.js?v=348"></script>
+    <!-- Modal Drawer Menú Lateral del Músico -->
+    <div id="modal-musician-drawer" class="modal-overlay modal-drawer-overlay">
+        <div class="musician-drawer-content">
+            <div class="musician-drawer-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="icons/escudo.png" alt="Escudo Yacente" style="width: 28px; height: 28px; object-fit: contain;">
+                    <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--color-gold);">Menú Yacente</h3>
+                </div>
+                <button class="modal-close" id="btn-close-musician-drawer" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            <div class="musician-drawer-body">
+
+                <a href="#" class="drawer-item drawer-item-sugerencias" data-target="section-componente-sugerencias">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+                    <span>Sugerencias</span>
+                </a>
+                <a href="#" class="drawer-item drawer-item-ajustes" data-target="section-componente-ajustes">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Ajustes</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botón flotante volver arriba para Estadísticas -->
+    <button id="btn-back-to-top" class="btn-back-to-top hidden" title="Volver arriba" aria-label="Volver arriba">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
+
+    <script src="app.js?v=520"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=348
+        // Purga de caché antigua y registro del Service Worker v=520
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v348") {
+                    if (key !== "yacente-v520") {
                         caches.delete(key);
                     }
                 });
@@ -3240,20 +4276,16 @@
                     registration.update();
                 }
             });
+            let swRefreshing = false;
+            navigator.serviceWorker.addEventListener("controllerchange", () => {
+                if (swRefreshing) return;
+                swRefreshing = true;
+                window.location.reload();
+            });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=348")
+                navigator.serviceWorker.register("sw.js?v=520")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v348 registrado correctamente:", registration);
-                        registration.onupdatefound = () => {
-                            const installingWorker = registration.installing;
-                            if (installingWorker) {
-                                installingWorker.onstatechange = () => {
-                                    if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        window.location.reload();
-                                    }
-                                };
-                            }
-                        };
+                        console.log("[PWA] Service Worker v520 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
