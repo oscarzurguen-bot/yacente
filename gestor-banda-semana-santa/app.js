@@ -15641,13 +15641,17 @@ function renderComponenteCalendario() {
                 dayCell.classList.add("has-actuacion");
             }
 
-            // Añadir manejador de click para abrir el modal correspondiente
+            // Añadir manejador de click para abrir el modal correspondiente. Con una sola sesión
+            // hay que abrir por su propia clave (session.key), no por dateKey: si esa sesión tiene
+            // clave sufijada (p.ej. "2026-09-03_voces", el caso de un segundo ensayo el mismo
+            // día), state.sessionTypes[dateKey] no existe y el modal se abriría vacío/incorrecto.
             dayCell.addEventListener("click", () => {
                 if (daySessions.length === 1) {
+                    const sessionKey = daySessions[0].key;
                     if (isPastDay) {
-                        openCompRehearsalDetailModal(dateKey);
+                        openCompRehearsalDetailModal(sessionKey);
                     } else {
-                        openUpcomingEventDetailModal(dateKey);
+                        openUpcomingEventDetailModal(sessionKey);
                     }
                 } else {
                     openMultiEventSelectModal(dateKey, daySessions, isPastDay);
@@ -15665,9 +15669,14 @@ function renderComponenteCalendario() {
                     labelText = "voz";
                 }
 
-                // Determinar estado de preaviso o asistencia para la clase de color
+                // Determinar estado de preaviso o asistencia para la clase de color. OJO: hay que
+                // usar session.key (no dateKey) para buscar en attendance — si ese día hay más de
+                // una sesión, la segunda se guarda con una clave sufijada (p.ej.
+                // "2026-09-03_voces") y su asistencia vive bajo esa misma clave, no bajo la fecha
+                // "plana". Usar dateKey aquí hacía que la etiqueta cayera siempre en "pending"
+                // (gris) para cualquier sesión sufijada, aunque el músico ya hubiera hecho preaviso.
                 let badgeClass = "pending";
-                const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+                const record = (state.attendance && state.attendance[session.key]) ? state.attendance[session.key][musicianId] : null;
                 const isExplicitPreaviso = record && (record.preaviso === true || record.isPreaviso === true || record.status === "present" || record.justified === true || (record.reason && record.reason.trim().length > 0));
 
                 if (isExplicitPreaviso) {
@@ -15819,7 +15828,10 @@ function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
             labelText = "voz";
         }
 
-        const record = (state.attendance && state.attendance[dateKey]) ? state.attendance[dateKey][musicianId] : null;
+        // Usar session.key (no dateKey): con varias sesiones el mismo día, la segunda se guarda
+        // bajo una clave sufijada (p.ej. "2026-09-03_voces"), y su asistencia vive ahí, no bajo
+        // la fecha "plana".
+        const record = (state.attendance && state.attendance[session.key]) ? state.attendance[session.key][musicianId] : null;
 
         if (record) {
             if (record.status === "present") {
@@ -15846,10 +15858,13 @@ function openMultiEventSelectModal(dateKey, daySessions, isPastDay) {
 
         btn.addEventListener("click", () => {
             modal.classList.remove("active");
+            // Abrir por session.key, no por dateKey: si no, pulsar cualquiera de las sesiones de
+            // este día siempre abría la que tuviera la clave "plana" (normalmente la primera
+            // creada ese día), ignorando en cuál se había hecho clic realmente.
             if (isPastDay) {
-                openCompRehearsalDetailModal(dateKey);
+                openCompRehearsalDetailModal(session.key);
             } else {
-                openUpcomingEventDetailModal(dateKey);
+                openUpcomingEventDetailModal(session.key);
             }
         });
 
