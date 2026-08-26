@@ -15244,46 +15244,147 @@ function setupUpcomingEventDetailEvents() {
             }
         });
     }
+
+    const btnExportCalendar = document.getElementById("btn-export-calendar");
+    if (btnExportCalendar) {
+        btnExportCalendar.addEventListener("click", exportUpcomingEventsToICS);
+    }
+}
+
+// Fechas de hoy en adelante en las que un músico concreto está convocado. Solo sessionTypes es
+// la fuente fiable de eventos reales: un ensayo/actuación siempre crea su entrada en sessionTypes
+// a la vez que en attendance (ver creación de ensayos), pero attendance puede tener una entrada
+// vacía "huérfana" para hoy generada localmente por initializeAttendanceForDate() en dispositivos
+// sin sincronización con la nube activa. Si se incluyera attendance aquí, esa entrada huérfana se
+// mostraría como un "Ensayo General" fantasma que no existe para nadie más.
+// Usada tanto por renderComponentEventos() como por exportUpcomingEventsToICS() para que la lista
+// que se ve y la que se exporta sean siempre exactamente la misma.
+function getUpcomingEventDatesForMusician(musician) {
+    const dNow = new Date();
+    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
+
+    return Object.keys(state.sessionTypes)
+        .filter(date => {
+            if (date < todayStr) return false;
+
+            const session = state.sessionTypes[date];
+            const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
+            if (isSpecialRehearsal && !session.convocatedVoices.includes(musician.instrument)) {
+                return false;
+            }
+            return true;
+        })
+        .sort((a, b) => a.localeCompare(b));
+}
+
+function getSessionTypeLabelPlain(session) {
+    if (session.type !== "ensayo") return "Actuación";
+    const labels = {
+        general: "General",
+        trompetas1: "Trompetas 1ª",
+        bajos: "Bajos",
+        trompetas2y3: "Trompetas 2ª y 3ª",
+        cornetas: "Cornetas",
+        percusion: "Percusión",
+        voces: "Voces",
+        primeras: "Primeras"
+    };
+    return labels[session.subtype || "general"] || "Ensayo";
+}
+
+function escapeICSText(str) {
+    return String(str || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/;/g, "\\;")
+        .replace(/,/g, "\\,")
+        .replace(/\n/g, "\\n");
+}
+
+function exportUpcomingEventsToICS() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+    const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+    if (!musician) return;
+
+    const dates = getUpcomingEventDatesForMusician(musician);
+    if (dates.length === 0) {
+        showToast("No hay eventos próximos para exportar.", "warning");
+        return;
+    }
+
+    const nowStamp = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Yacente//Gestor de Banda//ES", "CALSCALE:GREGORIAN"];
+
+    dates.forEach(date => {
+        const session = state.sessionTypes[date];
+        const typeLabel = getSessionTypeLabelPlain(session);
+        const title = (session.name && session.name.trim())
+            ? session.name.trim()
+            : (session.type === "ensayo" ? `Ensayo ${typeLabel}` : "Actuación Oficial");
+        const location = session.location || (session.type === "ensayo" ? "Parking" : "");
+        const rawDate = date.split("_")[0]; // la clave puede llevar sufijo de subtipo (ej. "2026-08-26_voces")
+        const dateDigits = rawDate.replace(/-/g, "");
+
+        let dtStartLine, dtEndLine;
+        if (session.time && /^\d{1,2}:\d{2}$/.test(session.time)) {
+            const [h, m] = session.time.split(":");
+            const hh = h.padStart(2, "0");
+            const startDate = new Date(`${rawDate}T${hh}:${m}:00`);
+            const endDate = new Date(startDate.getTime());
+            endDate.setHours(endDate.getHours() + 2); // Duración por defecto: 2 horas
+            const fmt = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}00`;
+            dtStartLine = `DTSTART:${fmt(startDate)}`;
+            dtEndLine = `DTEND:${fmt(endDate)}`;
+        } else {
+            // Sin hora conocida: evento de día completo
+            const endDate = new Date(`${rawDate}T00:00:00`);
+            endDate.setDate(endDate.getDate() + 1);
+            const endDigits = `${endDate.getFullYear()}${String(endDate.getMonth() + 1).padStart(2, '0')}${String(endDate.getDate()).padStart(2, '0')}`;
+            dtStartLine = `DTSTART;VALUE=DATE:${dateDigits}`;
+            dtEndLine = `DTEND;VALUE=DATE:${endDigits}`;
+        }
+
+        ics.push("BEGIN:VEVENT");
+        ics.push(`UID:yacente-${date}-${musicianId}@yacente.app`);
+        ics.push(`DTSTAMP:${nowStamp}`);
+        ics.push(dtStartLine);
+        ics.push(dtEndLine);
+        ics.push(`SUMMARY:${escapeICSText(title)}`);
+        if (location) ics.push(`LOCATION:${escapeICSText(location)}`);
+        ics.push(`DESCRIPTION:${escapeICSText(typeLabel + " - Yacente")}`);
+        ics.push("END:VEVENT");
+    });
+
+    ics.push("END:VCALENDAR");
+
+    const blob = new Blob([ics.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "yacente-ensayos.ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast("Calendario exportado. Impórtalo en Google Calendar desde Ajustes ⚙️ > Importar y exportar > Importar.", "success");
 }
 
 function renderComponentEventos() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
-    
+
     const musician = state.musicians.find(m => String(m.id) === String(musicianId));
     if (!musician) return;
-    
 
-    
+
+
     const container = document.getElementById("componente-eventos-lista");
     if (!container) return;
     container.innerHTML = "";
-    
-    const dNow = new Date();
-    const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    // Solo sessionTypes es la fuente fiable de eventos reales: un ensayo/actuación siempre
-    // crea su entrada en sessionTypes al mismo tiempo que en attendance (ver creación de
-    // ensayos), pero attendance puede tener una entrada vacía "huérfana" para hoy generada
-    // localmente por initializeAttendanceForDate() en dispositivos sin sincronización con la
-    // nube activa. Si se incluyera attendance aquí, esa entrada huérfana se mostraría como un
-    // "Ensayo General" fantasma que no existe para nadie más.
-    const allUniqueDates = Object.keys(state.sessionTypes);
+    const dates = getUpcomingEventDatesForMusician(musician);
 
-    // Obtener todas las fechas de hoy y futuras en las que el músico está convocado
-    const allFutureDates = allUniqueDates.filter(date => {
-        if (date < todayStr) return false;
-
-        const session = state.sessionTypes[date];
-        const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
-        if (isSpecialRehearsal && !session.convocatedVoices.includes(musician.instrument)) {
-            return false;
-        }
-        return true;
-    });
-        
-    const dates = allFutureDates.sort((a, b) => a.localeCompare(b));
-        
     if (dates.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="padding: 30px 10px; text-align: center;">
