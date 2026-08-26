@@ -15609,42 +15609,11 @@ function renderComponenteCalendario() {
     const todayDay = today.getDate();
     const todayDateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    // Array para acumular las celdas de días
-    const cells = [];
-
-    // 1. Días del mes anterior (relleno)
-    let prevYear = year;
-    let prevMonth = month - 1;
-    if (prevMonth === -1) {
-        prevMonth = 11;
-        prevYear--;
-    }
-    for (let i = startingDay - 1; i >= 0; i--) {
-        const dayNum = prevMonthTotalDays - i;
-        const dayCell = document.createElement("div");
-        dayCell.className = "comp-calendar-day-card other-month";
-        dayCell.innerHTML = `<span class="comp-calendar-day-number">${dayNum}</span>`;
-        cells.push(dayCell);
-    }
-
-    // 2. Días del mes actual
-    for (let day = 1; day <= totalDays; day++) {
-        const dayCell = document.createElement("div");
-        dayCell.className = "comp-calendar-day-card";
-        
-        const monthStr = String(month + 1).padStart(2, '0');
-        const dayStr = String(day).padStart(2, '0');
-        const dateKey = `${year}-${monthStr}-${dayStr}`;
-        
-        dayCell.setAttribute("data-date", dateKey);
-        
-        if (isThisMonth && day === todayDay) {
-            dayCell.classList.add("today");
-        }
-
-        dayCell.innerHTML = `<span class="comp-calendar-day-number">${day}</span>`;
-
-        // Buscar todas las sesiones creadas para este día en las que el músico esté convocado
+    // Rellena una celda de día (evento, badges y clic) para que los días de relleno del mes
+    // anterior/siguiente se comporten exactamente igual que los del mes que se está viendo — así
+    // un evento el 1 de septiembre es visible y clicable aunque se esté viendo agosto, sin tener
+    // que cambiar de mes.
+    const attachCompCalendarDaySessions = (dayCell, dateKey) => {
         const daySessions = Object.keys(state.sessionTypes)
             .filter(key => key.startsWith(dateKey))
             .map(key => ({ key, ...state.sessionTypes[key] }))
@@ -15661,6 +15630,10 @@ function renderComponenteCalendario() {
 
         if (daySessions.length > 0) {
             const isPastDay = dateKey < todayDateKey;
+
+            // Los días de relleno (other-month) están atenuados y sin clic por defecto (ver CSS);
+            // esta clase los reactiva solo cuando tienen algún evento.
+            dayCell.classList.add("has-events");
 
             // Si hay alguna actuación en el día, se resalta la celda en verde
             const hasActuacion = daySessions.some(s => s.type === "actuacion");
@@ -15683,7 +15656,7 @@ function renderComponenteCalendario() {
 
             daySessions.forEach(session => {
                 const badge = document.createElement("span");
-                
+
                 // Determinar texto de la etiqueta rectangular
                 let labelText = "general";
                 if (session.type === "actuacion") {
@@ -15719,17 +15692,67 @@ function renderComponenteCalendario() {
         }
 
         dayCell.appendChild(indicatorContainer);
+    };
+
+    // Array para acumular las celdas de días
+    const cells = [];
+
+    // 1. Días del mes anterior (relleno)
+    let prevYear = year;
+    let prevMonth = month - 1;
+    if (prevMonth === -1) {
+        prevMonth = 11;
+        prevYear--;
+    }
+    for (let i = startingDay - 1; i >= 0; i--) {
+        const dayNum = prevMonthTotalDays - i;
+        const dayCell = document.createElement("div");
+        dayCell.className = "comp-calendar-day-card other-month";
+        const dateKey = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+        dayCell.setAttribute("data-date", dateKey);
+        dayCell.innerHTML = `<span class="comp-calendar-day-number">${dayNum}</span>`;
+        attachCompCalendarDaySessions(dayCell, dateKey);
+        cells.push(dayCell);
+    }
+
+    // 2. Días del mes actual
+    for (let day = 1; day <= totalDays; day++) {
+        const dayCell = document.createElement("div");
+        dayCell.className = "comp-calendar-day-card";
+
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dayStr = String(day).padStart(2, '0');
+        const dateKey = `${year}-${monthStr}-${dayStr}`;
+
+        dayCell.setAttribute("data-date", dateKey);
+
+        if (isThisMonth && day === todayDay) {
+            dayCell.classList.add("today");
+        }
+
+        dayCell.innerHTML = `<span class="comp-calendar-day-number">${day}</span>`;
+
+        attachCompCalendarDaySessions(dayCell, dateKey);
 
         cells.push(dayCell);
     }
 
     // 3. Días del mes siguiente (relleno)
+    let nextYear = year;
+    let nextMonth = month + 1;
+    if (nextMonth === 12) {
+        nextMonth = 0;
+        nextYear++;
+    }
     const gridCellCount = cells.length;
     const paddingNeeded = 42 - gridCellCount;
     for (let day = 1; day <= paddingNeeded; day++) {
         const dayCell = document.createElement("div");
         dayCell.className = "comp-calendar-day-card other-month";
+        const dateKey = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dayCell.setAttribute("data-date", dateKey);
         dayCell.innerHTML = `<span class="comp-calendar-day-number">${day}</span>`;
+        attachCompCalendarDaySessions(dayCell, dateKey);
         cells.push(dayCell);
     }
 

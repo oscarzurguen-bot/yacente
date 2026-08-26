@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=524">
+    <link rel="stylesheet" href="style.css?v=525">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -4269,13 +4269,13 @@
         </svg>
     </button>
 
-    <script src="app.js?v=524"></script>
+    <script src="app.js?v=525"></script>
     <script>
-        // Purga de caché antigua y registro del Service Worker v=524
+        // Purga de caché antigua y registro del Service Worker v=525
         if ("caches" in window) {
             caches.keys().then(keys => {
                 keys.forEach(key => {
-                    if (key !== "yacente-v524") {
+                    if (key !== "yacente-v525") {
                         caches.delete(key);
                     }
                 });
@@ -4294,9 +4294,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=524")
+                navigator.serviceWorker.register("sw.js?v=525")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v524 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v525 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
