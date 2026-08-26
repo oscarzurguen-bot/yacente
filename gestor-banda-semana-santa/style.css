@@ -4299,20 +4299,16 @@ body.component-portal #candle-tribute-container {
     box-shadow: 0 0 10px rgba(212, 175, 55, 0.15);
 }
 .comp-calendar-day-card.other-month {
+    opacity: 0.25;
     cursor: default;
     pointer-events: none;
 }
-/* El número del día se mantiene atenuado para distinguir el mes, pero si el día tiene algún
-   evento (has-events, añadida por JS) las etiquetas se ven a opacidad normal y el día vuelve a
-   ser clicable — antes toda la celda bajaba a 0.25 de opacidad y quedaba con pointer-events:none,
-   así que un evento el 1 de septiembre era invisible/inaccesible viendo el calendario de agosto. */
-.comp-calendar-day-card.other-month .comp-calendar-day-number {
-    opacity: 0.35;
-}
-.comp-calendar-day-card.other-month:not(.has-events) {
-    opacity: 0.25;
-}
+/* Si el día de relleno tiene algún evento (has-events, añadida por JS), se ve y es clicable, pero
+   se mantiene atenuado (más que un día normal, menos que uno sin eventos) para distinguir a
+   simple vista que pertenece a otro mes — antes un evento el 1 de septiembre quedaba invisible/
+   inaccesible del todo viendo el calendario de agosto. */
 .comp-calendar-day-card.other-month.has-events {
+    opacity: 0.55;
     pointer-events: auto;
     cursor: pointer;
 }
