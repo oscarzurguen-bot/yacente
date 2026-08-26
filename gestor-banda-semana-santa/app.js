@@ -5055,6 +5055,12 @@ function getSessionPrevision(date) {
         if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
             return;
         }
+        // Excluir músicos en baja temporal en esta fecha (mismo criterio que en el resto de
+        // cálculos de asistencia): si no, la previsión cuenta de más y el porcentaje estimado
+        // sale más bajo de lo real.
+        if (isMusicianOnLeaveOnDate(m, date)) {
+            return;
+        }
 
         totalConvocated++;
         const voice = m.instrument || "Otros";
@@ -5423,6 +5429,11 @@ function renderActuacionesList() {
         let total = 0;
 
         state.musicians.forEach(m => {
+            // Excluir músicos en baja temporal en esta fecha (mismo criterio que en
+            // renderEnsayosList y el resto de cálculos de asistencia).
+            if (isMusicianOnLeaveOnDate(m, date)) {
+                return;
+            }
             total++;
             const r = dayRecord ? dayRecord[m.id] : null;
             if (r) {
@@ -5572,6 +5583,11 @@ function openActuacionDetailModal(date) {
 
     const musiciansList = (state && state.musicians) || [];
     musiciansList.forEach(m => {
+        // Excluir músicos en baja temporal en esta fecha (mismo criterio que en
+        // openRehearsalDetailModal y el resto de cálculos de asistencia).
+        if (isMusicianOnLeaveOnDate(m, date)) {
+            return;
+        }
         const r = dayRecord ? dayRecord[m.id] : null;
         if (!r) return;
 
@@ -6452,6 +6468,13 @@ function renderStatistics() {
         const dayRecord = state.attendance[date] || {};
         
         state.musicians.forEach(m => {
+            // De baja ese día: no cuenta ni a favor ni en contra, ni en las estadísticas
+            // individuales de este músico ni en las globales de la banda. Antes este chequeo
+            // estaba después de sumar a musicianStats[m.id], así que solo protegía los totales
+            // globales — los propios días de baja de un músico sí contaban como falta en su
+            // ficha/ranking individual, dando un número distinto al del resto de la app.
+            if (isMusicianOnLeaveOnDate(m, date)) return;
+
             const record = dayRecord[m.id];
             if (!record) return;
 
@@ -6468,9 +6491,6 @@ function renderStatistics() {
                     musicianStats[m.id].lastReason = record.reason;
                 }
             }
-
-            // Excluir de las estadísticas globales de la banda si estaba de baja temporal en esta fecha
-            if (isMusicianOnLeaveOnDate(m, date)) return;
 
             totalPresenceCheck++;
 
@@ -6865,6 +6885,10 @@ function renderStatsStreaks(filteredDates) {
         let streak = 0;
         for (let i = 0; i < rehearsalDates.length; i++) {
             const date = rehearsalDates[i];
+            // De baja ese día: no cuenta ni a favor ni en contra, ni rompe la racha (mismo
+            // criterio que computeMusicianStreak, usado en la ficha individual del músico) —
+            // si no, este widget puede mostrar una racha distinta a la de su propia ficha.
+            if (isMusicianOnLeaveOnDate(m, date)) continue;
             const dayRecord = state.attendance[date];
             const record = dayRecord ? dayRecord[m.id] : null;
             if (record && record.status === "present") {
@@ -6986,6 +7010,9 @@ function renderStatsRanking(filteredDates) {
         let streak = 0;
         for (let i = 0; i < rehearsalDates.length; i++) {
             const date = rehearsalDates[i];
+            // De baja ese día: no cuenta ni rompe la racha (mismo criterio que
+            // computeMusicianStreak/renderStatsStreaks).
+            if (isMusicianOnLeaveOnDate(m, date)) continue;
             const dayRecord = state.attendance[date];
             const record = dayRecord ? dayRecord[musicianId] : null;
             if (record && record.status === "present") {
@@ -7668,6 +7695,9 @@ function renderMusicianDetailContent() {
     // Filtrar fechas pasadas y aplicables al filtro del modal
     const filteredDates = allDates.filter(dateStr => {
         if (!isSessionConcluded(dateStr)) return false; // Excluir sesiones no concluidas de las estadísticas
+        // De baja en esa fecha: no cuenta ni a favor ni en contra de este músico (igual que
+        // computeMusicianStreak). Si no, sus propios días de baja le salen como falta en su ficha.
+        if (isMusicianOnLeaveOnDate(musician, dateStr)) return false;
 
         // dateStr puede llevar sufijo (sesiones múltiples/especiales el mismo día): quitarlo antes
         // de parsear la fecha, si no new Date(...) da Invalid Date y el mes sale NaN.
@@ -8080,7 +8110,13 @@ function downloadMusicianPDFReport() {
     const typeFilter = document.getElementById("detail-filter-type").value;
 
     const allDates = Object.keys(state.attendance);
+    // Mismos filtros que renderMusicianDetailContent (la ficha en pantalla), para que el PDF
+    // descargado no dé un porcentaje distinto al que se ve en la app: excluir sesiones aún no
+    // concluidas y los días en los que este músico estuvo de baja.
     const filteredDates = allDates.filter(dateStr => {
+        if (!isSessionConcluded(dateStr)) return false;
+        if (isMusicianOnLeaveOnDate(musician, dateStr)) return false;
+
         const dateObj = new Date(dateStr);
         const month = dateObj.getMonth().toString();
 
@@ -8183,9 +8219,6 @@ function downloadMusicianPDFReport() {
     const filterTextType = typeFilter === "all" ? "Ensayos y Actuaciones" : (typeFilter === "ensayo" ? "Solo Ensayos" : "Solo Actuaciones");
 
     // Calcular datos de evolución mensual para el informe impreso
-    const todayPrint = new Date();
-    const todayStrPrint = `${todayPrint.getFullYear()}-${String(todayPrint.getMonth() + 1).padStart(2, '0')}-${String(todayPrint.getDate()).padStart(2, '0')}`;
-
     const seasonMonthsPrint = getSeasonMonthsArray(yearFilter === "all" ? getCurrentSeasonLabel() : yearFilter);
 
     const monthlyDataForPrint = seasonMonthsPrint.map(sm => {
@@ -8193,12 +8226,17 @@ function downloadMusicianPDFReport() {
         let total = 0;
 
         Object.keys(state.attendance).forEach(dateStr => {
-            if (dateStr > todayStrPrint) return;
+            // Mismo criterio que el resto del informe (isSessionConcluded), no solo "fecha <= hoy":
+            // si no, el ensayo de hoy (aún sin concluir, con su registro por defecto) contaba aquí
+            // aunque el resumen principal del PDF ya lo excluyera, dando porcentajes distintos
+            // dentro del mismo documento.
+            if (!isSessionConcluded(dateStr)) return;
             const dateParts = dateStr.split("-");
             const y = dateParts[0];
             const m = parseInt(dateParts[1], 10);
 
             if (y === sm.year && m === sm.monthNum) {
+                if (isMusicianOnLeaveOnDate(musician, dateStr)) return;
                 const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
                 if (typeFilter !== "all" && sessionType !== typeFilter) return;
 
@@ -8570,6 +8608,7 @@ function downloadSeasonPDFReport(selectedSeason) {
 
     const allDates = Object.keys(state.attendance);
     const seasonDates = allDates.filter(date => {
+        if (!isSessionConcluded(date)) return false; // Igual que renderStatistics: no contar la sesión de hoy si aún no ha concluido
         const parts = date.split("-");
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
@@ -8618,6 +8657,10 @@ function downloadSeasonPDFReport(selectedSeason) {
     seasonDates.forEach(date => {
         const dayRecord = state.attendance[date] || {};
         state.musicians.forEach(m => {
+            // De baja ese día: no cuenta ni a favor ni en contra (mismo criterio que
+            // computeMusicianAttendanceMetrics, ya usado más abajo en el ranking de este mismo
+            // PDF) — si no, esta sección del informe da un número distinto al del ranking.
+            if (isMusicianOnLeaveOnDate(m, date)) return;
             const r = dayRecord[m.id];
             if (r) {
                 const stats = musicianStats[m.id];
@@ -8684,6 +8727,7 @@ function downloadSeasonPDFReport(selectedSeason) {
             dayStats[dayIdx].sessions++;
             const dayRecord = state.attendance[date] || {};
             state.musicians.forEach(m => {
+                if (isMusicianOnLeaveOnDate(m, date)) return;
                 const r = dayRecord[m.id];
                 if (r) {
                     dayStats[dayIdx].totalChecks++;
@@ -8802,6 +8846,9 @@ function downloadSeasonPDFReport(selectedSeason) {
         let streak = 0;
         for (let i = 0; i < rehearsalDates.length; i++) {
             const date = rehearsalDates[i];
+            // De baja ese día: no cuenta ni rompe la racha (mismo criterio que
+            // computeMusicianStreak/renderStatsStreaks).
+            if (isMusicianOnLeaveOnDate(m, date)) continue;
             const dayRecord = state.attendance[date];
             const record = dayRecord ? dayRecord[musicianId] : null;
             if (record && record.status === "present") {
@@ -9257,9 +9304,13 @@ function renderVoiceDetailContent() {
     const monthFilter = document.getElementById("voice-filter-month").value;
     const typeFilter = document.getElementById("voice-filter-type").value;
 
-    // Filtrar fechas
+    // Filtrar fechas. Igual que en renderMusicianDetailContent/downloadMusicianPDFReport: excluir
+    // sesiones aún no concluidas para no contar ensayos futuros que ya tengan un registro por
+    // defecto.
     const allDates = Object.keys(state.attendance);
     const filteredDates = allDates.filter(dateStr => {
+        if (!isSessionConcluded(dateStr)) return false;
+
         const dateObj = new Date(dateStr);
         const month = dateObj.getMonth().toString();
 
@@ -9290,6 +9341,8 @@ function renderVoiceDetailContent() {
         let presents = 0;
 
         filteredDates.forEach(date => {
+            // De baja ese día: no cuenta ni a favor ni en contra de este músico.
+            if (isMusicianOnLeaveOnDate(m, date)) return;
             const record = state.attendance[date] ? state.attendance[date][m.id] : null;
             if (record) {
                 total++;
@@ -14990,6 +15043,12 @@ function openCompRehearsalDetailModal(date) {
         if (isSpecialRehearsal && (!m.instrument || !convocated.includes(m.instrument))) {
             return;
         }
+        // Excluir músicos en baja temporal en esta fecha (mismo criterio que
+        // updateAttendanceStatsRibbon, renderEnsayosList y openRehearsalDetailModal): si no,
+        // cuentan como falta y bajan el porcentaje aunque estuvieran de baja ese día.
+        if (isMusicianOnLeaveOnDate(m, date)) {
+            return;
+        }
         totalConvocated++;
         const r = dayRecord ? (dayRecord[m.id] || dayRecord[String(m.id)]) : null;
         if (r) {
@@ -18807,6 +18866,7 @@ function renderDayHeatmap(filteredDates) {
 
         state.musicians.forEach(m => {
             if (m.status === "inactive") return;
+            if (isMusicianOnLeaveOnDate(m, dateStr)) return;
             dayPossible++;
             const rec = attendanceForDay[m.id];
             if (rec && rec.status === "present") {
@@ -18950,6 +19010,7 @@ function renderMusicianMonthlyEvolution(musicianId) {
             const m = parseInt(dateParts[1], 10);
 
             if (y === sm.year && m === sm.monthNum) {
+                if (isMusicianOnLeaveOnDate(musician, dateStr)) return;
                 const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
                 if (typeFilter !== "all" && sessionType !== typeFilter) return;
 
