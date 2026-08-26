@@ -2849,14 +2849,20 @@ svg.chevron {
     align-items: center;
     gap: 6px;
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 140px;
+    /* Antes tenía max-width: 140px + nowrap/ellipsis en todo el badge (icono + "Justificada:" +
+       motivo), así que casi cualquier motivo real quedaba cortado con "...". Ahora el badge usa
+       el espacio disponible de la fila y solo el propio texto del motivo se trunca si hiciera
+       falta, dejando siempre visibles el icono, la etiqueta y el botón "Editar". */
+    min-width: 0;
+    flex: 1 1 auto;
 }
 .summary-reason-text {
     color: var(--text-primary);
     font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 .btn-edit-reason {
     background: none;
@@ -2868,6 +2874,7 @@ svg.chevron {
     margin-left: 8px;
     padding: 0;
     font-weight: 600;
+    flex-shrink: 0;
 }
 .btn-edit-reason:hover {
     color: var(--text-primary);

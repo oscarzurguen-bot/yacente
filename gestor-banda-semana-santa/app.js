@@ -4428,6 +4428,17 @@ function renderAttendance() {
                 });
 
                 cardDiv.querySelectorAll(".quick-reason-pill").forEach(pill => {
+                    // Si el input de motivo tiene el foco (p.ej. el usuario ha escrito algo a
+                    // mano y luego pulsa una píldora), el navegador dispara "blur" en el input
+                    // ANTES del "click" de la píldora. El handler de blur guardaba entonces lo
+                    // que hubiera a medio escribir y cerraba el formulario, así que el motivo
+                    // final se quedaba cortado por ese texto parcial y la píldora parecía no
+                    // hacer nada (su click llegaba después, sobre un formulario ya cerrado).
+                    // Evitamos el blur previniendo el mousedown, para que el input conserve el
+                    // foco hasta que el propio click de la píldora decida qué hacer.
+                    pill.addEventListener("mousedown", (e) => {
+                        e.preventDefault();
+                    });
                     pill.addEventListener("click", () => {
                         const value = pill.getAttribute("data-value");
                         inputReason.value = value;
@@ -4883,6 +4894,13 @@ function renderEnsayosList() {
             if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
                 return;
             }
+            // Excluir músicos en baja temporal en esta fecha, igual que en el ribbon de Pasar
+            // Lista (updateAttendanceStatsRibbon): si no, salen contados como falta sin
+            // justificar (tienen un registro "absent"/sin justificar por defecto aunque estén
+            // de baja) e inflan tanto el total como el ratio de la tarjeta.
+            if (isMusicianOnLeaveOnDate(m, date)) {
+                return;
+            }
             total++;
             const r = dayRecord ? dayRecord[m.id] : null;
             if (r) {
@@ -5148,6 +5166,13 @@ function openRehearsalDetailModal(date) {
     musiciansList.forEach(m => {
         // Skip if special voice rehearsal and musician not convocated
         if (isSpecialRehearsal && !convocated.includes(m.instrument)) {
+            return;
+        }
+        // Excluir músicos en baja temporal en esta fecha (mismo criterio que
+        // updateAttendanceStatsRibbon y renderEnsayosList): de lo contrario cuentan como falta
+        // sin justificar porque conservan el registro "absent" por defecto de cuando se creó la
+        // sesión, aunque estuvieran de baja.
+        if (isMusicianOnLeaveOnDate(m, date)) {
             return;
         }
 
@@ -5921,19 +5946,6 @@ function setupActuacionRepertoireModalEvents() {
             handleActuacionRepertoireDrop(e, getActuacionRepertoireList().length);
         });
     }
-}
-
-function isMusicianOnLeaveOnDate(musician, dateStr) {
-    if (!musician) return false;
-    if (musician.isBaja) return true;
-    if (musician.bajaPeriods && Array.isArray(musician.bajaPeriods)) {
-        return musician.bajaPeriods.some(p => {
-            const start = p.startDate || "";
-            const end = p.endDate || "9999-12-31";
-            return dateStr >= start && dateStr <= end;
-        });
-    }
-    return false;
 }
 
 function formatRoleShort(role) {
