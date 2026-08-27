@@ -26,7 +26,7 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v529";
+const CACHE_NAME = "yacente-v531";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
@@ -67,19 +67,26 @@ self.addEventListener("install", (event) => {
     self.skipWaiting();
 });
 
-// Activar: limpiar cachés antiguos
+// Activar: limpiar cachés antiguos y tomar el control de las páginas ya abiertas
 self.addEventListener("activate", (event) => {
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames
-                    .filter((name) => name !== CACHE_NAME)
-                    .map((name) => {
-                        console.log("[SW] Eliminando caché antiguo:", name);
-                        return caches.delete(name);
-                    })
-            );
-        })
+        Promise.all([
+            caches.keys().then((cacheNames) => {
+                return Promise.all(
+                    cacheNames
+                        .filter((name) => name !== CACHE_NAME)
+                        .map((name) => {
+                            console.log("[SW] Eliminando caché antiguo:", name);
+                            return caches.delete(name);
+                        })
+                );
+            }),
+            // Sin esto, un SW recién activado no controla las pestañas ya abiertas hasta que se
+            // recargan por su cuenta -- deja una ventana en la que la pestaña sigue "atendida"
+            // por el SW viejo mientras la caché ya se está renovando, justo la clase de carrera
+            // que causaba que la app se quedara colgada en el logo tras una actualización.
+            self.clients.claim()
+        ])
     );
 });
 
