@@ -1207,6 +1207,11 @@ svg.chevron {
     flex-direction: column;
     gap: 6px;
     transition: var(--transition-normal);
+    /* Es un item de grid (.musicians-list); sin esto, un nombre o rol largo (sin espacios donde
+       cortar la línea, por white-space:nowrap) empuja el ancho mínimo del propio grid item más
+       allá del track de 1fr, y la tarjeta entera se desborda del móvil en vez de truncar el
+       texto con el ellipsis que ya tenían .musician-name/.musician-role. */
+    min-width: 0;
 }
 .musician-card:hover {
     border-color: var(--border-active);
