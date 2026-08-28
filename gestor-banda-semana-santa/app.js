@@ -11037,7 +11037,11 @@ function openWeeklyReportModal(startDate, endDate, weekNumber) {
 
             state.musicians.forEach(mus => {
                 if (isSpecial && !convocatedVoices.includes(mus.instrument)) return;
-                
+                // Excluir músicos en baja temporal en esta fecha (mismo criterio que en el resto
+                // de cálculos de asistencia): si no, cuentan como convocados/falta y el resumen
+                // semanal (y su imagen) da un porcentaje distinto al real.
+                if (isMusicianOnLeaveOnDate(mus, session.key)) return;
+
                 convocados++;
                 const att = attRecord[mus.id] || { status: "absent" };
                 const isPresent = att.status === "present";
