@@ -10525,60 +10525,25 @@ function renderCalendar() {
     const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
     const todayDay = today.getDate();
 
-    // Array para acumular las 42 celdas de días
-    const cells = [];
-
-    // 1. Días del mes anterior (relleno)
-    let prevYear = year;
-    let prevMonth = month - 1;
-    if (prevMonth === -1) {
-        prevMonth = 11;
-        prevYear--;
-    }
-    for (let i = startingDay - 1; i >= 0; i--) {
-        const dayNum = prevMonthTotalDays - i;
-        const dayCell = document.createElement("div");
-        dayCell.className = "calendar-day-card other-month";
-        dayCell.innerHTML = `<span class="calendar-day-number">${dayNum}</span>`;
-        const prevMonthStr = String(prevMonth + 1).padStart(2, '0');
-        const prevDayStr = String(dayNum).padStart(2, '0');
-        const prevDateKey = `${prevYear}-${prevMonthStr}-${prevDayStr}`;
-        dayCell.setAttribute("data-date", prevDateKey);
-        dayCell.addEventListener("click", () => openQuickSessionModalForDate(prevDateKey));
-        cells.push(dayCell);
-    }
-
-    // 2. Días del mes actual
-    for (let day = 1; day <= totalDays; day++) {
-        const dayCell = document.createElement("div");
-        dayCell.className = "calendar-day-card";
-        
-        const monthStr = String(month + 1).padStart(2, '0');
-        const dayStr = String(day).padStart(2, '0');
-        const dateKey = `${year}-${monthStr}-${dayStr}`;
-        
-        dayCell.setAttribute("data-date", dateKey);
-        
-        if (isThisMonth && day === todayDay) {
-            dayCell.classList.add("today");
-        }
-
-        dayCell.innerHTML = `<span class="calendar-day-number">${day}</span>`;
-
-        // Buscar todas las sesiones creadas para este día
+    // Añade las etiquetas de ensayo/actuación de un día a su celda, para que los días de relleno
+    // del mes anterior/siguiente muestren sus eventos exactamente igual que los del mes que se
+    // está viendo (antes solo se hacía para el mes actual, así que un ensayo el 1 de septiembre
+    // era invisible viendo agosto). El clic del propio día (crear sesión rápida) ya funcionaba en
+    // los días de relleno, así que no hace falta tocarlo.
+    const attachCalendarDaySessionTags = (dayCell, dateKey) => {
         const daySessions = Object.keys(state.sessionTypes)
             .filter(key => key.startsWith(dateKey))
             .map(key => ({ key, ...state.sessionTypes[key] }));
-            
+
         const hasActuacion = daySessions.some(session => session.type === "actuacion");
         if (hasActuacion) {
             dayCell.classList.add("has-actuacion");
         }
-            
+
         daySessions.forEach(session => {
             const tag = document.createElement("div");
             tag.className = "calendar-session-tag";
-            
+
             // Evento click al tag para ver estadísticas del ensayo/actuación
             tag.addEventListener("click", (e) => {
                 e.stopPropagation(); // Evitar abrir configuración rápida del día
@@ -10588,7 +10553,7 @@ function renderCalendar() {
                     openRehearsalDetailModal(session.key);
                 }
             });
-            
+
             if (session.type === "actuacion") {
                 tag.classList.add("calendar-session-actuacion");
                 tag.innerText = `⭐ ${session.name || 'Actuación'}`;
@@ -10623,6 +10588,50 @@ function renderCalendar() {
             }
             dayCell.appendChild(tag);
         });
+    };
+
+    // Array para acumular las 42 celdas de días
+    const cells = [];
+
+    // 1. Días del mes anterior (relleno)
+    let prevYear = year;
+    let prevMonth = month - 1;
+    if (prevMonth === -1) {
+        prevMonth = 11;
+        prevYear--;
+    }
+    for (let i = startingDay - 1; i >= 0; i--) {
+        const dayNum = prevMonthTotalDays - i;
+        const dayCell = document.createElement("div");
+        dayCell.className = "calendar-day-card other-month";
+        dayCell.innerHTML = `<span class="calendar-day-number">${dayNum}</span>`;
+        const prevMonthStr = String(prevMonth + 1).padStart(2, '0');
+        const prevDayStr = String(dayNum).padStart(2, '0');
+        const prevDateKey = `${prevYear}-${prevMonthStr}-${prevDayStr}`;
+        dayCell.setAttribute("data-date", prevDateKey);
+        attachCalendarDaySessionTags(dayCell, prevDateKey);
+        dayCell.addEventListener("click", () => openQuickSessionModalForDate(prevDateKey));
+        cells.push(dayCell);
+    }
+
+    // 2. Días del mes actual
+    for (let day = 1; day <= totalDays; day++) {
+        const dayCell = document.createElement("div");
+        dayCell.className = "calendar-day-card";
+
+        const monthStr = String(month + 1).padStart(2, '0');
+        const dayStr = String(day).padStart(2, '0');
+        const dateKey = `${year}-${monthStr}-${dayStr}`;
+
+        dayCell.setAttribute("data-date", dateKey);
+
+        if (isThisMonth && day === todayDay) {
+            dayCell.classList.add("today");
+        }
+
+        dayCell.innerHTML = `<span class="calendar-day-number">${day}</span>`;
+
+        attachCalendarDaySessionTags(dayCell, dateKey);
 
         // Evento click para planificar sesión (Añadir nueva sesión)
         dayCell.addEventListener("click", () => openQuickSessionModalForDate(dateKey));
@@ -10647,6 +10656,7 @@ function renderCalendar() {
         const nextDayStr = String(day).padStart(2, '0');
         const nextDateKey = `${nextYear}-${nextMonthStr}-${nextDayStr}`;
         dayCell.setAttribute("data-date", nextDateKey);
+        attachCalendarDaySessionTags(dayCell, nextDateKey);
         dayCell.addEventListener("click", () => openQuickSessionModalForDate(nextDateKey));
         cells.push(dayCell);
     }
