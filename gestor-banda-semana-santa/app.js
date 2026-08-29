@@ -13703,21 +13703,21 @@ function computeMusicianBaseMedalsData(musicianId) {
     let unlockedGod = false;
     let nextGoalGod = 1;
 
-    if (maxConsecutiveMonths >= 12) {
+    if (maxConsecutiveMonths >= 6) {
         starsGod = 3;
-        descGod = "¡Insignia de Oro conseguida! 1 año completo de asistencia perfecta a los ensayos.";
-        unlockedGod = true;
-        nextGoalGod = 12;
-    } else if (maxConsecutiveMonths >= 6) {
-        starsGod = 2;
-        descGod = "Insignia de Plata conseguida. 6 meses de asistencia perfecta a los ensayos. Alcanza 12 meses para el nivel Oro.";
-        unlockedGod = true;
-        nextGoalGod = 12;
-    } else if (maxConsecutiveMonths >= 1) {
-        starsGod = 1;
-        descGod = "Insignia de Bronce conseguida. 1 mes de asistencia perfecta a los ensayos. Alcanza 6 meses para el nivel Plata.";
+        descGod = "¡Insignia de Oro conseguida! 6 meses consecutivos de asistencia perfecta a los ensayos.";
         unlockedGod = true;
         nextGoalGod = 6;
+    } else if (maxConsecutiveMonths >= 3) {
+        starsGod = 2;
+        descGod = "Insignia de Plata conseguida. 3 meses de asistencia perfecta a los ensayos. Alcanza 6 meses para el nivel Oro.";
+        unlockedGod = true;
+        nextGoalGod = 6;
+    } else if (maxConsecutiveMonths >= 1) {
+        starsGod = 1;
+        descGod = "Insignia de Bronce conseguida. 1 mes de asistencia perfecta a los ensayos. Alcanza 3 meses para el nivel Plata.";
+        unlockedGod = true;
+        nextGoalGod = 3;
     } else {
         starsGod = 0;
         descGod = "Asiste a todos los ensayos durante 1 mes natural para desbloquear Bronce.";
@@ -14263,8 +14263,8 @@ const MEDAL_TIER_DEFINITIONS = {
     ],
     god: [
         { label: "Bronce 🥉", req: "Asiste a todos los ensayos durante 1 mes", stars: 1 },
-        { label: "Plata 🥈", req: "Asiste a todos los ensayos durante 6 meses", stars: 2 },
-        { label: "Oro 🥇", req: "Asiste a todos los ensayos durante 1 año", stars: 3 }
+        { label: "Plata 🥈", req: "Asiste a todos los ensayos durante 3 meses", stars: 2 },
+        { label: "Oro 🥇", req: "Asiste a todos los ensayos durante 6 meses", stars: 3 }
     ],
     asistencia: [
         { label: "Bronce 🥉", req: ">80% de asistencia general", stars: 1 },
