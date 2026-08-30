@@ -4622,6 +4622,14 @@ body.component-portal .btn-mobile-menu-toggle {
 }
 body.component-portal .header-title-container {
     align-items: flex-start !important;
+    flex-wrap: nowrap !important;
+}
+/* Evita que el título/subtítulo se salte de línea respecto al botón hamburguesa:
+   como bloque de ancho automático dentro de un flex container, sin min-width:0
+   reclama el ancho completo de la línea y fuerza el wrap del botón. */
+body.component-portal .header-title-text {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 .btn-musician-hamburger:hover {
     opacity: 0.8;

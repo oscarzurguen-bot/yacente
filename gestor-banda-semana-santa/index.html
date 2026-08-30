@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=537">
+    <link rel="stylesheet" href="style.css?v=538">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -296,7 +296,7 @@
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
-                    <div>
+                    <div class="header-title-text">
                         <h2 id="page-title" style="margin: 0;">Asistencia</h2>
                         <p id="page-subtitle" class="text-muted" style="margin: 4px 0 0 0;">Control diario de músicos por sección</p>
                     </div>
@@ -4381,9 +4381,9 @@
         </svg>
     </button>
 
-    <script src="app.js?v=537"></script>
+    <script src="app.js?v=538"></script>
     <script>
-        // Registro del Service Worker v=537.
+        // Registro del Service Worker v=538.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4412,9 +4412,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=537")
+                navigator.serviceWorker.register("sw.js?v=538")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v537 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v538 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
