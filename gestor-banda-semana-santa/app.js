@@ -124,6 +124,7 @@ let state = {
     repertoireLinks: { youtube: "", spotify: "" },
     suggestions: [],
     rehearsalLocations: [],
+    uniforms: [],
     currentPreavisoDate: "",
     compCalendarYear: undefined,
     compCalendarMonth: undefined,
@@ -412,6 +413,18 @@ function initApp() {
         ];
     }
 
+    const storedUniforms = localStorage.getItem("harmonia_uniforms");
+    if (storedUniforms) {
+        try {
+            state.uniforms = JSON.parse(storedUniforms);
+        } catch(e) {
+            state.uniforms = [];
+        }
+    }
+    if (!state.uniforms || !Array.isArray(state.uniforms)) {
+        state.uniforms = [];
+    }
+
     // Cargar formaciones del simulador
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
     const storedDesfile = localStorage.getItem("yacente_formacion_desfile");
@@ -657,6 +670,7 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
     localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks || { youtube: "", spotify: "" }));
     localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
+    localStorage.setItem("harmonia_uniforms", JSON.stringify(state.uniforms || []));
 
     if (state.firebaseConfig) {
         localStorage.setItem("yacente_firebase_config", JSON.stringify(state.firebaseConfig));
@@ -765,6 +779,7 @@ let unsubDeletedNotifs = null;
 let unsubSuggestions = null;
 let unsubRepertoireLinks = null;
 let unsubRehearsalLocations = null;
+let unsubUniforms = null;
 let unsubMarchaSeasonRemovals = null;
 let unsubNotificationsClearedAt = null;
 
@@ -1417,6 +1432,18 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync lugares de ensayo:", err);
     });
+
+    // Escucha de uniformes (sincronización en tiempo real para directores y músicos)
+    unsubUniforms = db.collection("settings").doc("uniforms").onSnapshot(doc => {
+        if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
+            state.uniforms = doc.data().list;
+            saveStateToLocalStorage();
+            renderUniformeOptions();
+            renderAdminUniformesList();
+        }
+    }, err => {
+        console.error("Error sync uniformes:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -1436,6 +1463,7 @@ function stopCloudSync() {
     if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
     if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
     if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
+    if (unsubUniforms) { unsubUniforms(); unsubUniforms = null; }
     if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
     if (unsubNotificationsClearedAt) { unsubNotificationsClearedAt(); unsubNotificationsClearedAt = null; }
 }
@@ -3039,6 +3067,10 @@ function setupEventListeners() {
         if (document.getElementById("actuacion-trip-input")) {
             document.getElementById("actuacion-trip-input").checked = false;
         }
+        renderUniformeOptions();
+        if (document.getElementById("actuacion-uniforme-input")) {
+            document.getElementById("actuacion-uniforme-input").value = "";
+        }
         modalActuacion.classList.add("active");
     });
 
@@ -3055,6 +3087,7 @@ function setupEventListeners() {
 
         const isTrip = document.getElementById("actuacion-trip-input") ? document.getElementById("actuacion-trip-input").checked : false;
         const locationVal = document.getElementById("actuacion-location-input") ? document.getElementById("actuacion-location-input").value.trim() : "";
+        const uniformeId = document.getElementById("actuacion-uniforme-input") ? document.getElementById("actuacion-uniforme-input").value : "";
 
         if (editingKey) {
             // Modo Edición
@@ -3074,7 +3107,8 @@ function setupEventListeners() {
                     type: "actuacion",
                     name: actuacionName,
                     isTrip: isTrip,
-                    location: locationVal
+                    location: locationVal,
+                    uniformeId: uniformeId
                 };
                 if (state.attendance[editingKey]) {
                     state.attendance[targetKey] = state.attendance[editingKey];
@@ -3092,7 +3126,8 @@ function setupEventListeners() {
                     type: "actuacion",
                     name: actuacionName,
                     isTrip: isTrip,
-                    location: locationVal
+                    location: locationVal,
+                    uniformeId: uniformeId
                 };
             }
 
@@ -3124,11 +3159,12 @@ function setupEventListeners() {
 
             initializeAttendanceForDate(sessionKey);
             const createdAtIso = new Date().toISOString();
-            state.sessionTypes[sessionKey] = { 
-                type: "actuacion", 
-                name: actuacionName, 
+            state.sessionTypes[sessionKey] = {
+                type: "actuacion",
+                name: actuacionName,
                 isTrip: isTrip,
                 location: locationVal,
+                uniformeId: uniformeId,
                 createdAt: createdAtIso
             };
             
@@ -3833,6 +3869,8 @@ function setupMarchasDragAndDrop() {
     setupMusicianDrawerAndSettingsEvents();
     setupSuggestionsMailboxEvents();
     setupLugaresEnsayoEvents();
+    setupUniformesEvents();
+    setupUniformePreviewEvents();
     setupAdvancedStatsEvents();
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
@@ -4146,6 +4184,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Gestión de ubicaciones y enlace a Google Maps";
             dateContainer.classList.add("hidden");
             renderAdminLugaresEnsayoList();
+            break;
+        case "section-otros-uniformes":
+            pageTitle.innerText = "Uniformes";
+            pageSubtitle.innerText = "Gestión de uniformes para las actuaciones";
+            dateContainer.classList.add("hidden");
+            renderAdminUniformesList();
             break;
         case "section-otros-estadisticas-avanzadas":
             pageTitle.innerText = "Estadísticas Avanzadas";
@@ -4681,6 +4725,8 @@ function openEditActuacionModal(dateKey) {
     if (document.getElementById("actuacion-date-input")) document.getElementById("actuacion-date-input").value = rawDate;
     if (document.getElementById("actuacion-location-input")) document.getElementById("actuacion-location-input").value = sessionInfo.location || "";
     if (document.getElementById("actuacion-trip-input")) document.getElementById("actuacion-trip-input").checked = !!sessionInfo.isTrip;
+    renderUniformeOptions();
+    if (document.getElementById("actuacion-uniforme-input")) document.getElementById("actuacion-uniforme-input").value = sessionInfo.uniformeId || "";
 
     const modal = document.getElementById("modal-actuacion");
     if (modal) modal.classList.add("active");
@@ -10802,9 +10848,12 @@ function getWeeksGroupedBySeason(seasonLabel) {
 function getWeeklyGoalsSeasonOptions() {
     const current = getCurrentSeasonLabel();
     const { year1 } = getSeasonBounds(current);
+    const MIN_WEEKLY_GOALS_SEASON_YEAR = 2025; // No mostrar temporadas anteriores a 2025-2026
     const seasons = [];
     for (let offset = -2; offset <= 1; offset++) {
-        seasons.push(`${year1 + offset}-${year1 + offset + 1}`);
+        const startYear = year1 + offset;
+        if (startYear < MIN_WEEKLY_GOALS_SEASON_YEAR) continue;
+        seasons.push(`${startYear}-${startYear + 1}`);
     }
     return seasons;
 }
@@ -15287,6 +15336,33 @@ function openUpcomingEventDetailModal(date) {
         if (convBox) convBox.classList.add("hidden");
     }
 
+    // Uniforme (solo actuaciones)
+    const uniformeBox = document.getElementById("upcoming-event-detail-uniforme-box");
+    const uniformeNameEl = document.getElementById("upcoming-event-detail-uniforme-name");
+    const uniformeImgEl = document.getElementById("upcoming-event-detail-uniforme-img");
+    const uniformeObj = (sessionType === "actuacion" && sessionInfo && sessionInfo.uniformeId)
+        ? (state.uniforms || []).find(u => u.id === sessionInfo.uniformeId)
+        : null;
+
+    if (uniformeBox) {
+        if (uniformeObj) {
+            uniformeBox.classList.remove("hidden");
+            if (uniformeNameEl) uniformeNameEl.innerText = uniformeObj.name || "Uniforme";
+            if (uniformeImgEl) {
+                if (uniformeObj.image) {
+                    uniformeImgEl.src = uniformeObj.image;
+                    uniformeImgEl.classList.remove("hidden");
+                    uniformeImgEl.onclick = () => openUniformePreview(uniformeObj);
+                } else {
+                    uniformeImgEl.classList.add("hidden");
+                    uniformeImgEl.onclick = null;
+                }
+            }
+        } else {
+            uniformeBox.classList.add("hidden");
+        }
+    }
+
     modal.classList.add("active");
 }
 
@@ -17003,6 +17079,34 @@ function renderRehearsalLocationOptions() {
     }
 }
 
+// ==========================================================================
+// GESTIÓN DE UNIFORMES (DIRECTOR Y DESPLEGABLE DE ACTUACIONES)
+// ==========================================================================
+
+function dbSaveUniforms() {
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("settings").doc("uniforms").set({ list: state.uniforms || [] })
+            .catch(err => console.error("Error al guardar uniformes en la nube:", err));
+    }
+}
+
+function renderUniformeOptions() {
+    const select = document.getElementById("actuacion-uniforme-input");
+    if (!select) return;
+
+    const uniforms = state.uniforms || [];
+    const currentVal = select.value;
+
+    select.innerHTML = `<option value="">Sin especificar</option>` +
+        uniforms.map(u => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join("");
+
+    if (currentVal && uniforms.some(u => u.id === currentVal)) {
+        select.value = currentVal;
+    }
+}
+
 function compressImageFile(file, maxWidth, maxHeight, callback) {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -17117,6 +17221,83 @@ function renderAdminLugaresEnsayoList() {
                 renderAdminLugaresEnsayoList();
                 renderRehearsalLocationOptions();
                 showToast("Lugar de ensayo eliminado", "info");
+            }
+        });
+    });
+}
+
+function renderUniformeImageContent(uniforme) {
+    if (!uniforme) return "";
+
+    if (uniforme.image) {
+        return `<img src="${uniforme.image}" style="width:100%; height:100%; object-fit:cover; display:block;" alt="${escapeHtml(uniforme.name)}">`;
+    }
+
+    return `
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(212,175,55,0.18) 0%, rgba(15,15,15,0.92) 85%); color: var(--text-muted); text-align: center; padding: 20px; box-sizing: border-box;">
+            <span style="font-size: 3rem; margin-bottom: 8px; filter: drop-shadow(0 2px 10px rgba(0,0,0,0.6));">👔</span>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${escapeHtml(uniforme.name || "Uniforme")}</div>
+        </div>
+    `;
+}
+
+function renderAdminUniformesList() {
+    const container = document.getElementById("admin-uniformes-list");
+    const emptyEl = document.getElementById("admin-uniformes-empty");
+    if (!container) return;
+
+    const uniforms = state.uniforms || [];
+
+    if (uniforms.length === 0) {
+        container.innerHTML = "";
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    container.innerHTML = uniforms.map(u => `
+        <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 14px; border: 1px solid var(--border-color); background: var(--bg-card);">
+            <div style="width: 100%; aspect-ratio: 1 / 1; background: #000; border-bottom: 1px solid var(--border-color); position: relative; overflow: hidden;">
+                ${renderUniformeImageContent(u)}
+            </div>
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: space-between;">
+                <div style="font-weight: 700; font-size: 0.98rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <span>👔</span> ${escapeHtml(u.name)}
+                </div>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+                    <button class="btn btn-secondary btn-sm edit-uniforme-btn" data-id="${u.id}" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn btn-secondary btn-sm delete-uniforme-btn" data-id="${u.id}" style="padding: 6px 10px; font-size: 0.8rem; color: var(--color-absent);">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join("");
+
+    container.querySelectorAll(".edit-uniforme-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            openUniformeModal(btn.dataset.id);
+        });
+    });
+
+    container.querySelectorAll(".delete-uniforme-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (state.pastLockEnabled) {
+                showToast("Bloqueo de pasado activado, no se pueden eliminar uniformes.", "warning");
+                return;
+            }
+            const id = btn.dataset.id;
+            const u = state.uniforms.find(x => x.id === id);
+            if (!u) return;
+            if (confirm(`¿Estás seguro de eliminar el uniforme "${u.name}"?`)) {
+                state.uniforms = state.uniforms.filter(x => x.id !== id);
+                dbSaveUniforms();
+                renderAdminUniformesList();
+                renderUniformeOptions();
+                showToast("Uniforme eliminado", "info");
             }
         });
     });
@@ -18060,6 +18241,160 @@ function setupLugaresEnsayoEvents() {
             showToast("Lugar de ensayo guardado correctamente", "success");
         });
     }
+}
+
+let currentUniformeImageDataUrl = "";
+
+function updateUniformeImagePreview() {
+    const placeholder = document.getElementById("uniforme-image-placeholder");
+    const img = document.getElementById("uniforme-image-img");
+    const btnRemove = document.getElementById("btn-remove-uniforme-image");
+
+    if (currentUniformeImageDataUrl) {
+        if (img) {
+            img.src = currentUniformeImageDataUrl;
+            img.classList.remove("hidden");
+        }
+        if (placeholder) placeholder.classList.add("hidden");
+        if (btnRemove) btnRemove.classList.remove("hidden");
+    } else {
+        if (img) {
+            img.src = "";
+            img.classList.add("hidden");
+        }
+        if (placeholder) placeholder.classList.remove("hidden");
+        if (btnRemove) btnRemove.classList.add("hidden");
+    }
+}
+
+function openUniformeModal(id = null) {
+    const modal = document.getElementById("modal-uniforme");
+    const titleEl = document.getElementById("modal-uniforme-title");
+    const idInput = document.getElementById("uniforme-id");
+    const nameInput = document.getElementById("uniforme-nombre-input");
+
+    if (!modal) return;
+
+    if (id) {
+        const u = (state.uniforms || []).find(x => x.id === id);
+        if (u) {
+            if (titleEl) titleEl.innerText = "Editar Uniforme";
+            if (idInput) idInput.value = u.id;
+            if (nameInput) nameInput.value = u.name || "";
+            currentUniformeImageDataUrl = u.image || "";
+        }
+    } else {
+        if (titleEl) titleEl.innerText = "Añadir Uniforme";
+        if (idInput) idInput.value = "";
+        if (nameInput) nameInput.value = "";
+        currentUniformeImageDataUrl = "";
+    }
+
+    updateUniformeImagePreview();
+    modal.classList.add("active");
+}
+
+function setupUniformesEvents() {
+    const btnAdd = document.getElementById("btn-add-uniforme");
+    if (btnAdd) {
+        btnAdd.addEventListener("click", () => openUniformeModal());
+    }
+
+    const modal = document.getElementById("modal-uniforme");
+    const btnClose = document.getElementById("btn-close-uniforme-modal");
+    const btnCancel = document.getElementById("btn-cancel-uniforme-modal");
+    const form = document.getElementById("form-uniforme");
+
+    const btnUploadImg = document.getElementById("btn-upload-uniforme-image");
+    const fileInputImg = document.getElementById("uniforme-image-file");
+    const btnRemoveImg = document.getElementById("btn-remove-uniforme-image");
+
+    if (btnUploadImg && fileInputImg) {
+        btnUploadImg.addEventListener("click", () => fileInputImg.click());
+    }
+
+    if (fileInputImg) {
+        fileInputImg.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            compressImageFile(file, 800, 800, (dataUrl) => {
+                currentUniformeImageDataUrl = dataUrl;
+                updateUniformeImagePreview();
+            });
+        });
+    }
+
+    if (btnRemoveImg) {
+        btnRemoveImg.addEventListener("click", () => {
+            currentUniformeImageDataUrl = "";
+            if (fileInputImg) fileInputImg.value = "";
+            updateUniformeImagePreview();
+        });
+    }
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const id = document.getElementById("uniforme-id").value;
+            const name = document.getElementById("uniforme-nombre-input").value.trim();
+
+            if (!name) {
+                showToast("Por favor introduce el nombre del uniforme", "error");
+                return;
+            }
+
+            if (!state.uniforms) state.uniforms = [];
+
+            if (id) {
+                const idx = state.uniforms.findIndex(u => u.id === id);
+                if (idx !== -1) {
+                    state.uniforms[idx].name = name;
+                    state.uniforms[idx].image = currentUniformeImageDataUrl;
+                }
+            } else {
+                state.uniforms.push({
+                    id: "uni_" + Date.now(),
+                    name: name,
+                    image: currentUniformeImageDataUrl
+                });
+            }
+
+            dbSaveUniforms();
+            renderAdminUniformesList();
+            renderUniformeOptions();
+            closeModal();
+            showToast("Uniforme guardado correctamente", "success");
+        });
+    }
+}
+
+function openUniformePreview(uniforme) {
+    if (!uniforme || !uniforme.image) return;
+    const modal = document.getElementById("modal-uniforme-preview");
+    if (!modal) return;
+    const nameEl = document.getElementById("uniforme-preview-name");
+    const imgEl = document.getElementById("uniforme-preview-img");
+    if (nameEl) nameEl.innerText = uniforme.name || "Uniforme";
+    if (imgEl) imgEl.src = uniforme.image;
+    modal.classList.add("active");
+}
+
+function setupUniformePreviewEvents() {
+    const modal = document.getElementById("modal-uniforme-preview");
+    if (!modal) return;
+    const btnClose = document.getElementById("btn-close-uniforme-preview");
+    const closeModal = () => modal.classList.remove("active");
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
 }
 
 function renderAdminSuggestionsList() {

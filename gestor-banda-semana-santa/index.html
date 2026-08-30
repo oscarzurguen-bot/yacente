@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=534">
+    <link rel="stylesheet" href="style.css?v=536">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1421,6 +1421,14 @@
                         <p class="text-muted" style="margin: 0;">Gestiona los locales y ubicaciones para indicar a los músicos cómo llegar en Google Maps.</p>
                     </div>
 
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-uniformes" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.1rem;">👔</span>
+                            Uniformes
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Gestiona los uniformes disponibles para que los músicos sepan cómo vestir en cada actuación.</p>
+                    </div>
+
                     <div class="card settings-card otros-nav-card" data-target="section-otros-estadisticas-avanzadas" style="cursor: pointer; position: relative;">
                         <h3 style="display: flex; align-items: center; gap: 10px;">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
@@ -1473,6 +1481,35 @@
                     <div id="admin-lugares-ensayo-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
                         <span style="font-size: 2rem; display: block; margin-bottom: 8px;">📍</span>
                         No hay lugares de ensayo configurados todavía.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Uniformes (gestión admin) -->
+            <section id="section-otros-uniformes" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+                <div class="card" style="padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                                👔 Uniformes
+                            </h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Define los uniformes disponibles para que los músicos sepan qué llevar en cada actuación.
+                            </p>
+                        </div>
+                        <button id="btn-add-uniforme" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <span>➕</span> Añadir Uniforme
+                        </button>
+                    </div>
+
+                    <div id="admin-uniformes-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;"></div>
+                    <div id="admin-uniformes-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
+                        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">👔</span>
+                        No hay uniformes configurados todavía.
                     </div>
                 </div>
             </section>
@@ -2937,6 +2974,13 @@
                     <label for="actuacion-location-input">Lugar / Ubicación de la Actuación</label>
                     <input type="text" id="actuacion-location-input" placeholder="Ej: Cabra (Córdoba), Iglesia de San Juan..." style="width: 100%;">
                 </div>
+                <div class="form-group">
+                    <label for="actuacion-uniforme-input">Uniforme</label>
+                    <select id="actuacion-uniforme-input" style="width: 100%;">
+                        <option value="">Sin especificar</option>
+                    </select>
+                    <p class="text-muted" style="font-size: 0.75rem; margin-top: 4px; line-height: 1.35;">Selecciona el uniforme que deberán llevar los músicos. Gestiona los uniformes disponibles desde Otros &gt; Uniformes.</p>
+                </div>
                 <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                     <input type="checkbox" id="actuacion-trip-input" style="width: auto; margin: 0;">
                     <label for="actuacion-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
@@ -2991,6 +3035,60 @@
                     <button type="submit" class="btn btn-primary">Guardar Lugar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Añadir/Editar Uniforme -->
+    <div id="modal-uniforme" class="modal-overlay">
+        <div class="modal-card" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 id="modal-uniforme-title">Añadir Uniforme</h3>
+                <button class="modal-close" id="btn-close-uniforme-modal">&times;</button>
+            </div>
+            <form id="form-uniforme">
+                <input type="hidden" id="uniforme-id">
+                <div class="form-group">
+                    <label for="uniforme-nombre-input">Nombre del Uniforme</label>
+                    <input type="text" id="uniforme-nombre-input" required placeholder="Ej. Uniforme de Gala, Traje de Calle..." style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 600;">Foto del Uniforme (Opcional)</label>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div id="uniforme-image-preview" style="width: 80px; height: 80px; border-radius: 10px; border: 1px dashed var(--border-color); background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative;">
+                            <span id="uniforme-image-placeholder" style="font-size: 1.8rem; opacity: 0.5;">👔</span>
+                            <img id="uniforme-image-img" class="hidden" style="width: 100%; height: 100%; object-fit: cover;" alt="Vista previa">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <input type="file" id="uniforme-image-file" accept="image/*" style="display: none;">
+                            <button type="button" id="btn-upload-uniforme-image" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>📷</span> Subir Foto
+                            </button>
+                            <button type="button" id="btn-remove-uniforme-image" class="btn btn-secondary btn-sm hidden" style="color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                                <span>🗑️</span> Quitar Foto
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-muted" style="font-size: 0.74rem; margin-top: 6px; line-height: 1.35;">Sube una foto del uniforme para que los músicos sepan qué llevar.</p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-uniforme-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Uniforme</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Previsualización de Foto de Uniforme en Grande -->
+    <div id="modal-uniforme-preview" class="modal-overlay">
+        <div class="modal-card" style="max-width: 420px; width: 90%; text-align: center; padding: 22px; position: relative;">
+            <button class="modal-close" id="btn-close-uniforme-preview" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <h3 id="uniforme-preview-name" style="margin: 0 0 16px 0; color: var(--color-gold); font-family: 'Cinzel', serif; font-size: 1.1rem;">Uniforme</h3>
+            <img id="uniforme-preview-img" src="" alt="Uniforme" style="width: 100%; border-radius: 12px; border: 2px solid var(--color-gold); box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);">
         </div>
     </div>
 
@@ -4091,6 +4189,20 @@
                         <div id="upcoming-event-detail-convocated" style="font-size: 0.88rem; color: var(--color-gold); font-weight: 600; margin-top: 1px;">Cornetas 1ª, Trompetas 1ª</div>
                     </div>
                 </div>
+
+                <!-- Uniforme de la Actuación -->
+                <div id="upcoming-event-detail-uniforme-box" class="hidden" style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(212, 175, 55, 0.12); color: var(--color-gold); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">👔</div>
+                        <div>
+                            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Uniforme</div>
+                            <div id="upcoming-event-detail-uniforme-name" style="font-size: 0.88rem; color: var(--color-gold); font-weight: 600; margin-top: 1px;">-</div>
+                        </div>
+                    </div>
+                    <div style="width: 100%; display: flex; justify-content: center;">
+                        <img id="upcoming-event-detail-uniforme-img" src="" alt="Uniforme" style="width: 140px; height: 140px; object-fit: cover; border-radius: 14px; border: 2px solid var(--color-gold); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); cursor: pointer;" title="Toca para ver en grande">
+                    </div>
+                </div>
             </div>
 
             <!-- 3. Texto Explicativo del Preaviso -->
@@ -4269,9 +4381,9 @@
         </svg>
     </button>
 
-    <script src="app.js?v=534"></script>
+    <script src="app.js?v=536"></script>
     <script>
-        // Registro del Service Worker v=534.
+        // Registro del Service Worker v=536.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4300,9 +4412,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=534")
+                navigator.serviceWorker.register("sw.js?v=536")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v534 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v536 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);

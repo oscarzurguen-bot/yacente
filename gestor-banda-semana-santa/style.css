@@ -1580,7 +1580,8 @@ svg.chevron {
 }
 /* La vista ampliada de foto puede abrirse encima de otro modal (ej. detalle de músico),
    así que necesita quedar siempre por encima independientemente del orden en el DOM */
-#modal-photo-preview.active {
+#modal-photo-preview.active,
+#modal-uniforme-preview.active {
     z-index: 10000001 !important;
 }
 
