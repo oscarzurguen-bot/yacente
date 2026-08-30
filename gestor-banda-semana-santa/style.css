@@ -4631,6 +4631,10 @@ body.component-portal .header-title-text {
     min-width: 0;
     flex: 1 1 auto;
 }
+body.component-portal .content-header {
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+}
 .btn-musician-hamburger:hover {
     opacity: 0.8;
     transform: scale(1.08);
