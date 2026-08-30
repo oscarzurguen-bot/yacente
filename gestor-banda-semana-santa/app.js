@@ -4144,7 +4144,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             break;
         case "section-componente-historial":
             pageTitle.innerText = "Mi Historial";
-            pageSubtitle.innerText = "Mis asistencias pasadas a ensayos y actuaciones";
+            pageSubtitle.innerText = "Mis asistencias pasadas a eventos";
             dateContainer.classList.add("hidden");
             renderComponentHistorial();
             break;
