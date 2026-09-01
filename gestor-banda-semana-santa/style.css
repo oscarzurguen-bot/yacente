@@ -4966,6 +4966,41 @@ body.component-portal .content-header {
     filter: brightness(1.15);
 }
 
+.wordle-btn-jugar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 18px;
+    padding: 14px 20px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--color-gold), var(--color-gold-dark));
+    border: none;
+    color: #1a1005;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(212, 175, 55, 0.25);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.wordle-btn-jugar:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(212, 175, 55, 0.35);
+}
+
+.wordle-btn-jugar:active {
+    transform: translateY(0);
+}
+
+.wordle-btn-jugar:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
 .wordle-cal-legend {
     display: flex;
     flex-wrap: wrap;
@@ -5025,6 +5060,32 @@ body.component-portal .content-header {
     border-radius: 999px;
     font-size: 0.72rem;
     font-weight: 700;
+}
+
+.wordle-btn-pista[hidden] {
+    display: none;
+}
+
+.wordle-btn-pista {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: rgba(212, 175, 55, 0.08);
+    border: 1px dashed var(--color-gold-dark, var(--color-gold));
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-gold);
+    cursor: pointer;
+    margin-bottom: 14px;
+    transition: background 0.15s ease;
+}
+
+.wordle-btn-pista:hover {
+    background: rgba(212, 175, 55, 0.16);
 }
 
 .wordle-pista-letras-info {
@@ -5179,6 +5240,17 @@ body.component-portal .content-header {
 .wordle-key.wide {
     max-width: 56px;
     font-size: 0.68rem;
+}
+
+.wordle-key.key-enter {
+    background: linear-gradient(135deg, var(--color-gold), var(--color-gold-dark));
+    color: #1a1005;
+    font-weight: 800;
+    box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+}
+
+.wordle-key.key-enter:hover {
+    filter: brightness(1.08);
 }
 
 .wordle-key.correct {

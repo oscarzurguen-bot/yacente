@@ -18881,9 +18881,12 @@ function renderWordleCalendar() {
     const emptyEl = document.getElementById("wordleCalendarEmpty");
     if (!grid) return;
 
+    const btnJugar = document.getElementById("btnWordleJugarHoy");
+
     if (!state.wordleBank || state.wordleBank.length === 0) {
         grid.innerHTML = "";
         if (emptyEl) emptyEl.classList.remove("hidden");
+        if (btnJugar) btnJugar.disabled = true;
         return;
     }
     if (emptyEl) emptyEl.classList.add("hidden");
@@ -18896,6 +18899,15 @@ function renderWordleCalendar() {
     const ayerISO = wordleFechaISO(ayer);
     const progresoHoy = state.wordleProgress[hoyISO];
     const ayerDesbloqueado = !!(progresoHoy && progresoHoy.won);
+
+    if (btnJugar) {
+        btnJugar.disabled = false;
+        if (progresoHoy && progresoHoy.gameOver) {
+            btnJugar.innerHTML = progresoHoy.won ? "<span>🏆</span> Ver la palabra de hoy" : "<span>📖</span> Ver la palabra de hoy";
+        } else {
+            btnJugar.innerHTML = "<span>▶️</span> Jugar";
+        }
+    }
 
     const viewYear = wordleCalendarViewDate.getFullYear();
     const viewMonth = wordleCalendarViewDate.getMonth();
@@ -18979,7 +18991,8 @@ const wordleGameState = {
     current: "",
     gameOver: false,
     won: false,
-    pistaLetras: []
+    pistaLetras: [],
+    pistaActivada: false
 };
 let wordleUltimaFilaAnimada = -1;
 
@@ -19012,7 +19025,20 @@ function iniciarWordleJuegoState(fechaISO) {
     wordleGameState.gameOver = !!progreso.gameOver;
     wordleGameState.won = !!progreso.won;
     wordleGameState.current = "";
+    wordleGameState.pistaActivada = wordleGameState.gameOver ? true : !!progreso.pistaActivada;
     wordleUltimaFilaAnimada = wordleGameState.guesses.length - 1;
+}
+
+function wordleActivarPista() {
+    if (wordleGameState.pistaActivada) return;
+    wordleGameState.pistaActivada = true;
+    const progreso = state.wordleProgress[wordleFechaActual];
+    if (progreso) {
+        progreso.pistaActivada = true;
+        dbSaveWordleProgress();
+    }
+    wordlePintarTeclado();
+    wordlePintarPistaLetras();
 }
 
 function wordleCrearTablero() {
@@ -19068,7 +19094,7 @@ function wordlePintarTeclado() {
         const letra = btn.dataset.key;
         btn.classList.remove("correct", "present", "absent", "key-hint");
         if (mejorEstado[letra]) btn.classList.add(mejorEstado[letra]);
-        if (wordleGameState.pistaLetras.includes(letra)) {
+        if (wordleGameState.pistaActivada && wordleGameState.pistaLetras.includes(letra)) {
             btn.classList.add("key-hint");
             btn.title = "Pista: esta letra no está en la palabra de hoy";
         } else {
@@ -19079,13 +19105,23 @@ function wordlePintarTeclado() {
 
 function wordlePintarPistaLetras() {
     const info = document.getElementById("wordlePistaLetrasInfo");
+    const btn = document.getElementById("wordleBtnPista");
     if (!info) return;
+
     if (!wordleGameState.pistaLetras || wordleGameState.pistaLetras.length === 0) {
         info.hidden = true;
+        if (btn) btn.hidden = true;
         return;
     }
-    info.hidden = false;
-    info.innerHTML = `💡 Pista de hoy: <b>${wordleGameState.pistaLetras.join(", ")}</b> no están en la palabra (mira el teclado).`;
+
+    if (wordleGameState.pistaActivada) {
+        info.hidden = false;
+        info.innerHTML = `💡 Pista de hoy: <b>${wordleGameState.pistaLetras.join(", ")}</b> no están en la palabra (mira el teclado).`;
+        if (btn) btn.hidden = true;
+    } else {
+        info.hidden = true;
+        if (btn) btn.hidden = false;
+    }
 }
 
 function wordlePintarDificultad() {
@@ -19260,7 +19296,7 @@ function construirWordleTeclado() {
             btn.type = "button";
             btn.dataset.key = tecla;
             if (tecla === "ENTER") {
-                btn.className = "wordle-key wide";
+                btn.className = "wordle-key wide key-enter";
                 btn.textContent = "Entrar";
             } else if (tecla === "BACK") {
                 btn.className = "wordle-key wide";
@@ -19293,6 +19329,19 @@ function setupWordleGameEvents() {
             wordleCalendarViewDate.setMonth(wordleCalendarViewDate.getMonth() + 1);
             renderWordleCalendar();
         });
+    }
+
+    const btnJugar = document.getElementById("btnWordleJugarHoy");
+    if (btnJugar) {
+        btnJugar.addEventListener("click", () => {
+            if (btnJugar.disabled) return;
+            abrirWordleJuego(wordleFechaISO(new Date()));
+        });
+    }
+
+    const btnPista = document.getElementById("wordleBtnPista");
+    if (btnPista) {
+        btnPista.addEventListener("click", () => wordleActivarPista());
     }
 
     const btnVolver = document.getElementById("btnWordleVolverCalendario");
