@@ -18529,24 +18529,22 @@ function renderAdminWordleBankList() {
         const collapsed = !!wordleBankCollapsedGroups[len];
 
         return `
-            <div class="card wordle-bank-group" data-len="${len}" style="padding: 0; margin-bottom: 14px; border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden;">
-                <div class="wordle-bank-group-header" style="cursor: pointer; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; background: rgba(212, 175, 55, 0.06);">
-                    <span style="font-weight: 700; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${len} letras <span class="text-muted" style="font-weight: 500;">(${words.length})</span></span>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${collapsed ? "-90deg" : "0deg"}); transition: transform 0.2s ease;">
+            <div class="card wordle-bank-group" data-len="${len}" style="padding: 0; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;">
+                <div class="wordle-bank-group-header" style="cursor: pointer; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; background: rgba(212, 175, 55, 0.06);">
+                    <span style="font-weight: 700; font-size: 0.85rem; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${len} letras <span class="text-muted" style="font-weight: 500;">(${words.length})</span></span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${collapsed ? "-90deg" : "0deg"}); transition: transform 0.2s ease;">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </div>
-                <div class="wordle-bank-group-content" style="display: ${collapsed ? "none" : "block"}; padding: 12px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; ${collapsed ? "display: none;" : ""}">
+                <div class="wordle-bank-group-content" style="${collapsed ? "display: none;" : "display: flex;"} flex-direction: column; gap: 2px; padding: 6px;">
                     ${words.length === 0
-                        ? `<p class="text-muted" style="grid-column: 1 / -1; margin: 0; font-size: 0.82rem;">Todavía no hay palabras de ${len} letras.</p>`
+                        ? `<p class="text-muted" style="margin: 2px 4px; font-size: 0.76rem;">Todavía no hay palabras de ${len} letras.</p>`
                         : words.map(w => `
-                            <div class="card" style="padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; gap: 8px;">
-                                <div style="font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.02rem; letter-spacing: 1px; color: var(--text-primary);">${escapeHtml(w.palabra)}</div>
-                                <p class="text-muted" style="margin: 0; font-size: 0.8rem; line-height: 1.35;">${escapeHtml(w.definicion || "")}</p>
-                                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">
-                                    <button class="btn btn-secondary btn-sm edit-wordle-word-btn" data-id="${w.id}" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 600;">✏️ Editar</button>
-                                    <button class="btn btn-secondary btn-sm delete-wordle-word-btn" data-id="${w.id}" style="padding: 5px 9px; font-size: 0.78rem; color: var(--color-absent);">🗑️</button>
-                                </div>
+                            <div style="display: flex; align-items: center; gap: 8px; padding: 3px 8px; border-radius: 5px;">
+                                <span style="font-weight: 700; font-size: 0.8rem; letter-spacing: 0.5px; color: var(--text-primary); flex-shrink: 0;">${escapeHtml(w.palabra)}</span>
+                                <span class="text-muted" style="font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${escapeHtml(w.definicion || "")}">${escapeHtml(w.definicion || "")}</span>
+                                <button class="edit-wordle-word-btn" data-id="${w.id}" title="Editar" style="flex-shrink: 0; background: none; border: none; cursor: pointer; padding: 2px 3px; font-size: 0.78rem; line-height: 1; opacity: 0.75;">✏️</button>
+                                <button class="delete-wordle-word-btn" data-id="${w.id}" title="Eliminar" style="flex-shrink: 0; background: none; border: none; cursor: pointer; padding: 2px 3px; font-size: 0.78rem; line-height: 1; color: var(--color-absent); opacity: 0.75;">🗑️</button>
                             </div>
                         `).join("")
                     }
