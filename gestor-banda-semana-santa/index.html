@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=540">
+    <link rel="stylesheet" href="style.css?v=543">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1429,6 +1429,14 @@
                         <p class="text-muted" style="margin: 0;">Gestiona los uniformes disponibles para que los músicos sepan cómo vestir en cada actuación.</p>
                     </div>
 
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-wordle-bank" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.1rem;">🔤</span>
+                            Banco de preguntas Wordle Cofrade
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Gestiona las palabras y definiciones del Wordle diario de Semana Santa.</p>
+                    </div>
+
                     <div class="card settings-card otros-nav-card" data-target="section-otros-estadisticas-avanzadas" style="cursor: pointer; position: relative;">
                         <h3 style="display: flex; align-items: center; gap: 10px;">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
@@ -1510,6 +1518,46 @@
                     <div id="admin-uniformes-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
                         <span style="font-size: 2rem; display: block; margin-bottom: 8px;">👔</span>
                         No hay uniformes configurados todavía.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Banco de preguntas Wordle Cofrade (gestión admin) -->
+            <section id="section-otros-wordle-bank" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+                <div class="card" style="padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                                🔤 Banco de preguntas Wordle Cofrade
+                            </h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Palabras de 4 a 9 letras, agrupadas por longitud. Cada palabra necesita una definición que se mostrará al revelarse.
+                            </p>
+                        </div>
+                        <button id="btn-add-wordle-word" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <span>➕</span> Añadir Palabra
+                        </button>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 10px 14px; background: rgba(212, 175, 55, 0.06); border: 1px solid var(--border-color); border-radius: 8px;">
+                        <label class="switch" title="Activar/Desactivar Wordle para los músicos">
+                            <input type="checkbox" id="toggle-wordle-enabled-musicians">
+                            <span class="slider round"></span>
+                        </label>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">Visible para los músicos</div>
+                            <div class="text-muted" style="font-size: 0.76rem; margin-top: 2px;">Desactivado por defecto. Actívalo cuando compruebes que el juego funciona bien — de momento solo existe en este panel.</div>
+                        </div>
+                    </div>
+
+                    <div id="admin-wordle-bank-groups"></div>
+                    <div id="admin-wordle-bank-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
+                        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🔤</span>
+                        No hay palabras configuradas todavía.
                     </div>
                 </div>
             </section>
@@ -3092,6 +3140,32 @@
         </div>
     </div>
 
+    <!-- Modal: Añadir/Editar Palabra del Banco Wordle Cofrade -->
+    <div id="modal-wordle-word" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3 id="modal-wordle-word-title">Añadir Palabra</h3>
+                <button class="modal-close" id="btn-close-wordle-word-modal">&times;</button>
+            </div>
+            <form id="form-wordle-word">
+                <input type="hidden" id="wordle-word-id">
+                <div class="form-group">
+                    <label for="wordle-word-input">Palabra (4 a 9 letras)</label>
+                    <input type="text" id="wordle-word-input" required maxlength="9" placeholder="Ej. PALIO, COSTALERO..." style="width: 100%; text-transform: uppercase;" autocomplete="off">
+                    <div id="wordle-word-length-hint" class="text-muted" style="font-size: 0.76rem; margin-top: 5px;"></div>
+                </div>
+                <div class="form-group">
+                    <label for="wordle-word-definicion-input">Definición</label>
+                    <textarea id="wordle-word-definicion-input" required rows="3" placeholder="Se mostrará al jugador cuando se revele la palabra" style="width: 100%; resize: vertical; padding: 10px; background-color: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-family: inherit; font-size: 0.88rem; line-height: 1.5; box-sizing: border-box;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-wordle-word-modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Palabra</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Cambiar Contraseña Directiva -->
     <div id="modal-change-admin-password" class="modal-overlay">
         <div class="modal-card" style="max-width: 400px; width: 90%;">
@@ -4381,9 +4455,9 @@
         </svg>
     </button>
 
-    <script src="app.js?v=540"></script>
+    <script src="app.js?v=543"></script>
     <script>
-        // Registro del Service Worker v=540.
+        // Registro del Service Worker v=543.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4412,9 +4486,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=540")
+                navigator.serviceWorker.register("sw.js?v=543")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v540 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v543 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);

@@ -102,6 +102,55 @@ const getDemoSessionTypes = () => {
     return types;
 };
 
+// Banco de palabras de partida para el Wordle Cofrade (se usa solo la primera vez,
+// si la directiva todavía no ha guardado ninguna palabra en la nube).
+const DEFAULT_WORDLE_BANK = [
+    { palabra: "PASO", definicion: "Conjunto escultórico que procesiona a hombros o con ruedas" },
+    { palabra: "CERA", definicion: "Lo que gotea de los cirios encendidos" },
+    { palabra: "VELA", definicion: "Se lleva encendida durante la procesión" },
+    { palabra: "LUTO", definicion: "Color y sentimiento del Viernes Santo" },
+    { palabra: "ANDA", definicion: "Otro nombre popular para el paso procesional" },
+    { palabra: "BOMBO", definicion: "Instrumento de percusión grave de la banda" },
+    { palabra: "TRONO", definicion: "Estructura elevada donde va la imagen sagrada" },
+    { palabra: "SAETA", definicion: "Cante flamenco improvisado al paso de una imagen" },
+    { palabra: "CIRIO", definicion: "Vela grande que portan nazarenos y penitentes" },
+    { palabra: "FAROL", definicion: "Elemento de luz que adorna varales y respiraderos" },
+    { palabra: "PALIO", definicion: "Techo de tela y orfebrería sobre la Virgen" },
+    { palabra: "VARAL", definicion: "Palo largo que sostiene el techo del paso" },
+    { palabra: "GUION", definicion: "Estandarte que abre el cortejo de una cofradía" },
+    { palabra: "VIRGEN", definicion: "Imagen mariana que procesiona bajo palio" },
+    { palabra: "TÚNICA", definicion: "Prenda larga que viste el nazareno" },
+    { palabra: "MARCHA", definicion: "Género musical que interpreta la banda en el desfile" },
+    { palabra: "ENSAYO", definicion: "Lo que hace la banda antes de la actuación" },
+    { palabra: "CLARÍN", definicion: "Instrumento de viento metal de sonido agudo" },
+    { palabra: "SOTANA", definicion: "Prenda talar que puede vestir un monaguillo" },
+    { palabra: "PENDÓN", definicion: "Bandera o estandarte procesional" },
+    { palabra: "TULIPA", definicion: "Copa de cristal que protege la llama del cirio" },
+    { palabra: "HACHÓN", definicion: "Vela gruesa y grande usada en las cofradías" },
+    { palabra: "DESFILE", definicion: "Recorrido ordenado de una procesión o cortejo" },
+    { palabra: "CORNETA", definicion: "Instrumento de viento típico de las bandas procesionales" },
+    { palabra: "REDOBLE", definicion: "Toque repetido y rápido del tambor" },
+    { palabra: "CAPATAZ", definicion: "Dirige y da las órdenes a los costaleros" },
+    { palabra: "ANTIFAZ", definicion: "Parte delantera del capirote que cubre el rostro" },
+    { palabra: "CAPILLA", definicion: "Agrupación musical reducida, también recinto religioso" },
+    { palabra: "BATERÍA", definicion: "Sección de percusión de la banda" },
+    { palabra: "CAPIROTE", definicion: "Cono rígido que corona la vestimenta del nazareno" },
+    { palabra: "INCIENSO", definicion: "Su humo y aroma acompañan el paso de las imágenes" },
+    { palabra: "TROMPETA", definicion: "Instrumento de viento metal muy presente en la banda" },
+    { palabra: "SILENCIO", definicion: "Lo que pide el capataz antes de un toque solemne" },
+    { palabra: "MANTILLA", definicion: "Prenda de encaje que lucen las mujeres el Jueves Santo" },
+    { palabra: "INSIGNIA", definicion: "Elemento simbólico que porta un miembro de la cofradía" },
+    { palabra: "DIRECTOR", definicion: "Quien dirige a la banda de música" },
+    { palabra: "COSTALERO", definicion: "Carga el paso a hombros por debajo del mismo" },
+    { palabra: "CLARINETE", definicion: "Instrumento de viento madera con boquilla de caña" },
+    { palabra: "PENITENTE", definicion: "Quien procesiona vistiendo túnica y capirote" },
+    { palabra: "HORQUILLA", definicion: "Vara con la que los costaleros descansan el paso" },
+    { palabra: "FLISCORNO", definicion: "Instrumento de viento metal similar a la trompeta" },
+    { palabra: "PROCESIÓN", definicion: "Desfile religioso solemne por las calles" },
+    { palabra: "PASODOBLE", definicion: "Género musical español muy tocado por bandas" },
+    { palabra: "MADRUGADA", definicion: "Momento del día en que procesiona el Cristo más esperado" }
+].map((w, i) => ({ id: "wb_seed_" + i, palabra: w.palabra, definicion: w.definicion }));
+
 // ==========================================================================
 // ESTADO GLOBAL DE LA APLICACIÓN
 // ==========================================================================
@@ -125,6 +174,8 @@ let state = {
     suggestions: [],
     rehearsalLocations: [],
     uniforms: [],
+    wordleBank: [],
+    wordleEnabledForMusicians: false,
     currentPreavisoDate: "",
     compCalendarYear: undefined,
     compCalendarMonth: undefined,
@@ -425,6 +476,19 @@ function initApp() {
         state.uniforms = [];
     }
 
+    const storedWordleBank = localStorage.getItem("harmonia_wordle_bank");
+    if (storedWordleBank) {
+        try {
+            state.wordleBank = JSON.parse(storedWordleBank);
+        } catch(e) {
+            state.wordleBank = null;
+        }
+    }
+    if (!state.wordleBank || !Array.isArray(state.wordleBank) || state.wordleBank.length === 0) {
+        state.wordleBank = DEFAULT_WORDLE_BANK.slice();
+    }
+    state.wordleEnabledForMusicians = localStorage.getItem("harmonia_wordle_enabled_for_musicians") === "true";
+
     // Cargar formaciones del simulador
     const storedConcierto = localStorage.getItem("yacente_formacion_concierto");
     const storedDesfile = localStorage.getItem("yacente_formacion_desfile");
@@ -671,6 +735,8 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks || { youtube: "", spotify: "" }));
     localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
     localStorage.setItem("harmonia_uniforms", JSON.stringify(state.uniforms || []));
+    localStorage.setItem("harmonia_wordle_bank", JSON.stringify(state.wordleBank || []));
+    localStorage.setItem("harmonia_wordle_enabled_for_musicians", state.wordleEnabledForMusicians ? "true" : "false");
 
     if (state.firebaseConfig) {
         localStorage.setItem("yacente_firebase_config", JSON.stringify(state.firebaseConfig));
@@ -722,9 +788,18 @@ function isPastLockBlocked(dateStr) {
     if (!state.pastLockEnabled) return false;
     const targetDate = dateStr || state.currentDate;
     if (!targetDate) return false;
+    const rawDate = String(targetDate).split("_")[0];
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
-    return targetDate < todayStr;
+    if (rawDate >= todayStr) return false; // hoy o futuro: nunca bloqueado
+
+    // Margen de gracia: el bloqueo solo se activa a partir de 2 días después del evento,
+    // para permitir correcciones rápidas del pase de lista (p.ej. alguien que sí vino y se saltó).
+    const [y, m, d] = rawDate.split("-").map(Number);
+    const eventDate = new Date(y, m - 1, d);
+    const today = new Date(dNow.getFullYear(), dNow.getMonth(), dNow.getDate());
+    const diffDays = Math.round((today - eventDate) / 86400000);
+    return diffDays >= 2;
 }
 
 function isSessionConcluded(dateKey, sessionInfo = null) {
@@ -780,6 +855,7 @@ let unsubSuggestions = null;
 let unsubRepertoireLinks = null;
 let unsubRehearsalLocations = null;
 let unsubUniforms = null;
+let unsubWordleBank = null;
 let unsubMarchaSeasonRemovals = null;
 let unsubNotificationsClearedAt = null;
 
@@ -1444,6 +1520,19 @@ function startCloudSync() {
     }, err => {
         console.error("Error sync uniformes:", err);
     });
+
+    // Escucha del banco de preguntas del Wordle Cofrade (sincronización en tiempo real)
+    unsubWordleBank = db.collection("settings").doc("wordleBank").onSnapshot(doc => {
+        if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
+            state.wordleBank = doc.data().list;
+            state.wordleEnabledForMusicians = !!doc.data().enabledForMusicians;
+            saveStateToLocalStorage();
+            renderAdminWordleBankList();
+            syncWordleEnabledToggleUI();
+        }
+    }, err => {
+        console.error("Error sync banco Wordle:", err);
+    });
 }
 
 // Detiene escuchas en tiempo real
@@ -1464,6 +1553,7 @@ function stopCloudSync() {
     if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
     if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
     if (unsubUniforms) { unsubUniforms(); unsubUniforms = null; }
+    if (unsubWordleBank) { unsubWordleBank(); unsubWordleBank = null; }
     if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
     if (unsubNotificationsClearedAt) { unsubNotificationsClearedAt(); unsubNotificationsClearedAt = null; }
 }
@@ -3871,6 +3961,7 @@ function setupMarchasDragAndDrop() {
     setupLugaresEnsayoEvents();
     setupUniformesEvents();
     setupUniformePreviewEvents();
+    setupWordleBankEvents();
     setupAdvancedStatsEvents();
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
@@ -4190,6 +4281,13 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Gestión de uniformes para las actuaciones";
             dateContainer.classList.add("hidden");
             renderAdminUniformesList();
+            break;
+        case "section-otros-wordle-bank":
+            pageTitle.innerText = "Banco de Preguntas Wordle Cofrade";
+            pageSubtitle.innerText = "Palabras y definiciones del Wordle diario";
+            dateContainer.classList.add("hidden");
+            renderAdminWordleBankList();
+            syncWordleEnabledToggleUI();
             break;
         case "section-otros-estadisticas-avanzadas":
             pageTitle.innerText = "Estadísticas Avanzadas";
@@ -18371,6 +18469,252 @@ function setupUniformesEvents() {
             renderUniformeOptions();
             closeModal();
             showToast("Uniforme guardado correctamente", "success");
+        });
+    }
+}
+
+// ==========================================================================
+// GESTIÓN DEL BANCO DE PREGUNTAS WORDLE COFRADE (DIRECTOR)
+// ==========================================================================
+
+function dbSaveWordleBank() {
+    saveStateToLocalStorage();
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("settings").doc("wordleBank").set({
+            list: state.wordleBank || [],
+            enabledForMusicians: !!state.wordleEnabledForMusicians
+        }).catch(err => console.error("Error al guardar el banco Wordle en la nube:", err));
+    }
+}
+
+function syncWordleEnabledToggleUI() {
+    const toggle = document.getElementById("toggle-wordle-enabled-musicians");
+    if (toggle) toggle.checked = !!state.wordleEnabledForMusicians;
+}
+
+// Quita tildes para comparar palabras sin importar los acentos (la Ñ se conserva,
+// no es una vocal acentuada). Se usa solo para detectar duplicados.
+function normalizeWordleWord(str) {
+    return (str || "")
+        .toUpperCase()
+        .split("")
+        .map(ch => (ch === "Ñ" ? ch : ch.normalize("NFD").replace(/[̀-ͯ]/g, "")))
+        .join("");
+}
+
+const wordleBankCollapsedGroups = {};
+
+function renderAdminWordleBankList() {
+    const container = document.getElementById("admin-wordle-bank-groups");
+    const emptyEl = document.getElementById("admin-wordle-bank-empty");
+    if (!container) return;
+
+    const bank = state.wordleBank || [];
+
+    if (bank.length === 0) {
+        container.innerHTML = "";
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    const lengths = [4, 5, 6, 7, 8, 9];
+    container.innerHTML = lengths.map(len => {
+        const words = bank
+            .filter(w => (w.palabra || "").length === len)
+            .sort((a, b) => a.palabra.localeCompare(b.palabra, "es"));
+        const collapsed = !!wordleBankCollapsedGroups[len];
+
+        return `
+            <div class="card wordle-bank-group" data-len="${len}" style="padding: 0; margin-bottom: 14px; border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden;">
+                <div class="wordle-bank-group-header" style="cursor: pointer; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; background: rgba(212, 175, 55, 0.06);">
+                    <span style="font-weight: 700; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${len} letras <span class="text-muted" style="font-weight: 500;">(${words.length})</span></span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${collapsed ? "-90deg" : "0deg"}); transition: transform 0.2s ease;">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="wordle-bank-group-content" style="display: ${collapsed ? "none" : "block"}; padding: 12px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; ${collapsed ? "display: none;" : ""}">
+                    ${words.length === 0
+                        ? `<p class="text-muted" style="grid-column: 1 / -1; margin: 0; font-size: 0.82rem;">Todavía no hay palabras de ${len} letras.</p>`
+                        : words.map(w => `
+                            <div class="card" style="padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.02rem; letter-spacing: 1px; color: var(--text-primary);">${escapeHtml(w.palabra)}</div>
+                                <p class="text-muted" style="margin: 0; font-size: 0.8rem; line-height: 1.35;">${escapeHtml(w.definicion || "")}</p>
+                                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.06);">
+                                    <button class="btn btn-secondary btn-sm edit-wordle-word-btn" data-id="${w.id}" style="padding: 5px 10px; font-size: 0.78rem; font-weight: 600;">✏️ Editar</button>
+                                    <button class="btn btn-secondary btn-sm delete-wordle-word-btn" data-id="${w.id}" style="padding: 5px 9px; font-size: 0.78rem; color: var(--color-absent);">🗑️</button>
+                                </div>
+                            </div>
+                        `).join("")
+                    }
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    container.querySelectorAll(".wordle-bank-group-header").forEach(header => {
+        header.addEventListener("click", () => {
+            const group = header.closest(".wordle-bank-group");
+            const len = group.dataset.len;
+            wordleBankCollapsedGroups[len] = !wordleBankCollapsedGroups[len];
+            renderAdminWordleBankList();
+        });
+    });
+
+    container.querySelectorAll(".edit-wordle-word-btn").forEach(btn => {
+        btn.addEventListener("click", () => openWordleWordModal(btn.dataset.id));
+    });
+
+    container.querySelectorAll(".delete-wordle-word-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const id = btn.dataset.id;
+            const w = (state.wordleBank || []).find(x => x.id === id);
+            if (!w) return;
+            if (confirm(`¿Estás seguro de eliminar la palabra "${w.palabra}" del banco Wordle?`)) {
+                state.wordleBank = state.wordleBank.filter(x => x.id !== id);
+                dbSaveWordleBank();
+                renderAdminWordleBankList();
+                showToast("Palabra eliminada del banco", "info");
+            }
+        });
+    });
+}
+
+function updateWordleWordLengthHint(rawValue) {
+    const hintEl = document.getElementById("wordle-word-length-hint");
+    if (!hintEl) return;
+    const len = (rawValue || "").trim().length;
+    if (len === 0) {
+        hintEl.textContent = "Entre 4 y 9 letras";
+        hintEl.style.color = "";
+        return;
+    }
+    if (len < 4) {
+        hintEl.textContent = `${len} caracteres — mínimo 4`;
+        hintEl.style.color = "var(--color-absent)";
+    } else if (len > 9) {
+        hintEl.textContent = `${len} caracteres — máximo 9`;
+        hintEl.style.color = "var(--color-absent)";
+    } else {
+        hintEl.textContent = `${len} caracteres`;
+        hintEl.style.color = "var(--color-present)";
+    }
+}
+
+function openWordleWordModal(id = null) {
+    const modal = document.getElementById("modal-wordle-word");
+    const titleEl = document.getElementById("modal-wordle-word-title");
+    const idInput = document.getElementById("wordle-word-id");
+    const wordInput = document.getElementById("wordle-word-input");
+    const defInput = document.getElementById("wordle-word-definicion-input");
+    if (!modal) return;
+
+    if (id) {
+        const w = (state.wordleBank || []).find(x => x.id === id);
+        if (w) {
+            if (titleEl) titleEl.innerText = "Editar Palabra";
+            if (idInput) idInput.value = w.id;
+            if (wordInput) wordInput.value = w.palabra || "";
+            if (defInput) defInput.value = w.definicion || "";
+        }
+    } else {
+        if (titleEl) titleEl.innerText = "Añadir Palabra";
+        if (idInput) idInput.value = "";
+        if (wordInput) wordInput.value = "";
+        if (defInput) defInput.value = "";
+    }
+
+    updateWordleWordLengthHint(wordInput ? wordInput.value : "");
+    modal.classList.add("active");
+    if (wordInput) wordInput.focus();
+}
+
+function setupWordleBankEvents() {
+    const btnAdd = document.getElementById("btn-add-wordle-word");
+    if (btnAdd) {
+        btnAdd.addEventListener("click", () => openWordleWordModal());
+    }
+
+    const toggleEnabled = document.getElementById("toggle-wordle-enabled-musicians");
+    if (toggleEnabled) {
+        toggleEnabled.checked = !!state.wordleEnabledForMusicians;
+        toggleEnabled.addEventListener("change", () => {
+            state.wordleEnabledForMusicians = toggleEnabled.checked;
+            dbSaveWordleBank();
+            showToast(
+                state.wordleEnabledForMusicians
+                    ? "Wordle visible para los músicos"
+                    : "Wordle oculto para los músicos",
+                state.wordleEnabledForMusicians ? "success" : "info"
+            );
+        });
+    }
+
+    const modal = document.getElementById("modal-wordle-word");
+    const btnClose = document.getElementById("btn-close-wordle-word-modal");
+    const btnCancel = document.getElementById("btn-cancel-wordle-word-modal");
+    const form = document.getElementById("form-wordle-word");
+    const wordInput = document.getElementById("wordle-word-input");
+
+    if (wordInput) {
+        wordInput.addEventListener("input", () => updateWordleWordLengthHint(wordInput.value));
+    }
+
+    const closeModal = () => {
+        if (modal) modal.classList.remove("active");
+    };
+
+    if (btnClose) btnClose.addEventListener("click", closeModal);
+    if (btnCancel) btnCancel.addEventListener("click", closeModal);
+
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const id = document.getElementById("wordle-word-id").value;
+            const rawWord = document.getElementById("wordle-word-input").value.trim().toUpperCase();
+            const definicion = document.getElementById("wordle-word-definicion-input").value.trim();
+
+            if (rawWord.length < 4 || rawWord.length > 9) {
+                showToast("La palabra debe tener entre 4 y 9 letras", "error");
+                return;
+            }
+            if (!/^[A-ZÁÉÍÓÚÜÑ]+$/.test(rawWord)) {
+                showToast("La palabra solo puede contener letras (sin espacios ni números)", "error");
+                return;
+            }
+            if (!definicion) {
+                showToast("Añade una definición para la palabra", "error");
+                return;
+            }
+
+            if (!state.wordleBank) state.wordleBank = [];
+
+            const normalized = normalizeWordleWord(rawWord);
+            const duplicate = state.wordleBank.find(w => w.id !== id && normalizeWordleWord(w.palabra) === normalized);
+            if (duplicate) {
+                showToast(`"${duplicate.palabra}" ya está en el banco de palabras`, "error");
+                return;
+            }
+
+            if (id) {
+                const idx = state.wordleBank.findIndex(w => w.id === id);
+                if (idx !== -1) {
+                    state.wordleBank[idx].palabra = rawWord;
+                    state.wordleBank[idx].definicion = definicion;
+                }
+            } else {
+                state.wordleBank.push({
+                    id: "wb_" + Date.now(),
+                    palabra: rawWord,
+                    definicion: definicion
+                });
+            }
+
+            dbSaveWordleBank();
+            renderAdminWordleBankList();
+            closeModal();
+            showToast("Palabra guardada correctamente", "success");
         });
     }
 }
