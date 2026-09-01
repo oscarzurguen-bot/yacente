@@ -6590,6 +6590,7 @@ function renderStatistics() {
         renderStatsMarchasOlvidadas();
         renderGeneralOverviewChart();
         renderDayHeatmap([]);
+        renderStatsVocesChart([]);
         renderStatsEnsayos([]);
         renderStatsDireccion([]);
         return;
@@ -6761,6 +6762,7 @@ function renderStatistics() {
     renderStatsMarchasOlvidadas();
     renderGeneralOverviewChart();
     renderDayHeatmap(filteredDates);
+    renderStatsVocesChart(filteredDates);
     renderStatsEnsayos(filteredDates);
     renderStatsDireccion(filteredDates);
 }
@@ -18813,11 +18815,13 @@ function renderGeneralOverviewChart() {
     const container = document.getElementById("stats-ov-chart-container");
     if (!container) return;
 
-    // 1. Gather all rehearsal sessions (only past ones, matching other stats)
+    // 1. Gather all rehearsal sessions (only past ones, matching other stats).
+    // Se excluyen los ensayos de sección (por voces) para que no distorsionen la
+    // visión general del grupo completo: solo convocan a una parte de la banda.
     const rehearsalDates = Object.keys(state.attendance).filter(dateKey => {
         const session = state.sessionTypes[dateKey];
         const isPast = isSessionConcluded(dateKey);
-        return isPast && (!session || session.type === "ensayo");
+        return isPast && (!session || session.type === "ensayo") && !isSectionRehearsal(session);
     });
 
     // 2. Dynamic Season Dropdown Population
@@ -19581,6 +19585,10 @@ function renderDayHeatmap(filteredDates) {
     }));
 
     filteredDates.forEach(dateStr => {
+        // Se excluyen los ensayos de sección (por voces) para que no distorsionen la
+        // asistencia media del grupo completo: solo convocan a una parte de la banda.
+        if (isSectionRehearsal(state.sessionTypes[dateStr])) return;
+
         // dateStr puede llevar sufijo (p.ej. "2026-05-01_1" o "2026-05-01_trompetas1" para sesiones
         // múltiples/especiales el mismo día); hay que quedarse solo con la fecha real antes de parsear,
         // si no new Date(...) da Invalid Date y dayIdx sale NaN.
@@ -19693,6 +19701,136 @@ function renderDayHeatmap(filteredDates) {
                 <span>0%</span>
             </div>
             
+            <div class="grid-lines" style="position: absolute; left: 35px; right: 0; top: 0; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
+                <div style="border-top: 1px solid var(--border-color); width: 100%;"></div>
+            </div>
+
+            <div class="bars-container" style="display: flex; flex: 1; justify-content: space-around; align-items: flex-end; height: 100%; z-index: 1; padding-bottom: 30px; box-sizing: border-box; gap: 8px;">
+                ${barsHTML}
+            </div>
+        </div>
+        ${insightsHTML}
+    `;
+}
+
+// ==========================================================================
+// GRÁFICO DE BARRAS DE ASISTENCIA POR ENSAYOS DE VOCES (ESTILO DÍAS DE LA SEMANA)
+// ==========================================================================
+// Una barra por cada subtipo de ensayo seccional (Trompetas 1ª, Bajos, Cornetas...)
+// presente en los datos, con el % de asistencia de los músicos convocados a esa
+// sección. El denominador solo cuenta a quien fue convocado (y tiene ficha de
+// asistencia ese día), así que no se penaliza a quien no pertenece a la sección.
+function renderStatsVocesChart(filteredDates) {
+    const container = document.getElementById("stats-voces-chart-container");
+    if (!container) return;
+
+    const voiceStats = {};
+
+    (filteredDates || []).forEach(dateStr => {
+        const sessionInfo = state.sessionTypes[dateStr];
+        if (!isSectionRehearsal(sessionInfo)) return;
+
+        const subtype = sessionInfo.subtype;
+        if (!voiceStats[subtype]) {
+            voiceStats[subtype] = { subtype, sessionsCount: 0, totalPossible: 0, totalPresents: 0 };
+        }
+
+        const dayRecord = state.attendance[dateStr] || {};
+        let dayPresents = 0;
+        let dayPossible = 0;
+        state.musicians.forEach(m => {
+            if (isMusicianOnLeaveOnDate(m, dateStr)) return;
+            const r = dayRecord[m.id];
+            if (r) {
+                dayPossible++;
+                if (r.status === "present") dayPresents++;
+            }
+        });
+
+        if (dayPossible > 0) {
+            voiceStats[subtype].sessionsCount++;
+            voiceStats[subtype].totalPossible += dayPossible;
+            voiceStats[subtype].totalPresents += dayPresents;
+        }
+    });
+
+    const stats = Object.values(voiceStats)
+        .map(v => ({
+            ...v,
+            label: getRehearsalSubtypeText(v.subtype),
+            avgPct: v.totalPossible > 0 ? Math.round((v.totalPresents / v.totalPossible) * 100) : 0
+        }))
+        .sort((a, b) => b.avgPct - a.avgPct);
+
+    if (stats.length === 0) {
+        container.innerHTML = `<p class="text-muted text-center" style="padding: 20px 0;">No hay ensayos por voces registrados en este período.</p>`;
+        return;
+    }
+
+    let bestVoice = stats[0];
+    let worstVoice = stats[stats.length - 1];
+
+    let barsHTML = "";
+    stats.forEach(stat => {
+        const heightPct = stat.avgPct;
+        const displayValue = `${stat.avgPct}%`;
+        const tooltip = `${stat.label}: ${stat.avgPct}% asistencia (${stat.sessionsCount} convocatoria${stat.sessionsCount !== 1 ? 's' : ''})`;
+
+        let barGradient, valColor;
+        if (stat.avgPct >= 80) {
+            barGradient = "linear-gradient(180deg, #2ecc71 0%, rgba(46, 204, 113, 0.35) 100%)";
+            valColor = "#2ecc71";
+        } else if (stat.avgPct >= 60) {
+            barGradient = "linear-gradient(180deg, var(--color-gold) 0%, rgba(212, 175, 55, 0.35) 100%)";
+            valColor = "var(--color-gold)";
+        } else {
+            barGradient = "linear-gradient(180deg, #e74c3c 0%, rgba(231, 76, 60, 0.35) 100%)";
+            valColor = "#e74c3c";
+        }
+
+        barsHTML += `
+            <div class="chart-bar-wrapper" style="display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 32px; max-width: 80px; height: 100%; justify-content: flex-end; position: relative;">
+                <span class="bar-value" style="font-size: 0.75rem; font-weight: 700; color: ${valColor}; margin-bottom: 6px; z-index: 2; transition: opacity 0.2s;">
+                    ${displayValue}
+                </span>
+                <div class="bar-fill" style="width: 55%; height: ${heightPct}%; background: ${barGradient}; border-radius: 4px 4px 0 0; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: help; min-height: 4px" title="${tooltip}"></div>
+                <span class="bar-label" style="position: absolute; bottom: -24px; font-size: 0.75rem; color: var(--text-color); font-weight: 600; white-space: nowrap;">
+                    ${stat.label}
+                </span>
+            </div>
+        `;
+    });
+
+    let insightsHTML = "";
+    if (bestVoice) {
+        let insightText = `La sección con mejor asistencia en sus ensayos por voces es <strong>${bestVoice.label}</strong> con un <strong>${bestVoice.avgPct}%</strong> (${bestVoice.sessionsCount} ${bestVoice.sessionsCount !== 1 ? 'convocatorias' : 'convocatoria'}).`;
+        if (worstVoice && worstVoice.label !== bestVoice.label) {
+            insightText += ` La que menos convoca es <strong>${worstVoice.label}</strong> (<strong>${worstVoice.avgPct}%</strong>).`;
+        }
+        insightsHTML = `
+            <div class="day-heatmap-insight-box" style="margin-top: 28px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.2rem;">💡</span>
+                    <span style="font-size: 0.88rem; color: var(--text-primary);">${insightText}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="custom-vertical-chart" style="display: flex; height: 260px; width: 100%; border-bottom: 2px solid var(--border-color); border-left: 2px solid var(--border-color); position: relative; padding: 20px 10px 0 45px; box-sizing: border-box; font-family: 'Outfit', sans-serif;">
+            <div class="y-axis" style="position: absolute; left: 0; top: 0; bottom: 30px; width: 35px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 0.72rem; color: var(--text-muted); padding-right: 6px; box-sizing: border-box;">
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
+            </div>
+
             <div class="grid-lines" style="position: absolute; left: 35px; right: 0; top: 0; bottom: 30px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0;">
                 <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
                 <div style="border-top: 1px dashed rgba(255,255,255,0.06); width: 100%;"></div>
