@@ -133,22 +133,7 @@ const DEFAULT_WORDLE_BANK = [
     { palabra: "CAPATAZ", definicion: "Dirige y da las órdenes a los costaleros" },
     { palabra: "ANTIFAZ", definicion: "Parte delantera del capirote que cubre el rostro" },
     { palabra: "CAPILLA", definicion: "Agrupación musical reducida, también recinto religioso" },
-    { palabra: "BATERÍA", definicion: "Sección de percusión de la banda" },
-    { palabra: "CAPIROTE", definicion: "Cono rígido que corona la vestimenta del nazareno" },
-    { palabra: "INCIENSO", definicion: "Su humo y aroma acompañan el paso de las imágenes" },
-    { palabra: "TROMPETA", definicion: "Instrumento de viento metal muy presente en la banda" },
-    { palabra: "SILENCIO", definicion: "Lo que pide el capataz antes de un toque solemne" },
-    { palabra: "MANTILLA", definicion: "Prenda de encaje que lucen las mujeres el Jueves Santo" },
-    { palabra: "INSIGNIA", definicion: "Elemento simbólico que porta un miembro de la cofradía" },
-    { palabra: "DIRECTOR", definicion: "Quien dirige a la banda de música" },
-    { palabra: "COSTALERO", definicion: "Carga el paso a hombros por debajo del mismo" },
-    { palabra: "CLARINETE", definicion: "Instrumento de viento madera con boquilla de caña" },
-    { palabra: "PENITENTE", definicion: "Quien procesiona vistiendo túnica y capirote" },
-    { palabra: "HORQUILLA", definicion: "Vara con la que los costaleros descansan el paso" },
-    { palabra: "FLISCORNO", definicion: "Instrumento de viento metal similar a la trompeta" },
-    { palabra: "PROCESIÓN", definicion: "Desfile religioso solemne por las calles" },
-    { palabra: "PASODOBLE", definicion: "Género musical español muy tocado por bandas" },
-    { palabra: "MADRUGADA", definicion: "Momento del día en que procesiona el Cristo más esperado" }
+    { palabra: "BATERÍA", definicion: "Sección de percusión de la banda" }
 ].map((w, i) => ({ id: "wb_seed_" + i, palabra: w.palabra, definicion: w.definicion }));
 
 // ==========================================================================
@@ -487,6 +472,8 @@ function initApp() {
     if (!state.wordleBank || !Array.isArray(state.wordleBank) || state.wordleBank.length === 0) {
         state.wordleBank = DEFAULT_WORDLE_BANK.slice();
     }
+    // Migración: el juego ya no admite palabras de 8-9 letras, se descartan las que hubiera.
+    state.wordleBank = state.wordleBank.filter(w => (w.palabra || "").length >= 4 && (w.palabra || "").length <= 7);
     state.wordleEnabledForMusicians = localStorage.getItem("harmonia_wordle_enabled_for_musicians") === "true";
 
     // Cargar formaciones del simulador
@@ -1524,11 +1511,16 @@ function startCloudSync() {
     // Escucha del banco de preguntas del Wordle Cofrade (sincronización en tiempo real)
     unsubWordleBank = db.collection("settings").doc("wordleBank").onSnapshot(doc => {
         if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
-            state.wordleBank = doc.data().list;
+            const listaOriginal = doc.data().list;
+            // Migración: el juego ya no admite palabras de 8-9 letras, se descartan las que hubiera.
+            state.wordleBank = listaOriginal.filter(w => (w.palabra || "").length >= 4 && (w.palabra || "").length <= 7);
             state.wordleEnabledForMusicians = !!doc.data().enabledForMusicians;
             saveStateToLocalStorage();
             renderAdminWordleBankList();
             syncWordleEnabledToggleUI();
+            if (state.wordleBank.length !== listaOriginal.length) {
+                dbSaveWordleBank();
+            }
         }
     }, err => {
         console.error("Error sync banco Wordle:", err);
@@ -18478,6 +18470,13 @@ function setupUniformesEvents() {
 // ==========================================================================
 // GESTIÓN DEL BANCO DE PREGUNTAS WORDLE COFRADE (DIRECTOR)
 // ==========================================================================
+// Solo se juega con palabras de 4 a 7 letras: la longitud marca la dificultad.
+const WORDLE_DIFICULTAD_POR_LONGITUD = {
+    4: "Fácil",
+    5: "Normal",
+    6: "Difícil",
+    7: "Muy difícil"
+};
 
 function dbSaveWordleBank() {
     saveStateToLocalStorage();
@@ -18521,7 +18520,7 @@ function renderAdminWordleBankList() {
     }
     if (emptyEl) emptyEl.classList.add("hidden");
 
-    const lengths = [4, 5, 6, 7, 8, 9];
+    const lengths = [4, 5, 6, 7];
     container.innerHTML = lengths.map(len => {
         const words = bank
             .filter(w => (w.palabra || "").length === len)
@@ -18531,7 +18530,7 @@ function renderAdminWordleBankList() {
         return `
             <div class="card wordle-bank-group" data-len="${len}" style="padding: 0; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden;">
                 <div class="wordle-bank-group-header" style="cursor: pointer; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; background: rgba(212, 175, 55, 0.06);">
-                    <span style="font-weight: 700; font-size: 0.85rem; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${len} letras <span class="text-muted" style="font-weight: 500;">(${words.length})</span></span>
+                    <span style="font-weight: 700; font-size: 0.85rem; color: var(--color-gold); font-family: 'Outfit', sans-serif;">${len} letras · ${WORDLE_DIFICULTAD_POR_LONGITUD[len]} <span class="text-muted" style="font-weight: 500;">(${words.length})</span></span>
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="transform: rotate(${collapsed ? "-90deg" : "0deg"}); transition: transform 0.2s ease;">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
@@ -18586,18 +18585,18 @@ function updateWordleWordLengthHint(rawValue) {
     if (!hintEl) return;
     const len = (rawValue || "").trim().length;
     if (len === 0) {
-        hintEl.textContent = "Entre 4 y 9 letras";
+        hintEl.textContent = "Entre 4 y 7 letras";
         hintEl.style.color = "";
         return;
     }
     if (len < 4) {
         hintEl.textContent = `${len} caracteres — mínimo 4`;
         hintEl.style.color = "var(--color-absent)";
-    } else if (len > 9) {
-        hintEl.textContent = `${len} caracteres — máximo 9`;
+    } else if (len > 7) {
+        hintEl.textContent = `${len} caracteres — máximo 7`;
         hintEl.style.color = "var(--color-absent)";
     } else {
-        hintEl.textContent = `${len} caracteres`;
+        hintEl.textContent = `${len} caracteres · ${WORDLE_DIFICULTAD_POR_LONGITUD[len]}`;
         hintEl.style.color = "var(--color-present)";
     }
 }
@@ -18675,8 +18674,8 @@ function setupWordleBankEvents() {
             const rawWord = document.getElementById("wordle-word-input").value.trim().toUpperCase();
             const definicion = document.getElementById("wordle-word-definicion-input").value.trim();
 
-            if (rawWord.length < 4 || rawWord.length > 9) {
-                showToast("La palabra debe tener entre 4 y 9 letras", "error");
+            if (rawWord.length < 4 || rawWord.length > 7) {
+                showToast("La palabra debe tener entre 4 y 7 letras", "error");
                 return;
             }
             if (!/^[A-ZÁÉÍÓÚÜÑ]+$/.test(rawWord)) {

@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=546">
+    <link rel="stylesheet" href="style.css?v=547">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1551,7 +1551,7 @@
                                 🔤 Banco de preguntas Wordle Cofrade
                             </h3>
                             <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
-                                Palabras de 4 a 9 letras, agrupadas por longitud. Cada palabra necesita una definición que se mostrará al revelarse.
+                                Palabras de 4 a 7 letras (a más letras, más difícil), agrupadas por longitud. Cada palabra necesita una definición que se mostrará al revelarse.
                             </p>
                         </div>
                         <button id="btn-add-wordle-word" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
@@ -3166,8 +3166,8 @@
             <form id="form-wordle-word">
                 <input type="hidden" id="wordle-word-id">
                 <div class="form-group">
-                    <label for="wordle-word-input">Palabra (4 a 9 letras)</label>
-                    <input type="text" id="wordle-word-input" required maxlength="9" placeholder="Ej. PALIO, COSTALERO..." style="width: 100%; text-transform: uppercase;" autocomplete="off">
+                    <label for="wordle-word-input">Palabra (4 a 7 letras)</label>
+                    <input type="text" id="wordle-word-input" required maxlength="7" placeholder="Ej. PALIO, DESFILE..." style="width: 100%; text-transform: uppercase;" autocomplete="off">
                     <div id="wordle-word-length-hint" class="text-muted" style="font-size: 0.76rem; margin-top: 5px;"></div>
                 </div>
                 <div class="form-group">
@@ -4471,9 +4471,9 @@
         </svg>
     </button>
 
-    <script src="app.js?v=546"></script>
+    <script src="app.js?v=547"></script>
     <script>
-        // Registro del Service Worker v=546.
+        // Registro del Service Worker v=547.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4502,9 +4502,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=546")
+                navigator.serviceWorker.register("sw.js?v=547")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v546 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v547 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
