@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=551">
+    <link rel="stylesheet" href="style.css?v=552">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -4540,7 +4540,7 @@
             <div class="musician-drawer-body">
 
                 <a href="#" class="drawer-item drawer-item-wordle" data-target="section-componente-wordle">
-                    <span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1;">🔤</span>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" y2="14" x2="8"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.01-.1-.017-.151A4 4 0 0 0 17.32 5z"></path></svg>
                     <span>Wordle</span>
                 </a>
                 <a href="#" class="drawer-item drawer-item-sugerencias" data-target="section-componente-sugerencias">
@@ -4562,10 +4562,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=551"></script>
-    <script src="app.js?v=551"></script>
+    <script src="dictionary-es.js?v=552"></script>
+    <script src="app.js?v=552"></script>
     <script>
-        // Registro del Service Worker v=551.
+        // Registro del Service Worker v=552.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4594,9 +4594,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=551")
+                navigator.serviceWorker.register("sw.js?v=552")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v551 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v552 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
