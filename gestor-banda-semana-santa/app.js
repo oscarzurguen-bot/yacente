@@ -161,6 +161,7 @@ let state = {
     uniforms: [],
     wordleBank: [],
     wordleEnabledForMusicians: false,
+    wordleProgress: {},
     currentPreavisoDate: "",
     compCalendarYear: undefined,
     compCalendarMonth: undefined,
@@ -3954,6 +3955,7 @@ function setupMarchasDragAndDrop() {
     setupUniformesEvents();
     setupUniformePreviewEvents();
     setupWordleBankEvents();
+    setupWordleGameEvents();
     setupAdvancedStatsEvents();
     setupMarchaAudioLinksModalEvents();
     setupMarchaModalEvents();
@@ -4076,6 +4078,11 @@ function renderActiveSection(sectionId, forcedDirection) {
         document.body.classList.add("component-portal");
         if (mobNav) mobNav.classList.remove("hidden");
         if (!sectionId.startsWith("section-componente-")) {
+            sectionId = "section-componente-ficha";
+        }
+        // El Wordle está detrás del interruptor "Visible para los músicos" (Otros > Banco de
+        // preguntas Wordle Cofrade): aunque alguien fuerce la navegación, no se muestra si está apagado.
+        if (!state.wordleEnabledForMusicians && (sectionId === "section-componente-wordle" || sectionId === "section-componente-wordle-jugar")) {
             sectionId = "section-componente-ficha";
         }
     } else {
@@ -4249,6 +4256,19 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageTitle.innerText = "Ajustes";
             pageSubtitle.innerText = "Seguridad y gestión de la cuenta";
             dateContainer.classList.add("hidden");
+            break;
+        case "section-componente-wordle":
+            pageTitle.innerText = "Wordle";
+            pageSubtitle.innerText = "Adivina la palabra del día";
+            dateContainer.classList.add("hidden");
+            cargarWordleProgress(() => renderWordleCalendar());
+            break;
+        case "section-componente-wordle-jugar":
+            pageTitle.innerText = "Wordle";
+            pageSubtitle.innerText = "";
+            dateContainer.classList.add("hidden");
+            iniciarWordleJuegoState(wordleFechaActual);
+            renderWordleJuego();
             break;
         case "section-otros":
             pageTitle.innerText = "Otros";
@@ -16858,6 +16878,9 @@ function setupMusicianDrawerAndSettingsEvents() {
         document.querySelectorAll(".drawer-item").forEach(d => {
             d.classList.toggle("active", d.getAttribute("data-target") === currentId);
         });
+        document.querySelectorAll(".drawer-item-wordle").forEach(d => {
+            d.classList.toggle("hidden", !state.wordleEnabledForMusicians);
+        });
     };
 
     const closeDrawer = () => {
@@ -18716,6 +18739,599 @@ function setupWordleBankEvents() {
             showToast("Palabra guardada correctamente", "success");
         });
     }
+}
+
+// ==========================================================================
+// JUEGO WORDLE COFRADE (VISTA DEL MÚSICO)
+// ==========================================================================
+const WORDLE_DIFICULTAD_COLOR = {
+    4: "var(--color-present)",
+    5: "var(--color-gold)",
+    6: "var(--color-justified)",
+    7: "var(--color-absent)"
+};
+
+const WORDLE_LETRAS_TECLADO = [
+    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L", "Ñ"],
+    ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BACK"]
+];
+const WORDLE_ALFABETO_TECLADO = WORDLE_LETRAS_TECLADO.flat().filter(t => t !== "ENTER" && t !== "BACK");
+
+function wordleHashCadena(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+        h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    }
+    return h;
+}
+
+function wordleMulberry32(seed) {
+    return function () {
+        seed |= 0;
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function wordleFechaISO(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function wordleIntentosSegunLongitud(len) {
+    if (len <= 5) return 6;
+    return 7;
+}
+
+function wordleLetrasPistaDelDia(targetNorm) {
+    const candidatas = WORDLE_ALFABETO_TECLADO.filter(l => !targetNorm.includes(l));
+    const rand = wordleMulberry32(wordleHashCadena(targetNorm));
+    const pool = candidatas.slice();
+    const elegidas = [];
+    for (let i = 0; i < 3 && pool.length > 0; i++) {
+        const idx = Math.floor(rand() * pool.length);
+        elegidas.push(pool[idx]);
+        pool.splice(idx, 1);
+    }
+    return elegidas;
+}
+
+function wordleEvaluarIntento(guessNorm, targetNorm) {
+    const len = targetNorm.length;
+    const resultado = new Array(len).fill("absent");
+    const disponibles = {};
+
+    for (let i = 0; i < len; i++) {
+        if (guessNorm[i] === targetNorm[i]) {
+            resultado[i] = "correct";
+        } else {
+            disponibles[targetNorm[i]] = (disponibles[targetNorm[i]] || 0) + 1;
+        }
+    }
+    for (let i = 0; i < len; i++) {
+        if (resultado[i] === "correct") continue;
+        const letra = guessNorm[i];
+        if (disponibles[letra] > 0) {
+            resultado[i] = "present";
+            disponibles[letra]--;
+        }
+    }
+    return resultado;
+}
+
+// ---- Persistencia del progreso (por músico) ----
+function dbSaveWordleProgress() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+    localStorage.setItem("harmonia_wordle_progress_" + musicianId, JSON.stringify(state.wordleProgress || {}));
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("wordleProgress").doc(String(musicianId)).set({ days: state.wordleProgress || {} }, { merge: true })
+            .catch(err => console.error("Error al guardar progreso Wordle:", err));
+    }
+}
+
+function cargarWordleProgress(callback) {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) {
+        state.wordleProgress = {};
+        if (callback) callback();
+        return;
+    }
+    const stored = localStorage.getItem("harmonia_wordle_progress_" + musicianId);
+    try {
+        state.wordleProgress = stored ? JSON.parse(stored) : {};
+    } catch (e) {
+        state.wordleProgress = {};
+    }
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        db.collection("wordleProgress").doc(String(musicianId)).get().then(doc => {
+            if (doc.exists && doc.data() && doc.data().days) {
+                state.wordleProgress = doc.data().days;
+                localStorage.setItem("harmonia_wordle_progress_" + musicianId, JSON.stringify(state.wordleProgress));
+            }
+            if (callback) callback();
+        }).catch(err => {
+            console.error("Error al cargar progreso Wordle:", err);
+            if (callback) callback();
+        });
+    } else {
+        if (callback) callback();
+    }
+}
+
+// ---- Calendario ----
+const WORDLE_MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+let wordleCalendarViewDate = new Date();
+
+function wordlePalabraParaFecha(fechaISO) {
+    const progreso = state.wordleProgress[fechaISO];
+    if (progreso && progreso.entry) return progreso.entry;
+    const bank = state.wordleBank || [];
+    if (bank.length === 0) return null;
+    const idx = wordleHashCadena(fechaISO) % bank.length;
+    return bank[idx];
+}
+
+function renderWordleCalendar() {
+    const grid = document.getElementById("wordleCalendarGrid");
+    const emptyEl = document.getElementById("wordleCalendarEmpty");
+    if (!grid) return;
+
+    if (!state.wordleBank || state.wordleBank.length === 0) {
+        grid.innerHTML = "";
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const hoyISO = wordleFechaISO(hoy);
+    const ayer = new Date(hoy);
+    ayer.setDate(ayer.getDate() - 1);
+    const ayerISO = wordleFechaISO(ayer);
+    const progresoHoy = state.wordleProgress[hoyISO];
+    const ayerDesbloqueado = !!(progresoHoy && progresoHoy.won);
+
+    const viewYear = wordleCalendarViewDate.getFullYear();
+    const viewMonth = wordleCalendarViewDate.getMonth();
+
+    const labelEl = document.getElementById("wordleCalendarMonthLabel");
+    if (labelEl) labelEl.textContent = `${WORDLE_MESES[viewMonth]} ${viewYear}`;
+
+    const btnNext = document.getElementById("btnWordleCalendarNext");
+    const esMesActualOFuturo = (viewYear > hoy.getFullYear()) || (viewYear === hoy.getFullYear() && viewMonth >= hoy.getMonth());
+    if (btnNext) btnNext.disabled = esMesActualOFuturo;
+
+    const primerDiaSemana = new Date(viewYear, viewMonth, 1).getDay();
+    const offset = (primerDiaSemana + 6) % 7; // lunes = 0
+    const diasEnMes = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    let html = "";
+    for (let i = 0; i < offset; i++) {
+        html += `<div class="wordle-cal-cell empty"></div>`;
+    }
+
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+        const fecha = new Date(viewYear, viewMonth, dia);
+        fecha.setHours(0, 0, 0, 0);
+        const fechaISO = wordleFechaISO(fecha);
+        const esHoy = fechaISO === hoyISO;
+        const esAyer = fechaISO === ayerISO;
+        const esFuturo = fecha.getTime() > hoy.getTime();
+        const progreso = state.wordleProgress[fechaISO];
+
+        let clickable = false;
+        let estadoClass = "locked";
+        let badge = "";
+
+        if (esFuturo) {
+            estadoClass = "future";
+        } else if (esHoy) {
+            clickable = true;
+            estadoClass = progreso ? (progreso.won ? "won" : (progreso.gameOver ? "lost" : "today")) : "today";
+            if (progreso && progreso.gameOver) badge = progreso.won ? "✓" : "✕";
+        } else if (esAyer && ayerDesbloqueado) {
+            clickable = true;
+            estadoClass = progreso ? (progreso.won ? "won" : (progreso.gameOver ? "lost" : "unlocked")) : "unlocked";
+            if (progreso && progreso.gameOver) badge = progreso.won ? "✓" : "✕";
+        } else if (progreso && progreso.gameOver) {
+            estadoClass = progreso.won ? "won" : "lost";
+            badge = progreso.won ? "✓" : "✕";
+        } else {
+            estadoClass = "locked";
+        }
+
+        const entry = wordlePalabraParaFecha(fechaISO);
+        const dificultadColor = entry ? (WORDLE_DIFICULTAD_COLOR[entry.palabra.length] || "transparent") : "transparent";
+        const dotHtml = (!esFuturo && entry) ? `<span class="wordle-cal-dot" style="background:${dificultadColor};"></span>` : "";
+        const lockHtml = (estadoClass === "locked") ? `<span class="wordle-cal-badge">🔒</span>` : (badge ? `<span class="wordle-cal-badge">${badge}</span>` : "");
+
+        html += `
+            <button type="button" class="wordle-cal-cell ${estadoClass}" data-fecha="${fechaISO}" ${clickable ? "" : "disabled"}>
+                <span class="wordle-cal-daynum">${dia}</span>
+                ${dotHtml}
+                ${lockHtml}
+            </button>
+        `;
+    }
+
+    grid.innerHTML = html;
+    grid.querySelectorAll(".wordle-cal-cell[data-fecha]:not([disabled])").forEach(cell => {
+        cell.addEventListener("click", () => {
+            abrirWordleJuego(cell.dataset.fecha);
+        });
+    });
+}
+
+// ---- Tablero de juego ----
+let wordleFechaActual = "";
+const wordleGameState = {
+    entry: null,
+    palabraNorm: "",
+    longitud: 0,
+    maxIntentos: 0,
+    guesses: [],
+    current: "",
+    gameOver: false,
+    won: false,
+    pistaLetras: []
+};
+let wordleUltimaFilaAnimada = -1;
+
+function abrirWordleJuego(fechaISO) {
+    wordleFechaActual = fechaISO;
+    renderActiveSection("section-componente-wordle-jugar");
+}
+
+function iniciarWordleJuegoState(fechaISO) {
+    let progreso = state.wordleProgress[fechaISO];
+    let entry = progreso && progreso.entry ? progreso.entry : wordlePalabraParaFecha(fechaISO);
+
+    if (!entry) {
+        wordleGameState.entry = null;
+        return;
+    }
+
+    if (!progreso) {
+        progreso = { entry: entry, guesses: [], gameOver: false, won: false };
+        state.wordleProgress[fechaISO] = progreso;
+        dbSaveWordleProgress();
+    }
+
+    wordleGameState.entry = entry;
+    wordleGameState.palabraNorm = normalizeWordleWord(entry.palabra);
+    wordleGameState.longitud = wordleGameState.palabraNorm.length;
+    wordleGameState.maxIntentos = wordleIntentosSegunLongitud(wordleGameState.longitud);
+    wordleGameState.pistaLetras = wordleLetrasPistaDelDia(wordleGameState.palabraNorm);
+    wordleGameState.guesses = (progreso.guesses || []).slice();
+    wordleGameState.gameOver = !!progreso.gameOver;
+    wordleGameState.won = !!progreso.won;
+    wordleGameState.current = "";
+    wordleUltimaFilaAnimada = wordleGameState.guesses.length - 1;
+}
+
+function wordleCrearTablero() {
+    const board = document.getElementById("wordleBoard");
+    if (!board) return;
+    board.innerHTML = "";
+    board.dataset.len = String(wordleGameState.longitud);
+    for (let r = 0; r < wordleGameState.maxIntentos; r++) {
+        const row = document.createElement("div");
+        row.className = "wordle-board-row";
+        for (let c = 0; c < wordleGameState.longitud; c++) {
+            const tile = document.createElement("div");
+            tile.className = "wordle-tile";
+            row.appendChild(tile);
+        }
+        board.appendChild(row);
+    }
+}
+
+function wordlePintarFila(rowEl, letras, estados, animar) {
+    const tiles = rowEl.querySelectorAll(".wordle-tile");
+    tiles.forEach((tile, i) => {
+        tile.textContent = letras[i] || "";
+        tile.classList.toggle("filled", !!letras[i]);
+        if (estados) {
+            if (animar) {
+                setTimeout(() => {
+                    tile.classList.add("flip");
+                    tile.classList.add(estados[i]);
+                }, i * 220);
+            } else {
+                tile.classList.add(estados[i]);
+            }
+        }
+    });
+}
+
+const WORDLE_PRIORIDAD_ESTADO = { absent: 0, present: 1, correct: 2 };
+
+function wordlePintarTeclado() {
+    const mejorEstado = {};
+    wordleGameState.guesses.forEach(g => {
+        const estados = wordleEvaluarIntento(g, wordleGameState.palabraNorm);
+        g.split("").forEach((letra, i) => {
+            const actual = mejorEstado[letra];
+            if (!actual || WORDLE_PRIORIDAD_ESTADO[estados[i]] > WORDLE_PRIORIDAD_ESTADO[actual]) {
+                mejorEstado[letra] = estados[i];
+            }
+        });
+    });
+
+    document.querySelectorAll(".wordle-key[data-key]").forEach(btn => {
+        const letra = btn.dataset.key;
+        btn.classList.remove("correct", "present", "absent", "key-hint");
+        if (mejorEstado[letra]) btn.classList.add(mejorEstado[letra]);
+        if (wordleGameState.pistaLetras.includes(letra)) {
+            btn.classList.add("key-hint");
+            btn.title = "Pista: esta letra no está en la palabra de hoy";
+        } else {
+            btn.title = "";
+        }
+    });
+}
+
+function wordlePintarPistaLetras() {
+    const info = document.getElementById("wordlePistaLetrasInfo");
+    if (!info) return;
+    if (!wordleGameState.pistaLetras || wordleGameState.pistaLetras.length === 0) {
+        info.hidden = true;
+        return;
+    }
+    info.hidden = false;
+    info.innerHTML = `💡 Pista de hoy: <b>${wordleGameState.pistaLetras.join(", ")}</b> no están en la palabra (mira el teclado).`;
+}
+
+function wordlePintarDificultad() {
+    const badge = document.getElementById("wordleDificultadBadge");
+    const label = document.getElementById("wordleGameFechaLabel");
+    if (!badge) return;
+    const nombre = WORDLE_DIFICULTAD_POR_LONGITUD[wordleGameState.longitud] || "?";
+    const color = WORDLE_DIFICULTAD_COLOR[wordleGameState.longitud] || "var(--text-muted)";
+    badge.textContent = `${nombre} · ${wordleGameState.longitud} letras`;
+    badge.style.borderColor = color;
+    badge.style.color = color;
+    if (label) {
+        const hoyISO = wordleFechaISO(new Date());
+        label.textContent = wordleFechaActual === hoyISO ? "Palabra de hoy" : "Palabra de ayer";
+    }
+}
+
+let wordleMensajeTimeout = null;
+function wordleMostrarMensaje(texto, ms = 1500) {
+    const el = document.getElementById("wordleMessage");
+    if (!el) return;
+    el.textContent = texto;
+    clearTimeout(wordleMensajeTimeout);
+    if (ms > 0) {
+        wordleMensajeTimeout = setTimeout(() => { el.textContent = ""; }, ms);
+    }
+}
+
+function wordleAgitarFilaActual() {
+    const board = document.getElementById("wordleBoard");
+    if (!board) return;
+    const row = board.querySelectorAll(".wordle-board-row")[wordleGameState.guesses.length];
+    if (!row) return;
+    row.querySelectorAll(".wordle-tile").forEach(t => {
+        t.classList.remove("shake");
+        void t.offsetWidth;
+        t.classList.add("shake");
+    });
+}
+
+function renderWordleJuego() {
+    if (!wordleGameState.entry) return;
+    const board = document.getElementById("wordleBoard");
+    if (!board) return;
+    if (board.dataset.len !== String(wordleGameState.longitud)) {
+        wordleCrearTablero();
+    }
+    const rows = board.querySelectorAll(".wordle-board-row");
+
+    wordleGameState.guesses.forEach((g, i) => {
+        const letras = g.split("");
+        const estados = wordleEvaluarIntento(g, wordleGameState.palabraNorm);
+        const animar = i > wordleUltimaFilaAnimada;
+        wordlePintarFila(rows[i], letras, estados, animar);
+    });
+    if (wordleGameState.guesses.length - 1 > wordleUltimaFilaAnimada) {
+        wordleUltimaFilaAnimada = wordleGameState.guesses.length - 1;
+    }
+
+    const filaActualIdx = wordleGameState.guesses.length;
+    if (rows[filaActualIdx] && !wordleGameState.gameOver) {
+        wordlePintarFila(rows[filaActualIdx], wordleGameState.current.split(""), null, false);
+    }
+
+    wordlePintarTeclado();
+    wordlePintarPistaLetras();
+    wordlePintarDificultad();
+}
+
+function wordleManejarTecla(tecla) {
+    if (wordleGameState.gameOver) return;
+    if (tecla === "ENTER") {
+        wordleConfirmarIntento();
+        return;
+    }
+    if (tecla === "BACK") {
+        wordleGameState.current = wordleGameState.current.slice(0, -1);
+        renderWordleJuego();
+        return;
+    }
+    if (/^[A-ZÑ]$/.test(tecla) && wordleGameState.current.length < wordleGameState.longitud) {
+        wordleGameState.current += tecla;
+        renderWordleJuego();
+    }
+}
+
+function wordleConstruirGridCompartir() {
+    const emojiPorEstado = { correct: "🟩", present: "🟧", absent: "⬛" };
+    return wordleGameState.guesses
+        .map(g => wordleEvaluarIntento(g, wordleGameState.palabraNorm).map(e => emojiPorEstado[e]).join(""))
+        .join("\n");
+}
+
+function wordleMostrarFinDePartida() {
+    const modal = document.getElementById("modal-wordle-fin");
+    const title = document.getElementById("wordleFinTitle");
+    const wordEl = document.getElementById("wordleFinPalabra");
+    const defEl = document.getElementById("wordleFinDefinicion");
+    const grid = document.getElementById("wordleFinGrid");
+    if (!modal) return;
+
+    if (wordleGameState.won) {
+        title.textContent = "¡Enhorabuena! 🎉";
+        const board = document.getElementById("wordleBoard");
+        if (board) {
+            const rect = board.getBoundingClientRect();
+            spawnFloatingHearts(board, rect.left + rect.width / 2, rect.top + rect.height / 2);
+        }
+    } else {
+        title.textContent = "Se acabaron los intentos";
+    }
+    wordEl.textContent = `La palabra era: ${wordleGameState.entry.palabra}`;
+    defEl.textContent = wordleGameState.entry.definicion || "";
+    grid.textContent = `Wordle Cofrade ${wordleGameState.guesses.length}/${wordleGameState.maxIntentos}\n\n${wordleConstruirGridCompartir()}`;
+
+    modal.classList.add("active");
+}
+
+function wordleConfirmarIntento() {
+    if (wordleGameState.current.length !== wordleGameState.longitud) {
+        wordleMostrarMensaje("Faltan letras");
+        wordleAgitarFilaActual();
+        return;
+    }
+
+    const guessNorm = normalizeWordleWord(wordleGameState.current);
+
+    if (!DICCIONARIO_ES.has(guessNorm)) {
+        wordleMostrarMensaje("Esa palabra no existe");
+        wordleAgitarFilaActual();
+        return;
+    }
+
+    wordleGameState.guesses.push(guessNorm);
+    wordleGameState.current = "";
+
+    const gano = guessNorm === wordleGameState.palabraNorm;
+    const seAcabaron = wordleGameState.guesses.length >= wordleGameState.maxIntentos;
+
+    if (gano) {
+        wordleGameState.gameOver = true;
+        wordleGameState.won = true;
+    } else if (seAcabaron) {
+        wordleGameState.gameOver = true;
+        wordleGameState.won = false;
+    }
+
+    state.wordleProgress[wordleFechaActual] = {
+        entry: wordleGameState.entry,
+        guesses: wordleGameState.guesses,
+        gameOver: wordleGameState.gameOver,
+        won: wordleGameState.won
+    };
+    dbSaveWordleProgress();
+
+    renderWordleJuego();
+
+    if (wordleGameState.gameOver) {
+        setTimeout(() => wordleMostrarFinDePartida(), 550);
+    }
+}
+
+function construirWordleTeclado() {
+    const cont = document.getElementById("wordleKeyboard");
+    if (!cont) return;
+    cont.innerHTML = "";
+    WORDLE_LETRAS_TECLADO.forEach(fila => {
+        const rowEl = document.createElement("div");
+        rowEl.className = "wordle-keyboard-row";
+        fila.forEach(tecla => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.dataset.key = tecla;
+            if (tecla === "ENTER") {
+                btn.className = "wordle-key wide";
+                btn.textContent = "Entrar";
+            } else if (tecla === "BACK") {
+                btn.className = "wordle-key wide";
+                btn.textContent = "⌫";
+            } else {
+                btn.className = "wordle-key";
+                btn.textContent = tecla;
+            }
+            btn.addEventListener("click", () => wordleManejarTecla(tecla));
+            rowEl.appendChild(btn);
+        });
+        cont.appendChild(rowEl);
+    });
+}
+
+function setupWordleGameEvents() {
+    construirWordleTeclado();
+
+    const btnPrev = document.getElementById("btnWordleCalendarPrev");
+    const btnNext = document.getElementById("btnWordleCalendarNext");
+    if (btnPrev) {
+        btnPrev.addEventListener("click", () => {
+            wordleCalendarViewDate.setMonth(wordleCalendarViewDate.getMonth() - 1);
+            renderWordleCalendar();
+        });
+    }
+    if (btnNext) {
+        btnNext.addEventListener("click", () => {
+            if (btnNext.disabled) return;
+            wordleCalendarViewDate.setMonth(wordleCalendarViewDate.getMonth() + 1);
+            renderWordleCalendar();
+        });
+    }
+
+    const btnVolver = document.getElementById("btnWordleVolverCalendario");
+    if (btnVolver) {
+        btnVolver.addEventListener("click", (e) => {
+            e.preventDefault();
+            renderActiveSection("section-componente-wordle");
+        });
+    }
+
+    const modalFin = document.getElementById("modal-wordle-fin");
+    const btnCloseFin = document.getElementById("btn-close-wordle-fin");
+    const btnFinCalendario = document.getElementById("btn-wordle-fin-calendario");
+    const closeFinModal = () => { if (modalFin) modalFin.classList.remove("active"); };
+    if (btnCloseFin) btnCloseFin.addEventListener("click", closeFinModal);
+    if (btnFinCalendario) {
+        btnFinCalendario.addEventListener("click", () => {
+            closeFinModal();
+            renderActiveSection("section-componente-wordle");
+        });
+    }
+
+    document.addEventListener("keydown", (e) => {
+        const activeSection = document.querySelector(".app-section.active");
+        if (!activeSection || activeSection.id !== "section-componente-wordle-jugar") return;
+        const tag = (e.target && e.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+        if (e.key === "Enter") {
+            wordleManejarTecla("ENTER");
+        } else if (e.key === "Backspace") {
+            wordleManejarTecla("BACK");
+        } else {
+            const letra = normalizeWordleWord(e.key || "");
+            if (/^[A-ZÑ]$/.test(letra) && letra.length === 1) {
+                wordleManejarTecla(letra);
+            }
+        }
+    });
 }
 
 function openUniformePreview(uniforme) {

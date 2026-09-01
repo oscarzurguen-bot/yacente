@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=547">
+    <link rel="stylesheet" href="style.css?v=549">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -2210,6 +2210,69 @@
                 </div>
             </section>
 
+            <!-- Sección: Wordle Cofrade (calendario) -->
+            <section id="section-componente-wordle" class="app-section">
+                <div class="card wordle-cal-card" style="padding: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 4px; font-family: 'Cinzel', serif; font-size: 1.2rem; color: #D4AF37; display: flex; align-items: center; gap: 8px;">
+                        <span>🔤</span> Wordle Cofrade
+                    </h3>
+                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        Adivina la palabra del día. Si aciertas la de hoy, se desbloquea la de ayer.
+                    </p>
+
+                    <div class="wordle-cal-header">
+                        <button type="button" id="btnWordleCalendarPrev" class="wordle-cal-nav-btn" aria-label="Mes anterior">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <span id="wordleCalendarMonthLabel" class="wordle-cal-month-label"></span>
+                        <button type="button" id="btnWordleCalendarNext" class="wordle-cal-nav-btn" aria-label="Mes siguiente">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+
+                    <div class="wordle-cal-weekdays">
+                        <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                    </div>
+
+                    <div id="wordleCalendarGrid" class="wordle-cal-grid"></div>
+
+                    <div id="wordleCalendarEmpty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
+                        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🔤</span>
+                        Todavía no hay palabras configuradas. Vuelve pronto.
+                    </div>
+
+                    <div class="wordle-cal-legend">
+                        <span><i class="wordle-cal-dot-legend today"></i> Hoy</span>
+                        <span><i class="wordle-cal-dot-legend won"></i> Acertada</span>
+                        <span><i class="wordle-cal-dot-legend lost"></i> Fallada</span>
+                        <span>🔒 Bloqueada</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Wordle Cofrade (jugar) -->
+            <section id="section-componente-wordle-jugar" class="app-section">
+                <a href="#" id="btnWordleVolverCalendario" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver al calendario
+                </a>
+
+                <div class="card wordle-game-card" style="padding: 20px;">
+                    <div class="wordle-game-header">
+                        <span id="wordleGameFechaLabel" class="wordle-game-fecha"></span>
+                        <span id="wordleDificultadBadge" class="wordle-dificultad-badge"></span>
+                    </div>
+
+                    <div id="wordlePistaLetrasInfo" class="wordle-pista-letras-info" hidden></div>
+
+                    <div id="wordleBoard" class="wordle-board"></div>
+
+                    <div id="wordleMessage" class="wordle-message" aria-live="polite"></div>
+
+                    <div id="wordleKeyboard" class="wordle-keyboard"></div>
+                </div>
+            </section>
+
             <!-- Sección: Ajustes del Músico -->
             <section id="section-componente-ajustes" class="app-section">
                 <div class="card" style="padding: 20px; margin-bottom: 20px;">
@@ -3179,6 +3242,22 @@
                     <button type="submit" class="btn btn-primary">Guardar Palabra</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Fin de partida Wordle Cofrade (músico) -->
+    <div id="modal-wordle-fin" class="modal-overlay">
+        <div class="modal-card" style="max-width: 380px; text-align: center;">
+            <div class="modal-header">
+                <h3 id="wordleFinTitle">¡Enhorabuena!</h3>
+                <button class="modal-close" id="btn-close-wordle-fin">&times;</button>
+            </div>
+            <p id="wordleFinPalabra" style="color: var(--text-secondary); margin: 4px 0; font-weight: 600;"></p>
+            <p id="wordleFinDefinicion" class="text-muted" style="font-size: 0.85rem; margin: 4px 0 14px;"></p>
+            <div id="wordleFinGrid" style="white-space: pre; font-size: 1.3rem; line-height: 1.25; margin: 10px 0 18px;"></div>
+            <div class="modal-actions" style="justify-content: center;">
+                <button type="button" class="btn btn-primary" id="btn-wordle-fin-calendario">Volver al calendario</button>
+            </div>
         </div>
     </div>
 
@@ -4452,6 +4531,10 @@
             </div>
             <div class="musician-drawer-body">
 
+                <a href="#" class="drawer-item drawer-item-wordle" data-target="section-componente-wordle">
+                    <span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1;">🔤</span>
+                    <span>Wordle</span>
+                </a>
                 <a href="#" class="drawer-item drawer-item-sugerencias" data-target="section-componente-sugerencias">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
                     <span>Sugerencias</span>
@@ -4471,9 +4554,10 @@
         </svg>
     </button>
 
-    <script src="app.js?v=547"></script>
+    <script src="dictionary-es.js?v=549"></script>
+    <script src="app.js?v=549"></script>
     <script>
-        // Registro del Service Worker v=547.
+        // Registro del Service Worker v=549.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4502,9 +4586,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=547")
+                navigator.serviceWorker.register("sw.js?v=549")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v547 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v549 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);

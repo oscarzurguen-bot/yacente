@@ -26,13 +26,14 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-const CACHE_NAME = "yacente-v547";
+const CACHE_NAME = "yacente-v549";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
     "./index.html?pwa=1",
     "./style.css",
     "./app.js",
+    "./dictionary-es.js",
     "./manifest.json",
     "./icons/icon-512-rounded.png",
     "./icons/icon-192-rounded.png",
