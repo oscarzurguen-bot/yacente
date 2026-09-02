@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=552">
+    <link rel="stylesheet" href="style.css?v=554">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -2220,6 +2220,22 @@
                         Adivina la palabra del día. Si aciertas la de hoy, se desbloquea la de ayer.
                     </p>
 
+                    <div class="wordle-level-card">
+                        <div class="wordle-level-avatar">
+                            <img id="wordleLevelPhoto" class="hidden" alt="Foto de perfil">
+                            <span id="wordleLevelInitials"></span>
+                        </div>
+                        <div class="wordle-level-info">
+                            <div class="wordle-level-top-row">
+                                <span class="wordle-level-label">Nivel <span id="wordleLevelNumber">1</span></span>
+                                <span id="wordleLevelPointsText" class="wordle-level-points"></span>
+                            </div>
+                            <div class="wordle-level-bar-track">
+                                <div id="wordleLevelBarFill" class="wordle-level-bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="wordle-cal-header">
                         <button type="button" id="btnWordleCalendarPrev" class="wordle-cal-nav-btn" aria-label="Mes anterior">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
@@ -3262,6 +3278,7 @@
             </div>
             <p id="wordleFinPalabra" style="color: var(--text-secondary); margin: 4px 0; font-weight: 600;"></p>
             <p id="wordleFinDefinicion" class="text-muted" style="font-size: 0.85rem; margin: 4px 0 14px;"></p>
+            <p id="wordleFinPuntos" class="hidden" style="color: var(--color-gold); font-weight: 700; font-size: 0.95rem; margin: 4px 0 14px;"></p>
             <div id="wordleFinGrid" style="white-space: pre; font-size: 1.3rem; line-height: 1.25; margin: 10px 0 18px;"></div>
             <div class="modal-actions" style="justify-content: center;">
                 <button type="button" class="btn btn-primary" id="btn-wordle-fin-calendario">Volver al calendario</button>
@@ -4562,10 +4579,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=552"></script>
-    <script src="app.js?v=552"></script>
+    <script src="dictionary-es.js?v=554"></script>
+    <script src="app.js?v=554"></script>
     <script>
-        // Registro del Service Worker v=552.
+        // Registro del Service Worker v=554.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4594,9 +4611,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=552")
+                navigator.serviceWorker.register("sw.js?v=554")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v552 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v554 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);

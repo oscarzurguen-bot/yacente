@@ -18758,6 +18758,55 @@ const WORDLE_LETRAS_TECLADO = [
 ];
 const WORDLE_ALFABETO_TECLADO = WORDLE_LETRAS_TECLADO.flat().filter(t => t !== "ENTER" && t !== "BACK");
 
+// Puntos según en qué intento se acierta (índice 0 = 1er intento). El 7º solo es posible en
+// palabras de 6-7 letras (Difícil/Muy difícil), que permiten un intento extra.
+const WORDLE_PUNTOS_POR_INTENTO = [100, 80, 60, 40, 20, 10, 5];
+
+function wordlePuntosPorIntentos(numIntentos) {
+    return WORDLE_PUNTOS_POR_INTENTO[numIntentos - 1] || 0;
+}
+
+function wordleCalcularPuntuacionTotal() {
+    let total = 0;
+    Object.values(state.wordleProgress || {}).forEach(p => {
+        if (p && p.won && Array.isArray(p.guesses)) {
+            total += wordlePuntosPorIntentos(p.guesses.length);
+        }
+    });
+    return total;
+}
+
+function renderWordleNivel() {
+    const total = wordleCalcularPuntuacionTotal();
+    const nivel = Math.floor(total / 100) + 1;
+    const progresoNivel = total % 100;
+
+    const numEl = document.getElementById("wordleLevelNumber");
+    if (numEl) numEl.textContent = String(nivel);
+    const fillEl = document.getElementById("wordleLevelBarFill");
+    if (fillEl) fillEl.style.width = progresoNivel + "%";
+    const ptsEl = document.getElementById("wordleLevelPointsText");
+    if (ptsEl) ptsEl.textContent = `${progresoNivel}/100 · ${total} pts en total`;
+
+    const musicianId = getAuthMusicianId();
+    const musician = (state.musicians || []).find(m => String(m.id) === String(musicianId));
+    const imgEl = document.getElementById("wordleLevelPhoto");
+    const initialsEl = document.getElementById("wordleLevelInitials");
+    if (musician && musician.photo) {
+        if (imgEl) {
+            imgEl.src = musician.photo;
+            imgEl.classList.remove("hidden");
+        }
+        if (initialsEl) initialsEl.classList.add("hidden");
+    } else {
+        if (imgEl) imgEl.classList.add("hidden");
+        if (initialsEl) {
+            initialsEl.textContent = musician ? getInitials(musician.name) : "M";
+            initialsEl.classList.remove("hidden");
+        }
+    }
+}
+
 function wordleHashCadena(str) {
     let h = 0;
     for (let i = 0; i < str.length; i++) {
@@ -18882,6 +18931,7 @@ function renderWordleCalendar() {
     if (!grid) return;
 
     const btnJugar = document.getElementById("btnWordleJugarHoy");
+    renderWordleNivel();
 
     if (!state.wordleBank || state.wordleBank.length === 0) {
         grid.innerHTML = "";
@@ -18960,7 +19010,8 @@ function renderWordleCalendar() {
 
         const entry = wordlePalabraParaFecha(fechaISO);
         const dificultadColor = entry ? (WORDLE_DIFICULTAD_COLOR[entry.palabra.length] || "transparent") : "transparent";
-        const dotHtml = (!esFuturo && entry) ? `<span class="wordle-cal-dot" style="background:${dificultadColor};"></span>` : "";
+        const yaCompletado = !!(progreso && progreso.gameOver);
+        const dotHtml = (!esFuturo && entry && !yaCompletado) ? `<span class="wordle-cal-dot" style="background:${dificultadColor};"></span>` : "";
         const lockHtml = (estadoClass === "locked") ? `<span class="wordle-cal-badge">🔒</span>` : (badge ? `<span class="wordle-cal-badge">${badge}</span>` : "");
 
         html += `
@@ -19221,6 +19272,7 @@ function wordleMostrarFinDePartida() {
     const wordEl = document.getElementById("wordleFinPalabra");
     const defEl = document.getElementById("wordleFinDefinicion");
     const grid = document.getElementById("wordleFinGrid");
+    const puntosEl = document.getElementById("wordleFinPuntos");
     if (!modal) return;
 
     if (wordleGameState.won) {
@@ -19230,8 +19282,14 @@ function wordleMostrarFinDePartida() {
             const rect = board.getBoundingClientRect();
             spawnFloatingHearts(board, rect.left + rect.width / 2, rect.top + rect.height / 2);
         }
+        if (puntosEl) {
+            const puntos = wordlePuntosPorIntentos(wordleGameState.guesses.length);
+            puntosEl.textContent = `🏆 +${puntos} puntos`;
+            puntosEl.classList.remove("hidden");
+        }
     } else {
         title.textContent = "Se acabaron los intentos";
+        if (puntosEl) puntosEl.classList.add("hidden");
     }
     wordEl.textContent = `La palabra era: ${wordleGameState.entry.palabra}`;
     defEl.textContent = wordleGameState.entry.definicion || "";
