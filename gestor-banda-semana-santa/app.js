@@ -536,16 +536,16 @@ function initApp() {
 
     // Establecer fecha inicial (Hoy)
     const today = new Date().toISOString().split("T")[0];
-    state.currentDate = today;
     document.getElementById("attendance-date").value = today;
 
-    // Inicializar asistencia solo para dirección: este stub local rellena "Pasar Lista" con la
-    // plantilla al vuelo para que la dirección pueda pasar lista de hoy sin crear antes un
-    // ensayo formal. Para músicos no sirve para nada, y si su dispositivo pierde la conexión a
-    // la nube, este stub vacío de "hoy" queda huérfano en su caché local y termina apareciendo
-    // como un "Ensayo" fantasma en su pantalla de Eventos. Ver también renderComponentEventos().
-    if (getAuthRole() !== "component") {
-        initializeAttendanceForDate(today);
+    // Pasar Lista solo debe operar sobre ensayos/actuaciones ya creados: si hoy no hay ninguna
+    // sesión programada, no fabricamos aquí un registro de asistencia para una fecha sin sesión
+    // real (eso es lo que generaba ensayos fantasma). renderAttendance() muestra un estado vacío
+    // en su lugar cuando currentDate no tiene sessionTypes asociado.
+    const todaySessionKey = resolveExistingSessionKeyForDate(today);
+    state.currentDate = todaySessionKey || today;
+    if (getAuthRole() !== "component" && todaySessionKey) {
+        initializeAttendanceForDate(todaySessionKey);
     }
 
     // Renderizar interfaz inicial
@@ -603,6 +603,15 @@ function initApp() {
     initFirebase();
 }
 
+// Busca en sessionTypes la clave real de un ensayo/actuación ya creado para una fecha (con o sin
+// sufijo de subtipo). Pasar Lista solo debe trabajar sobre sesiones ya creadas: usar esto en vez
+// de asumir que la fecha plana es una clave válida evita fabricar sesiones fantasma sin querer.
+function resolveExistingSessionKeyForDate(rawDate) {
+    if (state.sessionTypes[rawDate]) return rawDate;
+    const match = Object.keys(state.sessionTypes).find(key => key.startsWith(rawDate));
+    return match || null;
+}
+
 function initializeAttendanceForDate(date, convocatedVoices = []) {
     if (!state.attendance[date]) {
         state.attendance[date] = {};
@@ -636,10 +645,10 @@ function updateSessionBadge() {
     const sessionInfo = state.sessionTypes[date];
     
     if (!sessionInfo) {
-        badge.innerText = "🎺 Ensayo General (Autocreado)";
-        badge.style.borderColor = "rgba(212, 175, 55, 0.35)";
-        badge.style.backgroundColor = "rgba(212, 175, 55, 0.05)";
-        badge.style.color = "var(--color-gold)";
+        badge.innerText = "⚠️ Sin ensayo creado";
+        badge.style.borderColor = "rgba(231, 76, 60, 0.35)";
+        badge.style.backgroundColor = "rgba(231, 76, 60, 0.05)";
+        badge.style.color = "var(--color-absent)";
         return;
     }
     
@@ -2323,8 +2332,20 @@ function setupEventListeners() {
         if (selectedDate) {
             // Si hay múltiples sesiones para esta fecha, seleccionamos la primera por defecto
             const sessionKeys = Object.keys(state.sessionTypes).filter(key => key.startsWith(selectedDate));
-            const activeKey = sessionKeys.length > 0 ? sessionKeys[0] : selectedDate;
-            
+
+            if (sessionKeys.length === 0) {
+                // Sin ensayo/actuación creado ese día: no fabricamos una sesión aquí, mostramos
+                // el estado vacío de renderAttendance() y avisamos de que hay que crearlo primero.
+                state.currentDate = selectedDate;
+                renderAttendance();
+                renderRehearsalMarchasWidget();
+                updateSessionBadge();
+                showToast(`No hay ningún ensayo creado para el ${formatDateSpanish(selectedDate)}`, "warning");
+                return;
+            }
+
+            const activeKey = sessionKeys[0];
+
             state.currentDate = activeKey;
             initializeAttendanceForDate(activeKey);
             renderAttendance();
@@ -3633,10 +3654,17 @@ function setupEventListeners() {
     const modalQuickSession = document.getElementById("modal-quick-session");
     
     document.getElementById("btn-configure-session").addEventListener("click", () => {
-        state.isAddingNewSession = false;
         const date = state.currentDate;
         if (!date) return;
-        
+
+        // Pasar Lista no debe poder crear un ensayo: este botón solo reconfigura uno ya existente.
+        if (!state.sessionTypes[date]) {
+            showToast("No hay ningún ensayo creado para este día. Créalo primero desde 'Ensayos'.", "warning");
+            return;
+        }
+
+        state.isAddingNewSession = false;
+
         document.getElementById("quick-session-title").innerText = `Configurar Sesión - ${formatDateSpanish(date)}`;
         
         // Reset defaults
@@ -3760,6 +3788,23 @@ function setupEventListeners() {
         let sessionKey = date;
         if (state.isAddingNewSession) {
             const rawDate = date.split("_")[0];
+
+            // Si ya existe una sesión del mismo tipo (y subtipo, si aplica) ese día, avisamos en
+            // vez de crear un duplicado silencioso con una clave sufijada al azar: esto era lo que
+            // generaba ensayos generales repetidos el mismo día sin que la dirección se diera cuenta.
+            const duplicateKey = Object.keys(state.sessionTypes)
+                .filter(k => k.startsWith(rawDate))
+                .find(k => {
+                    const existing = state.sessionTypes[k];
+                    if (existing.type !== newSession.type) return false;
+                    if (newSession.type === "ensayo") return existing.subtype === newSession.subtype;
+                    return true;
+                });
+            if (duplicateKey) {
+                showToast("Ya existe una sesión de este tipo registrada para esta fecha", "error");
+                return;
+            }
+
             sessionKey = rawDate;
             if (state.sessionTypes[sessionKey]) {
                 let counter = 1;
@@ -4346,8 +4391,33 @@ function renderAttendance() {
         return;
     }
 
-    const searchQuery = document.getElementById("search-musician").value.toLowerCase();
     const date = state.currentDate;
+
+    // Pasar Lista solo opera sobre ensayos/actuaciones ya creados: si la fecha activa no tiene
+    // sessionTypes asociado, no hay nada que pasar lista todavía. Mostramos un estado vacío con
+    // acceso directo a crear el ensayo en vez de fabricar aquí una asistencia fantasma.
+    if (!state.sessionTypes[date]) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p class="text-muted">No hay ningún ensayo o actuación creado para este día.</p>
+                <button type="button" class="btn btn-primary" id="btn-empty-state-create-rehearsal" style="margin-top: 10px;">Crear Ensayo</button>
+            </div>
+        `;
+        const btnCreate = document.getElementById("btn-empty-state-create-rehearsal");
+        if (btnCreate) {
+            btnCreate.addEventListener("click", () => {
+                const btnAddRehearsal = document.getElementById("btn-add-rehearsal");
+                if (btnAddRehearsal) btnAddRehearsal.click();
+                const rawDate = date.split("_")[0];
+                const dateInput = document.getElementById("rehearsal-date-input");
+                if (dateInput && rawDate) dateInput.value = rawDate;
+            });
+        }
+        updateAttendanceStatsRibbon();
+        return;
+    }
+
+    const searchQuery = document.getElementById("search-musician").value.toLowerCase();
 
     const grouped = {};
     SECCIONES_ORDEN.forEach(sec => grouped[sec] = []);
@@ -5095,7 +5165,10 @@ function renderEnsayosList() {
                 typeLabel = `<span class="musician-count-badge" style="background-color: var(--bg-primary); border-color: var(--border-color); font-size: 0.8rem; display: inline-block;">General</span>`;
             }
         } else {
-            typeLabel = `<span class="musician-count-badge" style="background-color: var(--bg-primary); border-color: var(--border-color); font-size: 0.8rem; display: inline-block;">General</span>`;
+            // Hay datos de asistencia para esta fecha pero ningún ensayo/actuación real creado en
+            // sessionTypes: es un resto huérfano (p.ej. de una sesión ya borrada). Se marca aparte
+            // de "General" para que la dirección pueda identificarlo y eliminarlo con seguridad.
+            typeLabel = `<span class="musician-count-badge" style="background-color: rgba(231, 76, 60, 0.1); border-color: rgba(231, 76, 60, 0.35); color: var(--color-absent); font-size: 0.8rem; display: inline-block;" title="Hay asistencia registrada para este día pero ningún ensayo creado. Es un resto de una sesión ya borrada: puedes eliminarlo con seguridad.">⚠️ Sin configurar</span>`;
         }
 
         const locationVal = sessionInfo && sessionInfo.location ? sessionInfo.location : "Parking";
@@ -6553,10 +6626,10 @@ function renderStatistics() {
     invalidateMusicianStatsCache();
     cleanupOrphanedMarchasRecords();
 
-    const allDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes || {}),
-        ...Object.keys(state.attendance || {})
-    ]));
+    // Solo sessionTypes es la fuente fiable de sesiones reales (ver resolveExistingSessionKeyForDate
+    // y getUpcomingEventDatesForMusician): una fecha con asistencia pero sin sessionTypes es un
+    // resto huérfano (p.ej. de una sesión ya borrada) y no debe contar como un ensayo/actuación real.
+    const allDates = Object.keys(state.sessionTypes || {});
 
     const yearSelectEl = document.getElementById("filter-year");
     populateSeasonSelect(yearSelectEl, allDates, true, yearSelectEl.value);
@@ -7841,11 +7914,9 @@ function renderMusicianDetailContent() {
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-    // Obtener todas las fechas únicas de sessionTypes y attendance
-    const allDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes || {}),
-        ...Object.keys(state.attendance || {})
-    ]));
+    // Solo sessionTypes es la fuente fiable de sesiones reales: una fecha con asistencia pero sin
+    // sessionTypes es un resto huérfano y no debe contar como ensayo/actuación real.
+    const allDates = Object.keys(state.sessionTypes || {});
 
     populateSeasonSelect(detailYearSelect, allDates, true, detailYearSelect.value);
     const yearFilter = detailYearSelect.value;
@@ -8267,7 +8338,8 @@ function downloadMusicianPDFReport() {
     const monthFilter = document.getElementById("detail-filter-month").value;
     const typeFilter = document.getElementById("detail-filter-type").value;
 
-    const allDates = Object.keys(state.attendance);
+    // Solo sessionTypes es la fuente fiable de sesiones reales (igual que renderMusicianDetailContent).
+    const allDates = Object.keys(state.sessionTypes || {});
     // Mismos filtros que renderMusicianDetailContent (la ficha en pantalla), para que el PDF
     // descargado no dé un porcentaje distinto al que se ve en la app: excluir sesiones aún no
     // concluidas y los días en los que este músico estuvo de baja.
@@ -8383,7 +8455,8 @@ function downloadMusicianPDFReport() {
         let presents = 0;
         let total = 0;
 
-        Object.keys(state.attendance).forEach(dateStr => {
+        // Solo sessionTypes es la fuente fiable de sesiones reales.
+        Object.keys(state.sessionTypes || {}).forEach(dateStr => {
             // Mismo criterio que el resto del informe (isSessionConcluded), no solo "fecha <= hoy":
             // si no, el ensayo de hoy (aún sin concluir, con su registro por defecto) contaba aquí
             // aunque el resumen principal del PDF ya lo excluyera, dando porcentajes distintos
@@ -8395,7 +8468,7 @@ function downloadMusicianPDFReport() {
 
             if (y === sm.year && m === sm.monthNum) {
                 if (isMusicianOnLeaveOnDate(musician, dateStr)) return;
-                const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
+                const sessionType = state.sessionTypes[dateStr].type;
                 if (typeFilter !== "all" && sessionType !== typeFilter) return;
 
                 const rec = state.attendance[dateStr] ? state.attendance[dateStr][musicianId] : null;
@@ -8764,7 +8837,8 @@ function downloadSeasonPDFReport(selectedSeason) {
     const year1 = parseInt(seasonParts[0], 10);
     const year2 = parseInt(seasonParts[1], 10);
 
-    const allDates = Object.keys(state.attendance);
+    // Solo sessionTypes es la fuente fiable de sesiones reales (igual que renderStatistics).
+    const allDates = Object.keys(state.sessionTypes || {});
     const seasonDates = allDates.filter(date => {
         if (!isSessionConcluded(date)) return false; // Igual que renderStatistics: no contar la sesión de hoy si aún no ha concluido
         const parts = date.split("-");
@@ -9446,7 +9520,7 @@ function openVoiceDetailStats(voiceName) {
     
     // Heredar los filtros actuales seleccionados en la pantalla de estadísticas principal
     const inheritedSeason = document.getElementById("filter-year").value;
-    populateSeasonSelect(document.getElementById("voice-filter-year"), Object.keys(state.attendance), true, inheritedSeason);
+    populateSeasonSelect(document.getElementById("voice-filter-year"), Object.keys(state.sessionTypes || {}), true, inheritedSeason);
     document.getElementById("voice-filter-month").value = document.getElementById("filter-month").value;
     document.getElementById("voice-filter-type").value = document.getElementById("filter-type").value;
     
@@ -9464,8 +9538,8 @@ function renderVoiceDetailContent() {
 
     // Filtrar fechas. Igual que en renderMusicianDetailContent/downloadMusicianPDFReport: excluir
     // sesiones aún no concluidas para no contar ensayos futuros que ya tengan un registro por
-    // defecto.
-    const allDates = Object.keys(state.attendance);
+    // defecto. Solo sessionTypes es la fuente fiable de sesiones reales.
+    const allDates = Object.keys(state.sessionTypes || {});
     const filteredDates = allDates.filter(dateStr => {
         if (!isSessionConcluded(dateStr)) return false;
 
@@ -13570,10 +13644,9 @@ function invalidateMusicianStatsCache() {
 
 function getAllSessionDatesCached() {
     if (!_musicianStatsCache.allDates) {
-        _musicianStatsCache.allDates = Array.from(new Set([
-            ...Object.keys(state.sessionTypes || {}),
-            ...Object.keys(state.attendance || {})
-        ]));
+        // Solo sessionTypes es la fuente fiable de sesiones reales: una fecha con asistencia pero
+        // sin sessionTypes es un resto huérfano y no debe contar como ensayo/actuación real.
+        _musicianStatsCache.allDates = Object.keys(state.sessionTypes || {});
     }
     return _musicianStatsCache.allDates;
 }
@@ -14291,12 +14364,12 @@ function calculateMusicianBestStreak(musicianId) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const dates = Object.keys(state.attendance)
+    const dates = Object.keys(state.sessionTypes || {})
         .filter(d => {
             if (!isSessionConcluded(d)) return false; // Excluir no concluidos
 
             const session = state.sessionTypes[d];
-            if (session && session.type !== "ensayo") return false;
+            if (!session || session.type !== "ensayo") return false;
 
             const record = state.attendance[d] ? state.attendance[d][musicianId] : null;
             if (!record) return false;
@@ -15005,11 +15078,10 @@ function renderComponentHistorial() {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    // Obtener todas las fechas únicas de sessionTypes y attendance
-    const allUniqueDates = Array.from(new Set([
-        ...Object.keys(state.sessionTypes),
-        ...Object.keys(state.attendance)
-    ]));
+    // Solo sessionTypes es la fuente fiable de sesiones reales: una fecha con asistencia pero sin
+    // sessionTypes es un resto huérfano (p.ej. de una sesión ya borrada) y no debe aparecer aquí
+    // como un ensayo real (ver también getUpcomingEventDatesForMusician).
+    const allUniqueDates = Object.keys(state.sessionTypes);
 
     // Obtener todas las fechas en las que el músico está convocado (sólo pasadas, anteriores a hoy)
     const allConvocatedDates = allUniqueDates.filter(date => {
@@ -19538,10 +19610,11 @@ function renderGeneralOverviewChart() {
     // 1. Gather all rehearsal sessions (only past ones, matching other stats).
     // Se excluyen los ensayos de sección (por voces) para que no distorsionen la
     // visión general del grupo completo: solo convocan a una parte de la banda.
-    const rehearsalDates = Object.keys(state.attendance).filter(dateKey => {
+    // Solo sessionTypes es la fuente fiable de sesiones reales.
+    const rehearsalDates = Object.keys(state.sessionTypes || {}).filter(dateKey => {
         const session = state.sessionTypes[dateKey];
         const isPast = isSessionConcluded(dateKey);
-        return isPast && (!session || session.type === "ensayo") && !isSectionRehearsal(session);
+        return isPast && session.type === "ensayo" && !isSectionRehearsal(session);
     });
 
     // 2. Dynamic Season Dropdown Population
@@ -20592,7 +20665,8 @@ function renderMusicianMonthlyEvolution(musicianId) {
         let presents = 0;
         let total = 0;
 
-        Object.keys(state.attendance).forEach(dateStr => {
+        // Solo sessionTypes es la fuente fiable de sesiones reales.
+        Object.keys(state.sessionTypes || {}).forEach(dateStr => {
             if (!isSessionConcluded(dateStr)) return;
             const dateParts = dateStr.split("-");
             const y = dateParts[0];
@@ -20600,7 +20674,7 @@ function renderMusicianMonthlyEvolution(musicianId) {
 
             if (y === sm.year && m === sm.monthNum) {
                 if (isMusicianOnLeaveOnDate(musician, dateStr)) return;
-                const sessionType = state.sessionTypes[dateStr] ? state.sessionTypes[dateStr].type : "ensayo";
+                const sessionType = state.sessionTypes[dateStr].type;
                 if (typeFilter !== "all" && sessionType !== typeFilter) return;
 
                 const rec = state.attendance[dateStr] ? state.attendance[dateStr][musicianId] : null;
