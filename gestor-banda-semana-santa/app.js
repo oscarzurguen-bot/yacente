@@ -15599,6 +15599,10 @@ function getUpcomingEventDatesForMusician(musician) {
     return Object.keys(state.sessionTypes)
         .filter(date => {
             if (date < todayStr) return false;
+            // La sesión de hoy deja de ser "próxima" en cuanto concluye (misma regla que
+            // Historial vía isSessionConcluded): si no, se ve duplicada el mismo día en Eventos
+            // y en Historial hasta que cambia la fecha.
+            if (isSessionConcluded(date)) return false;
 
             const session = state.sessionTypes[date];
             const isSpecialRehearsal = session.type === "ensayo" && session.subtype !== "general" && session.convocatedVoices && session.convocatedVoices.length > 0;
