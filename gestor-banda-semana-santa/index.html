@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=558">
+    <link rel="stylesheet" href="style.css?v=559">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1343,16 +1343,6 @@
                         </div>
                     </div>
 
-                    <!-- Papelera de Ensayos/Actuaciones eliminados -->
-                    <div class="card settings-card">
-                        <h3>🗑️ Papelera</h3>
-                        <p class="text-muted" style="margin-bottom: 16px;">Ensayos y actuaciones eliminados por error se guardan aquí durante 30 días y se pueden restaurar en cualquier momento.</p>
-
-                        <div id="trash-list-container" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
-                            <!-- Populated dynamically by JS -->
-                        </div>
-                    </div>
-
                     <!-- Cambio de Contraseña de Directiva -->
                     <div class="card settings-card">
                         <h3>Contraseña de Directiva</h3>
@@ -1473,6 +1463,32 @@
                             Estadísticas avanzadas (prueba)
                         </h3>
                         <p class="text-muted" style="margin: 0;">Gráficos detallados para analizar la evolución de la banda en profundidad.</p>
+                    </div>
+
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-papelera" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.1rem;">🗑️</span>
+                            Papelera
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Restaura ensayos y actuaciones eliminados por error durante los últimos 30 días.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Papelera de Ensayos/Actuaciones eliminados -->
+            <section id="section-otros-papelera" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+                <div class="card" style="padding: 20px;">
+                    <h3 style="margin: 0 0 4px 0; font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                        🗑️ Papelera
+                    </h3>
+                    <p class="text-muted" style="margin: 0 0 16px 0; font-size: 0.85rem;">Ensayos y actuaciones eliminados por error se guardan aquí durante 30 días y se pueden restaurar en cualquier momento.</p>
+
+                    <div id="trash-list-container" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Populated dynamically by JS -->
                     </div>
                 </div>
             </section>
@@ -4589,10 +4605,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=558"></script>
-    <script src="app.js?v=558"></script>
+    <script src="dictionary-es.js?v=559"></script>
+    <script src="app.js?v=559"></script>
     <script>
-        // Registro del Service Worker v=558.
+        // Registro del Service Worker v=559.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4621,9 +4637,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=558")
+                navigator.serviceWorker.register("sw.js?v=559")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v558 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v559 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);

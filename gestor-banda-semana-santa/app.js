@@ -1817,15 +1817,19 @@ function dbDeleteTrashEntry(id) {
 // para capturar los datos tal cual estaban justo antes del borrado.
 function moveSessionToTrash(date) {
     const sessionType = state.sessionTypes[date];
-    if (!sessionType) return;
+    const attendance = state.attendance[date];
+    // Sesión "huérfana": hay asistencia registrada para esta fecha pero ninguna ficha de sesión
+    // (aparece como "⚠️ Sin configurar" en Ensayos). Sigue mereciendo protección de papelera: si
+    // no, borrarla desde la lista pierde el pase de lista sin posibilidad de deshacerlo.
+    if (!sessionType && !attendance) return;
 
     const entry = {
         id: `${date}__${Date.now()}`,
         date,
-        kind: sessionType.type === "actuacion" ? "actuacion" : "ensayo",
+        kind: sessionType ? (sessionType.type === "actuacion" ? "actuacion" : "ensayo") : "huerfano",
         deletedAt: new Date().toISOString(),
-        sessionType: JSON.parse(JSON.stringify(sessionType)),
-        attendance: state.attendance[date] ? JSON.parse(JSON.stringify(state.attendance[date])) : null,
+        sessionType: sessionType ? JSON.parse(JSON.stringify(sessionType)) : null,
+        attendance: attendance ? JSON.parse(JSON.stringify(attendance)) : null,
         playedMarchas: state.playedMarchas[date] ? JSON.parse(JSON.stringify(state.playedMarchas[date])) : null,
         actuacionRepertoire: state.actuacionRepertoire[date] ? JSON.parse(JSON.stringify(state.actuacionRepertoire[date])) : null
     };
@@ -1848,8 +1852,12 @@ function restoreSessionFromTrash(id) {
         }
     }
 
-    state.sessionTypes[entry.date] = entry.sessionType;
-    dbSaveSessionType(entry.date, entry.sessionType);
+    // Las entradas "huérfanas" (asistencia sin ficha de sesión) nunca tuvieron sessionType, así
+    // que no hay que crear uno al restaurar: se devuelve la asistencia tal cual estaba.
+    if (entry.sessionType) {
+        state.sessionTypes[entry.date] = entry.sessionType;
+        dbSaveSessionType(entry.date, entry.sessionType);
+    }
 
     if (entry.attendance) {
         state.attendance[entry.date] = entry.attendance;
@@ -1884,8 +1892,9 @@ function restoreSessionFromTrash(id) {
     renderStatistics();
     renderCalendar();
     renderTrashList();
-    const label = entry.kind === "actuacion" ? "Actuación" : "Ensayo";
-    showToast(`${label} del ${formatDateSpanish(entry.date)} restaurado`, "success");
+    const label = entry.kind === "actuacion" ? "Actuación" : (entry.kind === "huerfano" ? "Asistencia" : "Ensayo");
+    const suffix = entry.kind === "huerfano" ? "restaurada" : "restaurado";
+    showToast(`${label} del ${formatDateSpanish(entry.date)} ${suffix}`, "success");
 }
 
 function permanentlyDeleteTrashEntry(id) {
@@ -1925,7 +1934,7 @@ function renderTrashList() {
     }
 
     container.innerHTML = items.map(entry => {
-        const label = entry.kind === "actuacion" ? "Actuación" : "Ensayo";
+        const label = entry.kind === "actuacion" ? "Actuación" : (entry.kind === "huerfano" ? "Asistencia sin configurar" : "Ensayo");
         const name = entry.sessionType && entry.sessionType.name ? ` — ${entry.sessionType.name}` : "";
         const deletedAtLabel = new Date(entry.deletedAt).toLocaleString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
         return `
@@ -4473,7 +4482,6 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageTitle.innerText = "Ajustes";
             pageSubtitle.innerText = "Administración general y copias de seguridad";
             dateContainer.classList.add("hidden");
-            renderTrashList();
             break;
         case "section-componente-ficha":
             pageTitle.innerText = "Mi Ficha";
@@ -4556,6 +4564,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             dateContainer.classList.add("hidden");
             renderAdminWordleBankList();
             syncWordleEnabledToggleUI();
+            break;
+        case "section-otros-papelera":
+            pageTitle.innerText = "Papelera";
+            pageSubtitle.innerText = "Ensayos y actuaciones eliminados, restaurables durante 30 días";
+            dateContainer.classList.add("hidden");
+            renderTrashList();
             break;
         case "section-otros-estadisticas-avanzadas":
             pageTitle.innerText = "Estadísticas Avanzadas";
@@ -5042,8 +5056,13 @@ function goToPasarLista(dateKey) {
 }
 
 function openEditRehearsalModal(dateKey) {
-    const sessionInfo = state.sessionTypes ? state.sessionTypes[dateKey] : null;
-    if (!sessionInfo) return;
+    // Puede no haber sessionInfo aunque la fecha aparezca en "Ensayos": son restos huérfanos con
+    // asistencia ya pasada pero sin ficha de sesión (p.ej. tras un borrado/migración incompleta).
+    // Antes esto impedía editar por completo ("no me deja editar"); ahora se abre igualmente el
+    // modal con valores por defecto para poder terminar de configurarlo sin tocar ni perder la
+    // asistencia ya registrada en state.attendance[dateKey].
+    const sessionInfo = (state.sessionTypes ? state.sessionTypes[dateKey] : null) || {};
+    const isOrphan = !state.sessionTypes || !state.sessionTypes[dateKey];
 
     renderRehearsalLocationOptions();
 
@@ -5053,8 +5072,8 @@ function openEditRehearsalModal(dateKey) {
     const submitBtn = document.getElementById("btn-submit-rehearsal-modal");
 
     if (keyInput) keyInput.value = dateKey;
-    if (titleEl) titleEl.innerText = "Editar Ensayo";
-    if (submitBtn) submitBtn.innerText = "Guardar Cambios";
+    if (titleEl) titleEl.innerText = isOrphan ? "Configurar Ensayo" : "Editar Ensayo";
+    if (submitBtn) submitBtn.innerText = isOrphan ? "Guardar Configuración" : "Guardar Cambios";
 
     if (document.getElementById("rehearsal-date-input")) document.getElementById("rehearsal-date-input").value = rawDate;
     if (document.getElementById("rehearsal-type-input")) document.getElementById("rehearsal-type-input").value = sessionInfo.subtype || "general";
