@@ -147,6 +147,7 @@ let state = {
     marchas: [],
     playedMarchas: {},
     actuacionRepertoire: {},
+    trash: [],
     marchaSeasonRemovals: {},
     notificationsClearedAt: null,
     marchasViewMode: "list",
@@ -423,6 +424,9 @@ function initApp() {
     const storedActuacionRepertoire = localStorage.getItem("harmonia_actuacion_repertoire");
     state.actuacionRepertoire = storedActuacionRepertoire ? JSON.parse(storedActuacionRepertoire) : {};
 
+    const storedTrash = localStorage.getItem("harmonia_trash");
+    state.trash = storedTrash ? JSON.parse(storedTrash) : [];
+
     const storedSuggestions = localStorage.getItem("harmonia_suggestions");
     state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
 
@@ -595,6 +599,7 @@ function initApp() {
         renderRehearsalMarchasWidget();
         updateSuggestionsBadge();
         renderRepertoireLinksUI();
+        renderTrashList();
     } catch (err) {
         console.error("Error al renderizar la interfaz inicial:", err);
     }
@@ -720,6 +725,7 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas || []));
     localStorage.setItem("harmonia_played_marchas", JSON.stringify(state.playedMarchas || {}));
     localStorage.setItem("harmonia_actuacion_repertoire", JSON.stringify(state.actuacionRepertoire || {}));
+    localStorage.setItem("harmonia_trash", JSON.stringify(state.trash || []));
     localStorage.setItem("harmonia_marcha_season_removals", JSON.stringify(state.marchaSeasonRemovals || {}));
     if (state.notificationsClearedAt) {
         localStorage.setItem("harmonia_notifications_cleared_at", state.notificationsClearedAt);
@@ -855,6 +861,7 @@ let unsubUniforms = null;
 let unsubWordleBank = null;
 let unsubMarchaSeasonRemovals = null;
 let unsubNotificationsClearedAt = null;
+let unsubTrash = null;
 
 function getDeletedNotificationIds(musicianId) {
     if (!musicianId) return [];
@@ -1249,6 +1256,21 @@ function startCloudSync() {
         console.error("Error sync repertorio de actuación:", err);
     });
 
+    // Escucha de la papelera de ensayos/actuaciones eliminados
+    unsubTrash = db.collection("trash").onSnapshot(snapshot => {
+        state.trash = [];
+        snapshot.forEach(doc => {
+            state.trash.push(doc.data());
+        });
+        state.trash.sort((a, b) => (b.deletedAt || "").localeCompare(a.deletedAt || ""));
+        localStorage.setItem("harmonia_trash", JSON.stringify(state.trash));
+        if (document.getElementById("section-ajustes").classList.contains("active")) {
+            renderTrashList();
+        }
+    }, err => {
+        console.error("Error sync papelera:", err);
+    });
+
     // Escucha de objetivos semanales por año
     unsubWeeklyGoals = db.collection("weeklyGoals").onSnapshot(snapshot => {
         state.weeklyGoals = {}; // Limpiar caché local
@@ -1558,6 +1580,7 @@ function stopCloudSync() {
     if (unsubWordleBank) { unsubWordleBank(); unsubWordleBank = null; }
     if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
     if (unsubNotificationsClearedAt) { unsubNotificationsClearedAt(); unsubNotificationsClearedAt = null; }
+    if (unsubTrash) { unsubTrash(); unsubTrash = null; }
 }
 
 // Función para subir los datos locales a la nube
@@ -1621,6 +1644,12 @@ function syncLocalToCloud() {
     // Subir retiradas de repertorio por temporada
     const refMarchaSeasonRemovals = db.collection("config").doc("marcha_season_removals");
     batch.set(refMarchaSeasonRemovals, state.marchaSeasonRemovals || {});
+
+    // Subir papelera
+    (state.trash || []).forEach(entry => {
+        const ref = db.collection("trash").doc(entry.id);
+        batch.set(ref, entry);
+    });
 
     batch.commit()
         .then(() => {
@@ -1757,6 +1786,173 @@ function dbDeleteSession(date) {
     } else {
         saveStateToLocalStorage();
     }
+}
+
+// ==========================================
+// PAPELERA DE ENSAYOS/ACTUACIONES ELIMINADOS
+// ==========================================
+const TRASH_RETENTION_DAYS = 30;
+
+function dbSaveTrashEntry(entry) {
+    if (isCloudActive()) {
+        firebase.firestore().collection("trash").doc(entry.id).set(entry)
+            .catch(err => console.error("Error al guardar en papelera en nube:", err));
+    } else {
+        saveStateToLocalStorage();
+    }
+}
+
+function dbDeleteTrashEntry(id) {
+    if (isCloudActive()) {
+        firebase.firestore().collection("trash").doc(id).delete()
+            .catch(err => console.error("Error al purgar entrada de papelera en nube:", err));
+    } else {
+        saveStateToLocalStorage();
+    }
+}
+
+// Guarda una copia completa de un ensayo/actuación en la papelera antes de borrarlo de verdad, para
+// poder restaurarlo si el borrado fue un error. Debe llamarse ANTES de limpiar state.attendance/
+// sessionTypes/playedMarchas/actuacionRepertoire (dbDeleteSession ya limpia estos dos últimos),
+// para capturar los datos tal cual estaban justo antes del borrado.
+function moveSessionToTrash(date) {
+    const sessionType = state.sessionTypes[date];
+    if (!sessionType) return;
+
+    const entry = {
+        id: `${date}__${Date.now()}`,
+        date,
+        kind: sessionType.type === "actuacion" ? "actuacion" : "ensayo",
+        deletedAt: new Date().toISOString(),
+        sessionType: JSON.parse(JSON.stringify(sessionType)),
+        attendance: state.attendance[date] ? JSON.parse(JSON.stringify(state.attendance[date])) : null,
+        playedMarchas: state.playedMarchas[date] ? JSON.parse(JSON.stringify(state.playedMarchas[date])) : null,
+        actuacionRepertoire: state.actuacionRepertoire[date] ? JSON.parse(JSON.stringify(state.actuacionRepertoire[date])) : null
+    };
+
+    if (!state.trash) state.trash = [];
+    state.trash.unshift(entry);
+    dbSaveTrashEntry(entry);
+}
+
+// Restaura un ensayo/actuación desde la papelera a su fecha original. Si ya se creó una sesión
+// nueva en esa misma fecha después del borrado, pide confirmación antes de sobrescribirla.
+function restoreSessionFromTrash(id) {
+    const entry = (state.trash || []).find(t => t.id === id);
+    if (!entry) return;
+
+    if (state.sessionTypes[entry.date]) {
+        const label = entry.kind === "actuacion" ? "actuación" : "ensayo";
+        if (!confirm(`Ya existe un(a) ${label} en la fecha ${formatDateSpanish(entry.date)}. ¿Restaurar de todas formas y sobrescribirlo?`)) {
+            return;
+        }
+    }
+
+    state.sessionTypes[entry.date] = entry.sessionType;
+    dbSaveSessionType(entry.date, entry.sessionType);
+
+    if (entry.attendance) {
+        state.attendance[entry.date] = entry.attendance;
+        if (isCloudActive()) {
+            firebase.firestore().collection("attendance").doc(entry.date).set(entry.attendance)
+                .catch(err => console.error("Error al restaurar asistencia en nube:", err));
+        }
+    }
+
+    if (entry.playedMarchas) {
+        state.playedMarchas[entry.date] = entry.playedMarchas;
+        if (isCloudActive()) {
+            firebase.firestore().collection("playedMarchas").doc(entry.date).set({ marchas: entry.playedMarchas })
+                .catch(err => console.error("Error al restaurar marchas ensayadas en nube:", err));
+        }
+    }
+
+    if (entry.actuacionRepertoire) {
+        state.actuacionRepertoire[entry.date] = entry.actuacionRepertoire;
+        if (isCloudActive()) {
+            firebase.firestore().collection("actuacionRepertoire").doc(entry.date).set({ marchas: entry.actuacionRepertoire })
+                .catch(err => console.error("Error al restaurar repertorio de actuación en nube:", err));
+        }
+    }
+
+    state.trash = state.trash.filter(t => t.id !== id);
+    dbDeleteTrashEntry(id);
+    if (!isCloudActive()) saveStateToLocalStorage();
+
+    renderEnsayosList();
+    renderActuacionesList();
+    renderStatistics();
+    renderCalendar();
+    renderTrashList();
+    const label = entry.kind === "actuacion" ? "Actuación" : "Ensayo";
+    showToast(`${label} del ${formatDateSpanish(entry.date)} restaurado`, "success");
+}
+
+function permanentlyDeleteTrashEntry(id) {
+    const entry = (state.trash || []).find(t => t.id === id);
+    if (!entry) return;
+    if (!confirm("¿Eliminar definitivamente esta entrada de la papelera? Esta acción no se puede deshacer.")) return;
+
+    state.trash = state.trash.filter(t => t.id !== id);
+    dbDeleteTrashEntry(id);
+    if (!isCloudActive()) saveStateToLocalStorage();
+    renderTrashList();
+    showToast("Entrada eliminada definitivamente de la papelera", "error");
+}
+
+// Purga automáticamente entradas de la papelera con más de TRASH_RETENTION_DAYS días.
+function purgeOldTrash() {
+    if (!state.trash || state.trash.length === 0) return;
+    const cutoff = Date.now() - TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const toPurge = state.trash.filter(t => new Date(t.deletedAt).getTime() < cutoff);
+    if (toPurge.length === 0) return;
+
+    state.trash = state.trash.filter(t => new Date(t.deletedAt).getTime() >= cutoff);
+    toPurge.forEach(t => dbDeleteTrashEntry(t.id));
+    if (!isCloudActive()) saveStateToLocalStorage();
+}
+
+function renderTrashList() {
+    const container = document.getElementById("trash-list-container");
+    if (!container) return;
+
+    purgeOldTrash();
+
+    const items = state.trash || [];
+    if (items.length === 0) {
+        container.innerHTML = `<p class="text-muted" style="padding: 4px 0;">La papelera está vacía.</p>`;
+        return;
+    }
+
+    container.innerHTML = items.map(entry => {
+        const label = entry.kind === "actuacion" ? "Actuación" : "Ensayo";
+        const name = entry.sessionType && entry.sessionType.name ? ` — ${entry.sessionType.name}` : "";
+        const deletedAtLabel = new Date(entry.deletedAt).toLocaleString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        return `
+            <div class="card" style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <div style="font-weight: 600; color: var(--color-gold);">${label} del ${formatDateSpanish(entry.date)}${name}</div>
+                    <div class="text-muted" style="font-size: 0.8rem; margin-top: 2px;">Eliminado el ${deletedAtLabel}</div>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-secondary btn-sm btn-restore-trash" data-id="${entry.id}">Restaurar</button>
+                    <button class="btn-action delete btn-purge-trash" data-id="${entry.id}" title="Eliminar definitivamente" style="padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    container.querySelectorAll(".btn-restore-trash").forEach(btn => {
+        btn.addEventListener("click", () => restoreSessionFromTrash(btn.dataset.id));
+    });
+    container.querySelectorAll(".btn-purge-trash").forEach(btn => {
+        btn.addEventListener("click", () => permanentlyDeleteTrashEntry(btn.dataset.id));
+    });
 }
 
 // Purga entradas de playedMarchas/actuacionRepertoire cuya sesión ya no existe en sessionTypes.
@@ -3012,8 +3208,19 @@ function setupEventListeners() {
         e.preventDefault();
         const editingKey = document.getElementById("rehearsal-editing-key") ? document.getElementById("rehearsal-editing-key").value : "";
         const selectedDate = document.getElementById("rehearsal-date-input").value;
-        const subtype = document.getElementById("rehearsal-type-input").value;
         if (!selectedDate) return;
+
+        // El desplegable de tipo solo ofrece los subtipos "por preset" actuales (trompetas1, bajos...);
+        // no incluye subtipos antiguos que ya no se pueden crear desde la UI pero sí existen en datos
+        // previos (p.ej. "voces", "primeras"). Si el ensayo que se edita tiene uno de esos subtipos, el
+        // <select> no tiene ninguna opción que lo represente y su .value queda vacío ("") aunque el
+        // usuario no haya tocado el campo de tipo en absoluto. Sin este fallback, ese "" se interpretaba
+        // como un cambio real de tipo y generaba una clave de sesión distinta (targetKey !== editingKey),
+        // lo que duplicaba el ensayo al editar solo la hora, el responsable o el lugar.
+        let subtype = document.getElementById("rehearsal-type-input").value;
+        if (!subtype && editingKey && state.sessionTypes[editingKey]) {
+            subtype = state.sessionTypes[editingKey].subtype || "general";
+        }
 
         let convocatedVoices = [];
         if (subtype === "trompetas1") {
@@ -3028,6 +3235,10 @@ function setupEventListeners() {
             convocatedVoices = ["Tambores", "Bombos", "Platos"];
         } else if (subtype === "primeras") {
             convocatedVoices = ["Trompetas 1ª", "Cornetas"];
+        } else if (subtype && subtype !== "general" && editingKey && state.sessionTypes[editingKey]) {
+            // Subtipo antiguo sin preset fijo (p.ej. "voces" personalizado): su lista de instrumentos
+            // convocados se definió a mano al crearlo, así que se conserva tal cual en vez de vaciarla.
+            convocatedVoices = state.sessionTypes[editingKey].convocatedVoices || [];
         }
 
         const locationVal = document.getElementById("rehearsal-location-input") ? document.getElementById("rehearsal-location-input").value : "Parking";
@@ -3634,13 +3845,14 @@ function setupEventListeners() {
             return;
         }
         
-        if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
+        if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Podrás restaurarlo desde la Papelera (Ajustes) durante 30 días.`)) {
+            moveSessionToTrash(date);
             delete state.attendance[date];
             delete state.sessionTypes[date];
             dbDeleteSession(date);
-            
+
             closeRehearsalDetailModal();
-            
+
             renderEnsayosList();
             renderStatistics();
             renderCalendar();
@@ -4261,8 +4473,7 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageTitle.innerText = "Ajustes";
             pageSubtitle.innerText = "Administración general y copias de seguridad";
             dateContainer.classList.add("hidden");
-            
-
+            renderTrashList();
             break;
         case "section-componente-ficha":
             pageTitle.innerText = "Mi Ficha";
@@ -5255,7 +5466,8 @@ function renderEnsayosList() {
                 showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
                 return;
             }
-            if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
+            if (confirm(`¿Estás seguro de que quieres eliminar por completo el ensayo del ${formatDateSpanish(date)}? Podrás restaurarlo desde la Papelera (Ajustes) durante 30 días.`)) {
+                moveSessionToTrash(date);
                 delete state.attendance[date];
                 delete state.sessionTypes[date];
                 dbDeleteSession(date);
@@ -5757,7 +5969,8 @@ function renderActuacionesList() {
                 return;
             }
             const actuacionName = sessionInfo.name || formatDateSpanish(date);
-            if (confirm(`¿Estás seguro de que quieres eliminar la actuación "${actuacionName}" del ${formatDateSpanish(date)}? Esta acción borrará el registro de asistencia.`)) {
+            if (confirm(`¿Estás seguro de que quieres eliminar la actuación "${actuacionName}" del ${formatDateSpanish(date)}? Podrás restaurarla desde la Papelera (Ajustes) durante 30 días.`)) {
+                moveSessionToTrash(date);
                 delete state.attendance[date];
                 delete state.sessionTypes[date];
                 dbDeleteSession(date);
