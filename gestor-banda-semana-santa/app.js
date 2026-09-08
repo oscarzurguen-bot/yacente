@@ -158,6 +158,9 @@ let state = {
     directorConcierto: null,
     repertoireLinks: { youtube: "", spotify: "" },
     suggestions: [],
+    polls: [],
+    pollOptions: {},
+    pollVotes: {},
     rehearsalLocations: [],
     uniforms: [],
     wordleBank: [],
@@ -177,6 +180,11 @@ let state = {
 };
 
 let preavisoSelectedStatus = null;
+
+// IDs de encuestas ya votadas por el músico actual en esta sesión (evita repetir lecturas a
+// Firestore); no se persiste, se recalcula bajo demanda con checkUnvotedPollsAndMaybePopup().
+let myVotedPollIds = new Set();
+let pollsInitialSyncDone = false;
 
 // ==========================================================================
 // HELPERS DE TEMPORADA (Septiembre de un año -> Agosto del siguiente)
@@ -430,6 +438,13 @@ function initApp() {
     const storedSuggestions = localStorage.getItem("harmonia_suggestions");
     state.suggestions = storedSuggestions ? JSON.parse(storedSuggestions) : [];
 
+    const storedPolls = localStorage.getItem("harmonia_polls");
+    state.polls = storedPolls ? JSON.parse(storedPolls) : [];
+    const storedPollOptions = localStorage.getItem("harmonia_poll_options");
+    state.pollOptions = storedPollOptions ? JSON.parse(storedPollOptions) : {};
+    const storedPollVotes = localStorage.getItem("harmonia_poll_votes");
+    state.pollVotes = storedPollVotes ? JSON.parse(storedPollVotes) : {};
+
     const storedRepertoireLinks = localStorage.getItem("harmonia_repertoire_links");
     state.repertoireLinks = storedRepertoireLinks ? JSON.parse(storedRepertoireLinks) : { youtube: "", spotify: "" };
 
@@ -579,6 +594,10 @@ function initApp() {
             const mobNav = document.getElementById("component-mobile-nav");
             if (mobNav) mobNav.classList.remove("hidden");
             renderActiveSection("section-componente-ficha");
+            // En modo nube esto lo dispara la primera sincronización de "polls" (startCloudSync,
+            // más abajo en initApp); en modo local no hay listener que lo haga, así que se
+            // comprueba aquí directamente.
+            if (!isCloudActive()) checkUnvotedPollsAndMaybePopup();
         } else {
             document.body.classList.remove("component-portal");
             renderActiveSection("section-pasar-lista");
@@ -735,6 +754,9 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_calendar_goals", JSON.stringify(state.calendarGoals || {}));
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
+    localStorage.setItem("harmonia_polls", JSON.stringify(state.polls || []));
+    localStorage.setItem("harmonia_poll_options", JSON.stringify(state.pollOptions || {}));
+    localStorage.setItem("harmonia_poll_votes", JSON.stringify(state.pollVotes || {}));
     localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks || { youtube: "", spotify: "" }));
     localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
     localStorage.setItem("harmonia_uniforms", JSON.stringify(state.uniforms || []));
@@ -855,6 +877,9 @@ let unsubFormacionDesfile = null;
 let unsubAnnouncements = null;
 let unsubDeletedNotifs = null;
 let unsubSuggestions = null;
+let unsubPolls = null;
+let unsubPollOptions = {};
+let unsubPollVotesAdmin = {};
 let unsubRepertoireLinks = null;
 let unsubRehearsalLocations = null;
 let unsubUniforms = null;
@@ -1516,6 +1541,66 @@ function startCloudSync() {
         console.error("Error sync sugerencias:", err);
     });
 
+    // Escucha de encuestas (dirección y músicos). Cada encuesta tiene su propia subcolección de
+    // opciones (una imagen por documento, nunca varias juntas, para no acercarse al límite de 1MB
+    // por documento de Firestore) y, solo para la directiva, una subcolección de votos por músico
+    // (los músicos no necesitan ver en tiempo real el voto de los demás, solo el suyo propio).
+    unsubPolls = db.collection("polls").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+        const list = [];
+        const currentPollIds = new Set();
+        snapshot.forEach(doc => {
+            list.push({ ...doc.data(), docId: doc.id });
+            currentPollIds.add(doc.id);
+        });
+        state.polls = list;
+
+        currentPollIds.forEach(pollId => {
+            if (!unsubPollOptions[pollId]) {
+                unsubPollOptions[pollId] = db.collection("polls").doc(pollId).collection("options").orderBy("order").onSnapshot(optSnap => {
+                    state.pollOptions[pollId] = optSnap.docs.map(d => ({ ...d.data(), docId: d.id }));
+                    rerenderActivePollSections();
+                }, err => console.error("Error sync opciones de encuesta:", err));
+            }
+            if (getAuthRole() !== "component" && !unsubPollVotesAdmin[pollId]) {
+                unsubPollVotesAdmin[pollId] = db.collection("polls").doc(pollId).collection("votes").onSnapshot(voteSnap => {
+                    state.pollVotes[pollId] = voteSnap.docs.map(d => d.data());
+                    rerenderActivePollSections();
+                }, err => console.error("Error sync votos de encuesta:", err));
+            }
+        });
+
+        // Dejar de escuchar (y limpiar del estado) encuestas que ya no existen
+        Object.keys(unsubPollOptions).forEach(pollId => {
+            if (!currentPollIds.has(pollId)) {
+                unsubPollOptions[pollId]();
+                delete unsubPollOptions[pollId];
+                delete state.pollOptions[pollId];
+            }
+        });
+        Object.keys(unsubPollVotesAdmin).forEach(pollId => {
+            if (!currentPollIds.has(pollId)) {
+                unsubPollVotesAdmin[pollId]();
+                delete unsubPollVotesAdmin[pollId];
+                delete state.pollVotes[pollId];
+            }
+        });
+
+        localStorage.setItem("harmonia_polls", JSON.stringify(state.polls));
+        // El aviso emergente de "encuesta pendiente" solo debe saltar una vez por apertura de la
+        // app, no cada vez que llega un snapshot (alguien vota, se cierra una encuesta, etc.) —
+        // por eso se dispara solo en la primera sincronización, no en cada actualización.
+        const isFirstPollsSync = !pollsInitialSyncDone;
+        pollsInitialSyncDone = true;
+        if (isFirstPollsSync && getAuthRole() === "component") {
+            checkUnvotedPollsAndMaybePopup();
+        } else {
+            updatePollsBadge();
+        }
+        rerenderActivePollSections();
+    }, err => {
+        console.error("Error sync encuestas:", err);
+    });
+
     // Escucha de lugares de ensayo (sincronización en tiempo real para directores y músicos)
     unsubRehearsalLocations = db.collection("settings").doc("rehearsalLocations").onSnapshot(doc => {
         if (doc.exists && doc.data() && Array.isArray(doc.data().list)) {
@@ -1574,6 +1659,11 @@ function stopCloudSync() {
     if (unsubAnnouncements) { unsubAnnouncements(); unsubAnnouncements = null; }
     if (unsubDeletedNotifs) { unsubDeletedNotifs(); unsubDeletedNotifs = null; }
     if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
+    if (unsubPolls) { unsubPolls(); unsubPolls = null; }
+    Object.values(unsubPollOptions).forEach(fn => fn && fn());
+    unsubPollOptions = {};
+    Object.values(unsubPollVotesAdmin).forEach(fn => fn && fn());
+    unsubPollVotesAdmin = {};
     if (unsubRepertoireLinks) { unsubRepertoireLinks(); unsubRepertoireLinks = null; }
     if (unsubRehearsalLocations) { unsubRehearsalLocations(); unsubRehearsalLocations = null; }
     if (unsubUniforms) { unsubUniforms(); unsubUniforms = null; }
@@ -2101,6 +2191,231 @@ function updateSuggestionsBadge() {
         } else {
             badge.classList.add("hidden");
         }
+    });
+}
+
+// ==========================================
+// ENCUESTAS
+// ==========================================
+
+// Crea una encuesta y sus opciones en un único batch: cada opción (con su imagen ya comprimida,
+// si tiene) va en su propio documento de la subcolección "options" para que ninguna encuesta con
+// varias imágenes se acerque al límite de 1MB por documento de Firestore.
+function dbCreatePoll(pollData, optionsList) {
+    const pollObj = {
+        title: pollData.title,
+        description: pollData.description || "",
+        type: pollData.type === "multi" ? "multi" : "single",
+        targetSection: pollData.targetSection || "all",
+        status: "active",
+        createdAt: new Date().toISOString(),
+        closedAt: null
+    };
+
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        const pollRef = db.collection("polls").doc();
+        const batch = db.batch();
+        batch.set(pollRef, pollObj);
+        optionsList.forEach((opt, index) => {
+            const optRef = pollRef.collection("options").doc();
+            batch.set(optRef, { text: opt.text, image: opt.image || null, order: index });
+        });
+        return batch.commit().catch(err => {
+            console.error("Error al crear encuesta en nube:", err);
+            throw err;
+        });
+    } else {
+        const pollId = "poll_" + Date.now();
+        state.polls.unshift({ ...pollObj, docId: pollId });
+        state.pollOptions[pollId] = optionsList.map((opt, index) => ({
+            docId: "opt_" + Date.now() + "_" + index,
+            text: opt.text,
+            image: opt.image || null,
+            order: index
+        }));
+        saveStateToLocalStorage();
+        updatePollsBadge();
+        return Promise.resolve();
+    }
+}
+
+function dbClosePoll(poll) {
+    if (isCloudActive()) {
+        firebase.firestore().collection("polls").doc(poll.docId).update({ status: "closed", closedAt: new Date().toISOString() })
+            .catch(err => console.error("Error al cerrar encuesta en nube:", err));
+    } else {
+        const p = state.polls.find(x => x.docId === poll.docId);
+        if (p) {
+            p.status = "closed";
+            p.closedAt = new Date().toISOString();
+        }
+        saveStateToLocalStorage();
+        updatePollsBadge();
+    }
+}
+
+// Borra la encuesta y limpia también sus subcolecciones de opciones y votos (Firestore no las
+// borra en cascada solas). El recuento de quién votó qué se pierde para siempre: la pantalla de
+// borrado debe avisarlo explícitamente antes de llamar a esta función.
+function dbDeletePoll(poll) {
+    if (isCloudActive()) {
+        const db = firebase.firestore();
+        const pollRef = db.collection("polls").doc(poll.docId);
+        Promise.all([
+            pollRef.collection("options").get().then(snap => Promise.all(snap.docs.map(d => d.ref.delete()))),
+            pollRef.collection("votes").get().then(snap => Promise.all(snap.docs.map(d => d.ref.delete())))
+        ]).then(() => pollRef.delete())
+            .catch(err => console.error("Error al eliminar encuesta en nube:", err));
+    } else {
+        state.polls = state.polls.filter(p => p.docId !== poll.docId);
+        delete state.pollOptions[poll.docId];
+        delete state.pollVotes[poll.docId];
+        saveStateToLocalStorage();
+        updatePollsBadge();
+    }
+}
+
+// Vota (o cambia el voto, si la encuesta sigue activa) del músico autenticado. El id de documento
+// del voto es el propio id del músico: así "ya he votado" es una lectura directa por id y "cambiar
+// mi voto" es un simple overwrite, sin necesidad de buscar ni borrar un voto previo.
+function dbCastVote(pollId, musicianId, musicianName, optionIds) {
+    const voteObj = { musicianId, musicianName, optionIds, votedAt: new Date().toISOString() };
+    myVotedPollIds.add(pollId);
+
+    if (isCloudActive()) {
+        return firebase.firestore().collection("polls").doc(pollId).collection("votes").doc(musicianId).set(voteObj)
+            .catch(err => {
+                console.error("Error al votar en nube:", err);
+                throw err;
+            });
+    } else {
+        if (!state.pollVotes[pollId]) state.pollVotes[pollId] = [];
+        const idx = state.pollVotes[pollId].findIndex(v => v.musicianId === musicianId);
+        if (idx !== -1) {
+            state.pollVotes[pollId][idx] = voteObj;
+        } else {
+            state.pollVotes[pollId].push(voteObj);
+        }
+        saveStateToLocalStorage();
+        updatePollsBadge();
+        return Promise.resolve();
+    }
+}
+
+// Devuelve (por callback) el voto propio del músico autenticado para una encuesta, usando la
+// caché en memoria si ya está disponible (modo local, o ya consultada antes) y si no, una lectura
+// puntual a Firestore — los músicos no mantienen una suscripción en vivo a los votos ajenos.
+function getMyVoteForPoll(pollId, callback) {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) {
+        callback(null);
+        return;
+    }
+    if (state.pollVotes[pollId]) {
+        callback(state.pollVotes[pollId].find(v => v.musicianId === musicianId) || null);
+        return;
+    }
+    if (isCloudActive()) {
+        firebase.firestore().collection("polls").doc(pollId).collection("votes").doc(musicianId).get()
+            .then(doc => callback(doc.exists ? doc.data() : null))
+            .catch(err => {
+                console.error("Error al comprobar voto propio:", err);
+                callback(null);
+            });
+    } else {
+        callback(null);
+    }
+}
+
+// Recuento (anónimo) de votos de una encuesta para la vista de resultados del músico: lectura
+// puntual, no una suscripción en vivo (evita cargar al músico con los votos de todos los demás).
+function getPollResultsTally(pollId, callback) {
+    if (state.pollVotes[pollId]) {
+        callback(state.pollVotes[pollId]);
+        return;
+    }
+    if (isCloudActive()) {
+        firebase.firestore().collection("polls").doc(pollId).collection("votes").get()
+            .then(snap => callback(snap.docs.map(d => d.data())))
+            .catch(err => {
+                console.error("Error al leer resultados de encuesta:", err);
+                callback([]);
+            });
+    } else {
+        callback([]);
+    }
+}
+
+function updatePollsBadge() {
+    let pending = 0;
+    if (getAuthRole() === "component") {
+        const musicianId = getAuthMusicianId();
+        (state.polls || [])
+            .filter(p => p.status === "active" && isPollVisibleToMusician(p, musicianId))
+            .forEach(p => {
+                const votes = state.pollVotes[p.docId];
+                const hasVoted = myVotedPollIds.has(p.docId) || (votes && votes.some(v => v.musicianId === musicianId));
+                if (!hasVoted) pending++;
+            });
+    } else {
+        pending = (state.polls || []).filter(p => p.status === "active").length;
+    }
+    document.querySelectorAll(".polls-pending-badge").forEach(badge => {
+        if (pending > 0) {
+            badge.innerText = pending > 99 ? "99+" : String(pending);
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
+    });
+}
+
+// Re-renderiza la sección de encuestas (músico o dirección) solo si está activa en pantalla ahora
+// mismo, igual que hace el resto de listeners de Firestore de la app para no gastar trabajo en
+// vistas que no se están mostrando.
+function rerenderActivePollSections() {
+    const compSection = document.getElementById("section-componente-encuestas");
+    if (compSection && compSection.classList.contains("active")) {
+        renderComponentEncuestasPage();
+    }
+    const adminSection = document.getElementById("section-otros-encuestas");
+    if (adminSection && adminSection.classList.contains("active")) {
+        renderAdminPollsList();
+    }
+}
+
+// Comprueba si el músico autenticado tiene alguna encuesta activa sin votar y, si es así, muestra
+// el aviso emergente para la primera de ellas. Se llama una única vez por apertura de la app
+// (desde la primera sincronización de "polls"), no en cada actualización posterior.
+function checkUnvotedPollsAndMaybePopup() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return;
+
+    const activePolls = (state.polls || []).filter(p => p.status === "active" && isPollVisibleToMusician(p, musicianId));
+    if (activePolls.length === 0) {
+        updatePollsBadge();
+        return;
+    }
+
+    const checks = activePolls.map(poll => new Promise(resolve => {
+        if (myVotedPollIds.has(poll.docId)) {
+            resolve();
+            return;
+        }
+        getMyVoteForPoll(poll.docId, vote => {
+            if (vote) myVotedPollIds.add(poll.docId);
+            resolve();
+        });
+    }));
+
+    Promise.all(checks).then(() => {
+        updatePollsBadge();
+        const unvoted = activePolls.filter(p => !myVotedPollIds.has(p.docId));
+        if (unvoted.length > 0) {
+            openPollReminderModal(unvoted[0]);
+        }
+        rerenderActivePollSections();
     });
 }
 
@@ -4217,6 +4532,8 @@ function setupMarchasDragAndDrop() {
     setupAnnouncementEvents();
     setupMusicianDrawerAndSettingsEvents();
     setupSuggestionsMailboxEvents();
+    setupPollEvents();
+    setupPollAdminEvents();
     setupLugaresEnsayoEvents();
     setupUniformesEvents();
     setupUniformePreviewEvents();
@@ -4288,6 +4605,7 @@ function setupComponentSwipeNavigation() {
         "section-componente-historial",
         "section-componente-repertorio",
         "section-componente-sugerencias",
+        "section-componente-encuestas",
         "section-componente-ajustes"
     ];
 
@@ -4368,6 +4686,7 @@ function renderActiveSection(sectionId, forcedDirection) {
         "section-componente-historial",
         "section-componente-repertorio",
         "section-componente-sugerencias",
+        "section-componente-encuestas",
         "section-componente-ajustes"
     ];
 
@@ -4516,6 +4835,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             renderComponentSugerenciasPage();
             renderMySuggestionHistory();
             break;
+        case "section-componente-encuestas":
+            pageTitle.innerText = "Encuestas";
+            pageSubtitle.innerText = "Vota las decisiones de la banda";
+            dateContainer.classList.add("hidden");
+            renderComponentEncuestasPage();
+            break;
         case "section-componente-ajustes":
             pageTitle.innerText = "Ajustes";
             pageSubtitle.innerText = "Seguridad y gestión de la cuenta";
@@ -4545,6 +4870,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             dateContainer.classList.add("hidden");
             renderAdminSuggestionsList();
             dbMarkAllSuggestionsRead().then(() => updateSuggestionsBadge());
+            break;
+        case "section-otros-encuestas":
+            pageTitle.innerText = "Encuestas";
+            pageSubtitle.innerText = "Crea votaciones para los músicos de la banda";
+            dateContainer.classList.add("hidden");
+            renderAdminPollsList();
             break;
         case "section-otros-lugares-ensayo":
             pageTitle.innerText = "Lugares de Ensayo";
@@ -10280,8 +10611,9 @@ function setupFirebaseListeners() {
                 // Conectar en segundo plano a la nube
                 startCloudSync();
 
-                
+
                 renderActiveSection("section-componente-ficha");
+                if (!isCloudActive()) checkUnvotedPollsAndMaybePopup();
                 showToast(`Bienvenido/a, ${musician.name}`, "success");
             };
             
@@ -17468,6 +17800,223 @@ function setupSuggestionsMailboxEvents() {
 }
 
 // ==========================================================================
+// ENCUESTAS (VISTA MÚSICO)
+// ==========================================================================
+
+// Igual que el filtro de destinatarios de los comunicados: "all" llega a todos, cualquier otro
+// valor es el nombre exacto de una sección/instrumento y solo la ven los músicos de esa sección.
+function isPollVisibleToMusician(poll, musicianId) {
+    if (!poll.targetSection || poll.targetSection === "all") return true;
+    const musician = (state.musicians || []).find(m => String(m.id) === String(musicianId));
+    return !!musician && musician.instrument === poll.targetSection;
+}
+
+function renderComponentEncuestasPage() {
+    const container = document.getElementById("component-polls-list");
+    const emptyState = document.getElementById("component-polls-empty");
+    if (!container) return;
+
+    const musicianId = getAuthMusicianId();
+    const polls = (state.polls || [])
+        .filter(poll => isPollVisibleToMusician(poll, musicianId))
+        .sort((a, b) => {
+            if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+            return new Date(b.createdAt) - new Date(a.createdAt);
+        });
+
+    container.innerHTML = "";
+    if (polls.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    polls.forEach(poll => {
+        const votes = state.pollVotes[poll.docId];
+        const hasVoted = myVotedPollIds.has(poll.docId) || !!(votes && votes.some(v => v.musicianId === musicianId));
+
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "card-item";
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        `;
+
+        const statusBadge = poll.status === "active"
+            ? `<span style="background: rgba(46, 204, 113, 0.15); color: #2ecc71; font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap;">ACTIVA</span>`
+            : `<span style="background: rgba(255,255,255,0.06); color: var(--text-muted); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap;">CERRADA</span>`;
+        const voteStatus = poll.status === "active"
+            ? (hasVoted
+                ? `<span style="color: var(--color-present); font-size: 0.8rem;">✓ Ya has votado</span>`
+                : `<span style="color: var(--color-gold); font-size: 0.8rem; font-weight: 600;">Pendiente de votar</span>`)
+            : "";
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="font-weight: 600;">${escapeHtml(poll.title)}</span>
+                ${statusBadge}
+            </div>
+            ${poll.description ? `<p class="text-muted" style="margin: 0; font-size: 0.82rem;">${escapeHtml(poll.description)}</p>` : ""}
+            ${voteStatus}
+        `;
+        itemDiv.addEventListener("click", () => openVotePollModal(poll));
+        container.appendChild(itemDiv);
+    });
+}
+
+function pollOptionImageHtml(opt) {
+    return opt.image
+        ? `<img src="${opt.image}" style="width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;">`
+        : "";
+}
+
+// Abre el modal de una encuesta: en modo votación (activa y sin voto propio), en modo "puedes
+// cambiar tu voto" (activa y ya votada), o en modo solo-resultados (cerrada).
+function openVotePollModal(poll) {
+    const modal = document.getElementById("modal-vote-poll");
+    if (!modal) return;
+
+    const options = (state.pollOptions[poll.docId] || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    document.getElementById("vote-poll-id").value = poll.docId;
+    document.getElementById("vote-poll-title").innerText = poll.title;
+    document.getElementById("vote-poll-description").innerText = poll.description || "";
+
+    const submitBtn = document.getElementById("btn-submit-vote-poll");
+    const closeBtnFooter = document.getElementById("btn-close-vote-poll-footer");
+    const optionsContainer = document.getElementById("vote-poll-options");
+    submitBtn.onclick = () => submitPollVote(poll);
+
+    const showVotingForm = (myVote) => {
+        const selected = new Set(myVote ? myVote.optionIds : []);
+        const inputType = poll.type === "multi" ? "checkbox" : "radio";
+        optionsContainer.innerHTML = options.map(opt => `
+            <label style="display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; cursor: pointer;">
+                <input type="${inputType}" name="vote-poll-option" value="${opt.docId}" ${selected.has(opt.docId) ? "checked" : ""} style="margin-top: 4px; flex-shrink: 0;">
+                <div style="flex: 1;">
+                    ${pollOptionImageHtml(opt)}
+                    <span>${escapeHtml(opt.text)}</span>
+                </div>
+            </label>
+        `).join("");
+        submitBtn.classList.remove("hidden");
+        submitBtn.innerText = myVote ? "Actualizar mi voto" : "Enviar Voto";
+        submitBtn.onclick = () => submitPollVote(poll);
+        closeBtnFooter.classList.add("hidden");
+    };
+
+    const showResults = (votes, allowChange) => {
+        const total = votes.length;
+        const tally = {};
+        votes.forEach(v => (v.optionIds || []).forEach(id => { tally[id] = (tally[id] || 0) + 1; }));
+        optionsContainer.innerHTML = options.map(opt => {
+            const count = tally[opt.docId] || 0;
+            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+            return `
+                <div style="border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
+                    ${pollOptionImageHtml(opt)}
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px;">
+                        <span style="font-weight: 600;">${escapeHtml(opt.text)}</span>
+                        <span class="text-muted" style="font-size: 0.8rem; white-space: nowrap;">${count} voto${count === 1 ? "" : "s"} · ${pct}%</span>
+                    </div>
+                    <div style="background: var(--bg-primary); border-radius: 6px; overflow: hidden; height: 8px;">
+                        <div style="width: ${pct}%; height: 100%; background: var(--color-gold);"></div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+        closeBtnFooter.classList.remove("hidden");
+        if (allowChange) {
+            submitBtn.classList.remove("hidden");
+            submitBtn.innerText = "Cambiar mi voto";
+            submitBtn.onclick = () => getMyVoteForPoll(poll.docId, showVotingForm);
+        } else {
+            submitBtn.classList.add("hidden");
+        }
+    };
+
+    if (poll.status === "closed") {
+        getPollResultsTally(poll.docId, votes => showResults(votes, false));
+        modal.classList.add("active");
+    } else {
+        getMyVoteForPoll(poll.docId, myVote => {
+            if (myVote) {
+                getPollResultsTally(poll.docId, votes => showResults(votes, true));
+            } else {
+                showVotingForm(null);
+            }
+            modal.classList.add("active");
+        });
+    }
+}
+
+function submitPollVote(poll) {
+    const musicianId = getAuthMusicianId();
+    const musician = (state.musicians || []).find(m => String(m.id) === String(musicianId));
+    if (!musicianId || !musician) {
+        showToast("Sesión de músico no válida", "error");
+        return;
+    }
+    const checked = Array.from(document.querySelectorAll('#vote-poll-options input[name="vote-poll-option"]:checked'));
+    if (checked.length === 0) {
+        showToast("Selecciona al menos una opción", "warning");
+        return;
+    }
+    const optionIds = checked.map(input => input.value);
+
+    dbCastVote(poll.docId, musicianId, musician.name, optionIds)
+        .then(() => {
+            showToast("Voto registrado, ¡gracias!", "success");
+            document.getElementById("modal-vote-poll").classList.remove("active");
+            renderComponentEncuestasPage();
+            updatePollsBadge();
+        })
+        .catch(() => {
+            showToast("No se ha podido registrar tu voto. Comprueba tu conexión e inténtalo de nuevo.", "error");
+        });
+}
+
+// Aviso emergente al abrir la app cuando hay alguna encuesta activa sin votar (ver
+// checkUnvotedPollsAndMaybePopup). No bloquea el resto de la app: se puede cerrar sin votar y
+// reaparecerá en la siguiente apertura mientras siga sin responderse.
+function openPollReminderModal(poll) {
+    const modal = document.getElementById("modal-poll-reminder");
+    const titleEl = document.getElementById("poll-reminder-title");
+    if (!modal || !titleEl) return;
+
+    titleEl.innerText = poll.title;
+    document.getElementById("btn-poll-reminder-vote").onclick = () => {
+        modal.classList.remove("active");
+        openVotePollModal(poll);
+    };
+    modal.classList.add("active");
+}
+
+function setupPollEvents() {
+    const closeVoteModal = () => {
+        const modal = document.getElementById("modal-vote-poll");
+        if (modal) modal.classList.remove("active");
+    };
+    const btnCloseVote = document.getElementById("btn-close-vote-poll");
+    const btnCloseVoteFooter = document.getElementById("btn-close-vote-poll-footer");
+    if (btnCloseVote) btnCloseVote.addEventListener("click", closeVoteModal);
+    if (btnCloseVoteFooter) btnCloseVoteFooter.addEventListener("click", closeVoteModal);
+
+    const btnDismissReminder = document.getElementById("btn-poll-reminder-dismiss");
+    if (btnDismissReminder) {
+        btnDismissReminder.addEventListener("click", () => {
+            const modal = document.getElementById("modal-poll-reminder");
+            if (modal) modal.classList.remove("active");
+        });
+    }
+}
+
+// ==========================================================================
 // GESTIÓN DE LUGARES DE ENSAYO (DIRECTOR Y DESPLEGABLES)
 // ==========================================================================
 
@@ -19837,6 +20386,270 @@ function renderAdminSuggestionsList() {
 
         container.appendChild(itemDiv);
     });
+}
+
+// ==========================================================================
+// ENCUESTAS (VISTA DIRECCIÓN)
+// ==========================================================================
+
+function renderAdminPollsList() {
+    const container = document.getElementById("admin-polls-list");
+    const emptyState = document.getElementById("admin-polls-empty");
+    if (!container) return;
+
+    const polls = (state.polls || []).slice().sort((a, b) => {
+        if (a.status !== b.status) return a.status === "active" ? -1 : 1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    container.innerHTML = "";
+    if (polls.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+        return;
+    }
+    if (emptyState) emptyState.classList.add("hidden");
+
+    polls.forEach(poll => {
+        const voteCount = (state.pollVotes[poll.docId] || []).length;
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "card-item";
+        itemDiv.style.cssText = `
+            padding: 14px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
+
+        const statusBadge = poll.status === "active"
+            ? `<span style="background: rgba(46, 204, 113, 0.15); color: #2ecc71; font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap;">ACTIVA</span>`
+            : `<span style="background: rgba(255,255,255,0.06); color: var(--text-muted); font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap;">CERRADA</span>`;
+
+        itemDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="font-weight: 700; color: var(--color-gold);">${escapeHtml(poll.title)}</span>
+                ${statusBadge}
+            </div>
+            ${poll.description ? `<p class="text-muted" style="margin: 0; font-size: 0.82rem;">${escapeHtml(poll.description)}</p>` : ""}
+            <span class="text-muted" style="font-size: 0.8rem;">${voteCount} voto${voteCount === 1 ? "" : "s"} · ${poll.type === "multi" ? "elección múltiple" : "elección única"} · Dirigida a: ${poll.targetSection && poll.targetSection !== "all" ? escapeHtml(poll.targetSection) : "Toda la banda"}</span>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;">
+                <button type="button" class="btn btn-secondary btn-sm btn-poll-results">Ver resultados</button>
+                ${poll.status === "active"
+                    ? `<button type="button" class="btn btn-secondary btn-sm btn-poll-close">Cerrar</button>`
+                    : `<button type="button" class="btn btn-secondary btn-sm btn-poll-reopen">Reabrir</button>`}
+                <button type="button" class="btn-action delete btn-poll-delete" title="Eliminar encuesta" style="margin-left: auto; padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `;
+
+        itemDiv.querySelector(".btn-poll-results").addEventListener("click", () => openPollResultsModal(poll));
+        if (poll.status === "active") {
+            itemDiv.querySelector(".btn-poll-close").addEventListener("click", () => {
+                if (!confirm(`¿Cerrar la encuesta "${poll.title}"? Los músicos ya no podrán votar ni cambiar su voto.`)) return;
+                dbClosePoll(poll);
+                showToast("Encuesta cerrada", "success");
+                renderAdminPollsList();
+            });
+        } else {
+            itemDiv.querySelector(".btn-poll-reopen").addEventListener("click", () => {
+                // dbClosePoll siempre pone status "closed"; reabrir es la operación inversa, así que
+                // se guarda directamente en vez de reutilizar esa función.
+                if (isCloudActive()) {
+                    firebase.firestore().collection("polls").doc(poll.docId).update({ status: "active", closedAt: null })
+                        .catch(err => console.error("Error al reabrir encuesta en nube:", err));
+                } else {
+                    const p = state.polls.find(x => x.docId === poll.docId);
+                    if (p) { p.status = "active"; p.closedAt = null; }
+                    saveStateToLocalStorage();
+                }
+                showToast("Encuesta reabierta", "success");
+                renderAdminPollsList();
+            });
+        }
+        itemDiv.querySelector(".btn-poll-delete").addEventListener("click", () => {
+            if (!confirm(`¿Eliminar definitivamente la encuesta "${poll.title}"? Se perderá también el registro de quién votó qué. Esta acción no se puede deshacer.`)) return;
+            dbDeletePoll(poll);
+            showToast("Encuesta eliminada", "error");
+            renderAdminPollsList();
+        });
+
+        container.appendChild(itemDiv);
+    });
+}
+
+function openPollResultsModal(poll) {
+    const modal = document.getElementById("modal-poll-results");
+    const titleEl = document.getElementById("poll-results-title");
+    const body = document.getElementById("poll-results-body");
+    if (!modal || !body) return;
+
+    titleEl.innerText = `Resultados — ${poll.title}`;
+    const options = (state.pollOptions[poll.docId] || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+    const votes = state.pollVotes[poll.docId] || [];
+    const total = votes.length;
+
+    body.innerHTML = options.map(opt => {
+        const voters = votes.filter(v => (v.optionIds || []).includes(opt.docId));
+        const pct = total > 0 ? Math.round((voters.length / total) * 100) : 0;
+        const voterNames = voters.length > 0
+            ? voters.map(v => escapeHtml(v.musicianName || "Desconocido")).join(", ")
+            : `<span class="text-muted">Nadie ha votado esta opción todavía</span>`;
+        return `
+            <div style="border: 1px solid var(--border-color); border-radius: 10px; padding: 12px;">
+                ${pollOptionImageHtml(opt)}
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px;">
+                    <span style="font-weight: 600;">${escapeHtml(opt.text)}</span>
+                    <span class="text-muted" style="font-size: 0.8rem; white-space: nowrap;">${voters.length} voto${voters.length === 1 ? "" : "s"} · ${pct}%</span>
+                </div>
+                <div style="background: var(--bg-primary); border-radius: 6px; overflow: hidden; height: 8px; margin-bottom: 8px;">
+                    <div style="width: ${pct}%; height: 100%; background: var(--color-gold);"></div>
+                </div>
+                <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">${voterNames}</p>
+            </div>
+        `;
+    }).join("");
+
+    modal.classList.add("active");
+}
+
+// Añade una fila de opción vacía (o rellena, si se pasan datos) al formulario de creación de
+// encuesta, clonando la plantilla <template id="tpl-poll-option-row">.
+function addPollOptionRow(prefill) {
+    const template = document.getElementById("tpl-poll-option-row");
+    const container = document.getElementById("poll-editor-options");
+    if (!template || !container) return;
+
+    const rowEl = template.content.firstElementChild.cloneNode(true);
+    const textInput = rowEl.querySelector(".poll-option-text-input");
+    const fileInput = rowEl.querySelector(".poll-option-image-file");
+    const imgEl = rowEl.querySelector(".poll-option-image-img");
+    const placeholderEl = rowEl.querySelector(".poll-option-image-placeholder");
+    const btnUpload = rowEl.querySelector(".btn-upload-poll-option-image");
+    const btnRemoveImage = rowEl.querySelector(".btn-remove-poll-option-image");
+    const btnRemoveRow = rowEl.querySelector(".btn-remove-poll-option-row");
+
+    if (prefill && prefill.text) textInput.value = prefill.text;
+    if (prefill && prefill.image) {
+        imgEl.src = prefill.image;
+        imgEl.classList.remove("hidden");
+        placeholderEl.classList.add("hidden");
+        btnRemoveImage.classList.remove("hidden");
+    }
+
+    btnUpload.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        // maxWidth/maxHeight generosos y sin recorte (a diferencia de la foto de perfil cuadrada):
+        // las opciones de encuesta suelen ser diseños rectangulares (p.ej. una estampita) y
+        // recortarlas a cuadrado les cortaría el diseño.
+        compressImageFile(file, 800, 800, (dataUrl) => {
+            imgEl.src = dataUrl;
+            imgEl.classList.remove("hidden");
+            placeholderEl.classList.add("hidden");
+            btnRemoveImage.classList.remove("hidden");
+        });
+    });
+    btnRemoveImage.addEventListener("click", () => {
+        imgEl.src = "";
+        imgEl.classList.add("hidden");
+        placeholderEl.classList.remove("hidden");
+        btnRemoveImage.classList.add("hidden");
+        fileInput.value = "";
+    });
+    btnRemoveRow.addEventListener("click", () => {
+        // Siempre deben quedar al menos 2 opciones para que la encuesta tenga sentido.
+        if (container.querySelectorAll(".poll-option-row").length <= 2) {
+            showToast("Una encuesta necesita al menos 2 opciones", "warning");
+            return;
+        }
+        rowEl.remove();
+    });
+
+    container.appendChild(rowEl);
+}
+
+function openPollEditorModal() {
+    const modal = document.getElementById("modal-poll-editor");
+    const form = document.getElementById("form-poll-editor");
+    const optionsContainer = document.getElementById("poll-editor-options");
+    if (!modal || !form) return;
+
+    form.reset();
+    document.getElementById("poll-editor-id").value = "";
+    optionsContainer.innerHTML = "";
+    addPollOptionRow();
+    addPollOptionRow();
+
+    modal.classList.add("active");
+}
+
+function setupPollAdminEvents() {
+    const modal = document.getElementById("modal-poll-editor");
+    const closeEditor = () => modal && modal.classList.remove("active");
+
+    const btnAddPoll = document.getElementById("btn-add-poll");
+    if (btnAddPoll) btnAddPoll.addEventListener("click", openPollEditorModal);
+
+    const btnClose = document.getElementById("btn-close-poll-editor-modal");
+    const btnCancel = document.getElementById("btn-cancel-poll-editor");
+    if (btnClose) btnClose.addEventListener("click", closeEditor);
+    if (btnCancel) btnCancel.addEventListener("click", closeEditor);
+
+    const btnAddOption = document.getElementById("btn-add-poll-option");
+    if (btnAddOption) btnAddOption.addEventListener("click", () => addPollOptionRow());
+
+    const btnCloseResults = document.getElementById("btn-close-poll-results");
+    if (btnCloseResults) {
+        btnCloseResults.addEventListener("click", () => {
+            const resultsModal = document.getElementById("modal-poll-results");
+            if (resultsModal) resultsModal.classList.remove("active");
+        });
+    }
+
+    const form = document.getElementById("form-poll-editor");
+    if (form) {
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const title = document.getElementById("poll-editor-title-input").value.trim();
+            const description = document.getElementById("poll-editor-description-input").value.trim();
+            const type = document.getElementById("poll-editor-multi-toggle").checked ? "multi" : "single";
+            const targetSection = document.getElementById("poll-editor-target-select").value;
+            if (!title) return;
+
+            const rows = Array.from(document.querySelectorAll("#poll-editor-options .poll-option-row"));
+            const options = rows.map(row => {
+                const text = row.querySelector(".poll-option-text-input").value.trim();
+                const imgEl = row.querySelector(".poll-option-image-img");
+                const hasImage = imgEl && !imgEl.classList.contains("hidden") && imgEl.src;
+                return { text, image: hasImage ? imgEl.src : null };
+            }).filter(opt => opt.text);
+
+            if (options.length < 2) {
+                showToast("Añade al menos 2 opciones con texto", "warning");
+                return;
+            }
+
+            const submitBtn = form.querySelector("button[type=submit]");
+            if (submitBtn) submitBtn.disabled = true;
+
+            dbCreatePoll({ title, description, type, targetSection }, options)
+                .then(() => {
+                    showToast("Encuesta creada", "success");
+                    closeEditor();
+                    renderAdminPollsList();
+                })
+                .catch(() => {
+                    showToast("No se ha podido crear la encuesta. Comprueba tu conexión e inténtalo de nuevo.", "error");
+                })
+                .finally(() => {
+                    if (submitBtn) submitBtn.disabled = false;
+                });
+        });
+    }
 }
 
 function renderGeneralOverviewChart() {

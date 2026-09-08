@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=561">
+    <link rel="stylesheet" href="style.css?v=563">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1426,6 +1426,18 @@
                         <p class="text-muted" style="margin: 0;">Consulta las propuestas enviadas por los músicos de la banda.</p>
                     </div>
 
+                    <div class="card settings-card otros-nav-card" data-target="section-otros-encuestas" style="cursor: pointer; position: relative;">
+                        <h3 style="display: flex; align-items: center; gap: 10px;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                            </svg>
+                            Encuestas
+                            <span class="polls-pending-badge hidden" style="background-color: var(--color-absent); color: white; border-radius: 50%; min-width: 18px; height: 18px; padding: 0 4px; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center;">0</span>
+                        </h3>
+                        <p class="text-muted" style="margin: 0;">Crea votaciones para los músicos, como elegir el diseño de la próxima estampita.</p>
+                    </div>
+
                     <div class="card settings-card otros-nav-card" data-target="section-otros-lugares-ensayo" style="cursor: pointer; position: relative;">
                         <h3 style="display: flex; align-items: center; gap: 10px;">
                             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
@@ -1514,6 +1526,35 @@
                 <div id="admin-suggestions-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
                     <span style="font-size: 2rem; display: block; margin-bottom: 10px;">📭</span>
                     Aún no se ha recibido ninguna sugerencia.
+                </div>
+            </section>
+
+            <!-- Sección: Encuestas (gestión admin) -->
+            <section id="section-otros-encuestas" class="app-section">
+                <a href="#" class="otros-back-link" data-target="section-otros" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Volver a Otros
+                </a>
+                <div class="card" style="padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h3 style="margin: 0; font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--color-gold); display: flex; align-items: center; gap: 8px;">
+                                🗳️ Encuestas
+                            </h3>
+                            <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">
+                                Crea votaciones para los músicos, con imagen opcional en cada opción.
+                            </p>
+                        </div>
+                        <button id="btn-add-poll" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <span>➕</span> Crear Encuesta
+                        </button>
+                    </div>
+                </div>
+
+                <div id="admin-polls-list" class="vertical-cards-list"></div>
+                <div id="admin-polls-empty" class="hidden text-muted" style="text-align: center; padding: 40px 10px;">
+                    <span style="font-size: 2rem; display: block; margin-bottom: 10px;">🗳️</span>
+                    Todavía no has creado ninguna encuesta.
                 </div>
             </section>
 
@@ -2243,6 +2284,24 @@
                     <div id="my-suggestions-history-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
                         <span style="font-size: 1.8rem; display: block; margin-bottom: 8px;">📭</span>
                         No has enviado ninguna sugerencia todavía.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección: Encuestas (músico) -->
+            <section id="section-componente-encuestas" class="app-section">
+                <div class="card" style="padding: 20px;">
+                    <h3 style="margin-top: 0; margin-bottom: 8px; font-family: 'Cinzel', serif; font-size: 1.2rem; color: #D4AF37; display: flex; align-items: center; gap: 8px;">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                        Encuestas
+                    </h3>
+                    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                        Vota las decisiones de la banda, activas o ya cerradas.
+                    </p>
+                    <div id="component-polls-list" class="vertical-cards-list"></div>
+                    <div id="component-polls-empty" class="hidden text-muted" style="text-align: center; padding: 30px 10px;">
+                        <span style="font-size: 1.8rem; display: block; margin-bottom: 8px;">🗳️</span>
+                        Todavía no hay ninguna encuesta creada.
                     </div>
                 </div>
             </section>
@@ -4278,6 +4337,126 @@
             </div>
         </div>
     </div>
+    <!-- Modal: Votar / ver resultados de una encuesta -->
+    <div id="modal-vote-poll" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px; width: 92%; padding: 24px; position: relative; max-height: 85vh; overflow-y: auto;">
+            <button class="modal-close" id="btn-close-vote-poll" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <input type="hidden" id="vote-poll-id">
+            <h3 id="vote-poll-title" style="margin: 0 0 6px 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold); padding-right: 24px;">Título de la encuesta</h3>
+            <p id="vote-poll-description" class="text-muted" style="margin: 0 0 16px 0; font-size: 0.85rem;"></p>
+            <div id="vote-poll-options" style="display: flex; flex-direction: column; gap: 12px;"></div>
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button type="button" id="btn-submit-vote-poll" class="btn btn-primary" style="flex: 1; font-weight: 600;">Enviar Voto</button>
+                <button type="button" id="btn-close-vote-poll-footer" class="btn btn-secondary hidden" style="flex: 1;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Aviso de encuesta pendiente (aparece al abrir la app si hay alguna activa sin votar) -->
+    <div id="modal-poll-reminder" class="modal-overlay">
+        <div class="modal-card" style="max-width: 400px; width: 92%; text-align: center; padding: 28px 24px; position: relative;">
+            <span style="font-size: 2.2rem; display: block; margin-bottom: 10px;">🗳️</span>
+            <h3 style="margin: 0 0 8px 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold);">¡Tienes una encuesta pendiente!</h3>
+            <p id="poll-reminder-title" class="text-muted" style="margin: 0 0 20px 0; font-size: 0.9rem;">Título de la encuesta</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="btn-poll-reminder-vote" class="btn btn-primary" style="font-weight: 600;">Votar ahora</button>
+                <button type="button" id="btn-poll-reminder-dismiss" class="btn btn-secondary">Ahora no</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Crear/Editar Encuesta (admin) -->
+    <div id="modal-poll-editor" class="modal-overlay">
+        <div class="modal-card" style="max-width: 520px; max-height: 88vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 id="modal-poll-editor-title">Crear Encuesta</h3>
+                <button class="modal-close" id="btn-close-poll-editor-modal">&times;</button>
+            </div>
+            <form id="form-poll-editor">
+                <input type="hidden" id="poll-editor-id">
+                <div class="form-group">
+                    <label for="poll-editor-title-input">Título</label>
+                    <input type="text" id="poll-editor-title-input" required placeholder="Ej. Diseño de la estampita 2027" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="poll-editor-description-input">Descripción (opcional)</label>
+                    <textarea id="poll-editor-description-input" rows="2" placeholder="Contexto adicional para los músicos" style="width: 100%; resize: vertical; font-family: inherit;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="poll-editor-target-select">Dirigida a</label>
+                    <select id="poll-editor-target-select" style="width: 100%; padding: 8px 12px; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); box-sizing: border-box;">
+                        <option value="all" selected>🎺 Toda la Banda (Todos los músicos)</option>
+                        <option value="Trompetas 1ª">Trompetas 1ª</option>
+                        <option value="Bajos">Bajos</option>
+                        <option value="Trompetas 2ª y 3ª">Trompetas 2ª y 3ª</option>
+                        <option value="Cornetas">Cornetas</option>
+                        <option value="Percusión">Percusión</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                    <label class="switch" title="Permitir marcar varias opciones">
+                        <input type="checkbox" id="poll-editor-multi-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Permitir elegir varias opciones a la vez</span>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Opciones</label>
+                    <div id="poll-editor-options" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                    <button type="button" id="btn-add-poll-option" class="btn btn-secondary btn-sm" style="margin-top: 10px; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>➕</span> Añadir opción
+                    </button>
+                </div>
+
+                <div class="modal-actions" style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="button" id="btn-cancel-poll-editor" class="btn btn-secondary" style="flex: 1;">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="flex: 1; font-weight: 600;">Guardar Encuesta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Plantilla (no se muestra directamente) de una fila de opción del editor de encuestas -->
+    <template id="tpl-poll-option-row">
+        <div class="poll-option-row" style="border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; display: flex; gap: 12px; align-items: flex-start;">
+            <div class="poll-option-image-preview" style="width: 64px; height: 64px; border-radius: 8px; border: 1px dashed var(--border-color); background: rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative;">
+                <span class="poll-option-image-placeholder" style="font-size: 1.4rem; opacity: 0.5;">🖼️</span>
+                <img class="poll-option-image-img hidden" style="width: 100%; height: 100%; object-fit: cover;" alt="Vista previa">
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                <input type="text" class="poll-option-text-input" placeholder="Texto de la opción" required style="width: 100%;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="file" class="poll-option-image-file hidden" accept="image/*">
+                    <button type="button" class="btn btn-secondary btn-sm btn-upload-poll-option-image" style="display: inline-flex; align-items: center; gap: 4px;"><span>📷</span> Imagen</button>
+                    <button type="button" class="btn btn-secondary btn-sm btn-remove-poll-option-image hidden" style="color: var(--color-absent); display: inline-flex; align-items: center; gap: 4px;"><span>🗑️</span> Quitar</button>
+                    <button type="button" class="btn-action delete btn-remove-poll-option-row" title="Eliminar esta opción" style="margin-left: auto; padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Modal: Resultados de una encuesta, desglose por músico (admin) -->
+    <div id="modal-poll-results" class="modal-overlay">
+        <div class="modal-card" style="max-width: 480px; width: 92%; padding: 24px; position: relative; max-height: 85vh; overflow-y: auto;">
+            <button class="modal-close" id="btn-close-poll-results" style="position: absolute; top: 14px; right: 14px; z-index: 10;">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <h3 id="poll-results-title" style="margin: 0 0 16px 0; font-family: 'Cinzel', serif; font-size: 1.15rem; color: var(--color-gold); padding-right: 24px;">Resultados</h3>
+            <div id="poll-results-body" style="display: flex; flex-direction: column; gap: 16px;"></div>
+        </div>
+    </div>
+
     <!-- Modal: Detalle de un Compañero (desde Top 25 Asistencia) -->
     <div id="modal-peer-detail" class="modal-overlay">
         <div class="modal-card" style="max-width: 420px; width: 92%; text-align: center; padding: 24px; position: relative;">
@@ -4601,6 +4780,11 @@
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
                     <span>Sugerencias</span>
                 </a>
+                <a href="#" class="drawer-item drawer-item-encuestas" data-target="section-componente-encuestas" style="position: relative;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    <span>Encuestas</span>
+                    <span class="polls-pending-badge hidden" style="background-color: var(--color-absent); color: white; border-radius: 50%; min-width: 18px; height: 18px; padding: 0 4px; font-size: 0.7rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-left: auto;">0</span>
+                </a>
                 <a href="#" class="drawer-item drawer-item-ajustes" data-target="section-componente-ajustes">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     <span>Ajustes</span>
@@ -4616,10 +4800,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=561"></script>
-    <script src="app.js?v=561"></script>
+    <script src="dictionary-es.js?v=563"></script>
+    <script src="app.js?v=563"></script>
     <script>
-        // Registro del Service Worker v=561.
+        // Registro del Service Worker v=563.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4648,9 +4832,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=561")
+                navigator.serviceWorker.register("sw.js?v=563")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v561 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v563 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
