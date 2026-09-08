@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=559">
+    <link rel="stylesheet" href="style.css?v=560">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -1439,7 +1439,9 @@
 
                     <div class="card settings-card otros-nav-card" data-target="section-otros-uniformes" style="cursor: pointer; position: relative;">
                         <h3 style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.1rem;">👔</span>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 .55.45 1 1 1h10c.55 0 1-.45 1-1V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
+                            </svg>
                             Uniformes
                         </h3>
                         <p class="text-muted" style="margin: 0;">Gestiona los uniformes disponibles para que los músicos sepan cómo vestir en cada actuación.</p>
@@ -1447,7 +1449,13 @@
 
                     <div class="card settings-card otros-nav-card" data-target="section-otros-wordle-bank" style="cursor: pointer; position: relative;">
                         <h3 style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 1.1rem;">🔤</span>
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-gold);">
+                                <line x1="6" y1="12" x2="10" y2="12"></line>
+                                <line x1="8" y1="10" x2="8" y2="14"></line>
+                                <line x1="15" y1="13" x2="15.01" y2="13"></line>
+                                <line x1="18" y1="11" x2="18.01" y2="11"></line>
+                                <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.01-.1-.017-.151A4 4 0 0 0 17.32 5z"></path>
+                            </svg>
                             Banco de preguntas Wordle Cofrade
                         </h3>
                         <p class="text-muted" style="margin: 0;">Gestiona las palabras y definiciones del Wordle diario de Semana Santa.</p>
@@ -4605,10 +4613,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=559"></script>
-    <script src="app.js?v=559"></script>
+    <script src="dictionary-es.js?v=560"></script>
+    <script src="app.js?v=560"></script>
     <script>
-        // Registro del Service Worker v=559.
+        // Registro del Service Worker v=560.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4637,9 +4645,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=559")
+                navigator.serviceWorker.register("sw.js?v=560")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v559 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v560 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
