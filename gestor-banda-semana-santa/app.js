@@ -1585,7 +1585,23 @@ function startCloudSync() {
             }
         });
 
+        // Si el músico tiene abierto ahora mismo el aviso o el modal de voto de una encuesta que
+        // la dirección acaba de borrar, hay que cerrarlo: si no, al pulsar "Votar ahora"/"Enviar
+        // Voto" se le crearía un voto huérfano en Firestore para una encuesta que ya no existe,
+        // justo el "rastro" que no debe quedar tras un borrado.
+        const voteModal = document.getElementById("modal-vote-poll");
+        const votePollId = document.getElementById("vote-poll-id");
+        if (voteModal && voteModal.classList.contains("active") && votePollId && !currentPollIds.has(votePollId.value)) {
+            voteModal.classList.remove("active");
+        }
+        const reminderModal = document.getElementById("modal-poll-reminder");
+        if (reminderModal && reminderModal.classList.contains("active") && reminderModal.dataset.pollId && !currentPollIds.has(reminderModal.dataset.pollId)) {
+            reminderModal.classList.remove("active");
+        }
+
         localStorage.setItem("harmonia_polls", JSON.stringify(state.polls));
+        localStorage.setItem("harmonia_poll_options", JSON.stringify(state.pollOptions));
+        localStorage.setItem("harmonia_poll_votes", JSON.stringify(state.pollVotes));
         // El aviso emergente de "encuesta pendiente" solo debe saltar una vez por apertura de la
         // app, no cada vez que llega un snapshot (alguien vota, se cierra una encuesta, etc.) —
         // por eso se dispara solo en la primera sincronización, no en cada actualización.
@@ -17962,6 +17978,14 @@ function submitPollVote(poll) {
         showToast("Sesión de músico no válida", "error");
         return;
     }
+    // Comprobación defensiva: si la dirección borró la encuesta mientras este modal seguía
+    // abierto, no se debe crear un voto huérfano para una encuesta que ya no existe.
+    if (!(state.polls || []).some(p => p.docId === poll.docId)) {
+        showToast("Esta encuesta ya no está disponible", "error");
+        document.getElementById("modal-vote-poll").classList.remove("active");
+        renderComponentEncuestasPage();
+        return;
+    }
     const checked = Array.from(document.querySelectorAll('#vote-poll-options input[name="vote-poll-option"]:checked'));
     if (checked.length === 0) {
         showToast("Selecciona al menos una opción", "warning");
@@ -17990,6 +18014,7 @@ function openPollReminderModal(poll) {
     if (!modal || !titleEl) return;
 
     titleEl.innerText = poll.title;
+    modal.dataset.pollId = poll.docId;
     document.getElementById("btn-poll-reminder-vote").onclick = () => {
         modal.classList.remove("active");
         openVotePollModal(poll);
@@ -18102,6 +18127,44 @@ function compressImageFile(file, maxWidth, maxHeight, callback) {
             ctx.drawImage(img, 0, 0, width, height);
             const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
             callback(dataUrl);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Como compressImageFile() pero con reintento automático a menor tamaño/calidad si el resultado
+// se queda demasiado cerca del límite de 1MB por documento de Firestore. Se usa solo para las
+// imágenes de opciones de encuesta porque, a diferencia de una foto de perfil o un uniforme, un
+// diseño de estampita escaneado (mucho detalle/contraste) puede comprimir bastante peor en JPEG
+// que una fotografía normal a la misma resolución.
+function compressPollOptionImage(file, callback, maxDim = 800, quality = 0.82) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+            if (dataUrl.length > 700000 && maxDim > 350) {
+                compressPollOptionImage(file, callback, Math.round(maxDim * 0.75), Math.max(0.6, quality - 0.1));
+            } else {
+                callback(dataUrl);
+            }
         };
         img.src = e.target.result;
     };
@@ -20543,10 +20606,11 @@ function addPollOptionRow(prefill) {
     fileInput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        // maxWidth/maxHeight generosos y sin recorte (a diferencia de la foto de perfil cuadrada):
-        // las opciones de encuesta suelen ser diseños rectangulares (p.ej. una estampita) y
-        // recortarlas a cuadrado les cortaría el diseño.
-        compressImageFile(file, 800, 800, (dataUrl) => {
+        // Sin recorte a cuadrado (a diferencia de la foto de perfil): las opciones de encuesta
+        // suelen ser diseños rectangulares (p.ej. una estampita) y recortarlas los cortaría. Usa
+        // compressPollOptionImage (no compressImageFile) porque además reintenta a menor tamaño
+        // si hace falta, para no arriesgarse al límite de 1MB por documento de Firestore.
+        compressPollOptionImage(file, (dataUrl) => {
             imgEl.src = dataUrl;
             imgEl.classList.remove("hidden");
             placeholderEl.classList.add("hidden");
@@ -20642,8 +20706,14 @@ function setupPollAdminEvents() {
                     closeEditor();
                     renderAdminPollsList();
                 })
-                .catch(() => {
-                    showToast("No se ha podido crear la encuesta. Comprueba tu conexión e inténtalo de nuevo.", "error");
+                .catch((err) => {
+                    // Mostrar el motivo real en vez de un genérico "comprueba tu conexión": si son
+                    // las reglas de seguridad de Firestore (colección nueva no permitida) o una
+                    // imagen demasiado grande, el mensaje de error lo dice explícitamente.
+                    const reason = err && err.code === "permission-denied"
+                        ? "las reglas de seguridad de Firestore no permiten crear encuestas todavía"
+                        : (err && err.message) || "error desconocido";
+                    showToast(`No se ha podido crear la encuesta: ${reason}`, "error");
                 })
                 .finally(() => {
                     if (submitBtn) submitBtn.disabled = false;
