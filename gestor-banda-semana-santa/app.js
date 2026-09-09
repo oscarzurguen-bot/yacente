@@ -185,6 +185,13 @@ let preavisoSelectedStatus = null;
 // Firestore); no se persiste, se recalcula bajo demanda con checkUnvotedPollsAndMaybePopup().
 let myVotedPollIds = new Set();
 let pollsInitialSyncDone = false;
+// Cola de encuestas activas sin votar pendientes de mostrar en el aviso emergente al abrir la app:
+// se muestran de una en una (ver showNextPollReminder) para que, si hay varias, el músico pueda
+// votarlas o descartarlas todas seguidas en vez de que solo se le muestre la primera.
+let pollReminderQueue = [];
+// Si el modal de voto se abrió desde el aviso emergente (en vez de desde la lista normal de
+// Encuestas), al votar o cerrarlo hay que continuar con la siguiente encuesta de la cola.
+let voteModalOpenedFromReminder = false;
 
 // ==========================================================================
 // HELPERS DE TEMPORADA (Septiembre de un año -> Agosto del siguiente)
@@ -1601,6 +1608,10 @@ function startCloudSync() {
         const votePollId = document.getElementById("vote-poll-id");
         if (voteModal && voteModal.classList.contains("active") && votePollId && !currentPollIds.has(votePollId.value)) {
             voteModal.classList.remove("active");
+            if (voteModalOpenedFromReminder) {
+                voteModalOpenedFromReminder = false;
+                showNextPollReminder();
+            }
         }
         const reminderModal = document.getElementById("modal-poll-reminder");
         if (reminderModal && reminderModal.classList.contains("active") && reminderModal.dataset.pollId && !currentPollIds.has(reminderModal.dataset.pollId)) {
@@ -2438,10 +2449,11 @@ function checkUnvotedPollsAndMaybePopup() {
 
     Promise.all(checks).then(() => {
         updatePollsBadge();
-        const unvoted = activePolls.filter(p => !myVotedPollIds.has(p.docId));
-        if (unvoted.length > 0) {
-            openPollReminderModal(unvoted[0]);
-        }
+        // Encola TODAS las encuestas activas sin votar, no solo la primera: showNextPollReminder
+        // va mostrando el aviso de una en una (al votar o al descartar "Ahora no" pasa a la
+        // siguiente) hasta que el músico las haya visto todas.
+        pollReminderQueue = activePolls.filter(p => !myVotedPollIds.has(p.docId));
+        showNextPollReminder();
         rerenderActivePollSections();
     });
 }
@@ -18000,6 +18012,10 @@ function submitPollVote(poll) {
         showToast("Esta encuesta ya no está disponible", "error");
         document.getElementById("modal-vote-poll").classList.remove("active");
         renderComponentEncuestasPage();
+        if (voteModalOpenedFromReminder) {
+            voteModalOpenedFromReminder = false;
+            showNextPollReminder();
+        }
         return;
     }
     const checked = Array.from(document.querySelectorAll('#vote-poll-options input[name="vote-poll-option"]:checked'));
@@ -18015,6 +18031,12 @@ function submitPollVote(poll) {
             document.getElementById("modal-vote-poll").classList.remove("active");
             renderComponentEncuestasPage();
             updatePollsBadge();
+            // Si venía del aviso emergente y hay más encuestas pendientes en la cola, continúa
+            // con la siguiente en vez de dejar que el músico tenga que ir a buscarlas él mismo.
+            if (voteModalOpenedFromReminder) {
+                voteModalOpenedFromReminder = false;
+                showNextPollReminder();
+            }
         })
         .catch(() => {
             showToast("No se ha podido registrar tu voto. Comprueba tu conexión e inténtalo de nuevo.", "error");
@@ -18033,15 +18055,30 @@ function openPollReminderModal(poll) {
     modal.dataset.pollId = poll.docId;
     document.getElementById("btn-poll-reminder-vote").onclick = () => {
         modal.classList.remove("active");
+        voteModalOpenedFromReminder = true;
         openVotePollModal(poll);
     };
     modal.classList.add("active");
+}
+
+// Muestra el siguiente aviso pendiente de la cola (ver pollReminderQueue), o no hace nada si ya
+// se han mostrado todas.
+function showNextPollReminder() {
+    if (pollReminderQueue.length === 0) return;
+    const poll = pollReminderQueue.shift();
+    openPollReminderModal(poll);
 }
 
 function setupPollEvents() {
     const closeVoteModal = () => {
         const modal = document.getElementById("modal-vote-poll");
         if (modal) modal.classList.remove("active");
+        // Si se llegó aquí desde el aviso emergente (en vez de desde la lista normal de
+        // Encuestas), cerrar sin votar continúa con la siguiente encuesta pendiente de la cola.
+        if (voteModalOpenedFromReminder) {
+            voteModalOpenedFromReminder = false;
+            showNextPollReminder();
+        }
     };
     const btnCloseVote = document.getElementById("btn-close-vote-poll");
     const btnCloseVoteFooter = document.getElementById("btn-close-vote-poll-footer");
@@ -18053,6 +18090,7 @@ function setupPollEvents() {
         btnDismissReminder.addEventListener("click", () => {
             const modal = document.getElementById("modal-poll-reminder");
             if (modal) modal.classList.remove("active");
+            showNextPollReminder();
         });
     }
 }
