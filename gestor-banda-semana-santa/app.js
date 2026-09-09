@@ -1599,9 +1599,12 @@ function startCloudSync() {
             reminderModal.classList.remove("active");
         }
 
-        localStorage.setItem("harmonia_polls", JSON.stringify(state.polls));
-        localStorage.setItem("harmonia_poll_options", JSON.stringify(state.pollOptions));
-        localStorage.setItem("harmonia_poll_votes", JSON.stringify(state.pollVotes));
+        // A diferencia de otras cachés locales de esta app, las opciones/votos de encuesta pueden
+        // incluir imágenes en base64: guardarlas en localStorage en cada sincronización llegó a
+        // llenar la cuota del navegador en un móvil con meses de uso (QuotaExceededError, que al no
+        // capturarse cortaba el resto de esta función). Igual que el resto de colecciones de la app
+        // en modo nube (sugerencias, asistencia...), no se persiste nada aquí: Firestore ya es la
+        // fuente de verdad y estos listeners se reconectan solos al recuperar red.
         // El aviso emergente de "encuesta pendiente" solo debe saltar una vez por apertura de la
         // app, no cada vez que llega un snapshot (alguien vota, se cierra una encuesta, etc.) —
         // por eso se dispara solo en la primera sincronización, no en cada actualización.
