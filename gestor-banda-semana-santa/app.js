@@ -738,6 +738,7 @@ function isSectionRehearsal(sessionInfo) {
 }
 
 function saveStateToLocalStorage() {
+  try {
     localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
     localStorage.setItem("harmonia_attendance", JSON.stringify(state.attendance));
     localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
@@ -770,6 +771,13 @@ function saveStateToLocalStorage() {
         localStorage.removeItem("yacente_firebase_config");
         localStorage.removeItem("yacente_firebase_hash");
     }
+  } catch (err) {
+    // Un dispositivo con el almacenamiento local lleno (frecuente tras meses de uso, sobre todo
+    // por las fotos de perfil en base64) no debe romper el resto de la app: esta función se llama
+    // desde decenas de sitios, y sin este catch un QuotaExceededError aquí abortaba también
+    // cualquier código que viniera después en quien la llamó.
+    console.error("Error al guardar en almacenamiento local (puede estar lleno):", err);
+  }
 }
 
 // Hash débil antiguo (solo se mantiene para poder migrar contraseñas ya guardadas con este esquema)
@@ -17492,7 +17500,12 @@ function setupProfilePhotoEvents() {
                 const base64Photo = canvas.toDataURL("image/jpeg", 0.88);
                 musician.photo = base64Photo;
 
-                saveStateToLocalStorage();
+                // dbSaveMusician ya guarda en localStorage por su cuenta en modo local (rama
+                // else de isCloudActive()); llamar aquí también a saveStateToLocalStorage()
+                // sin condición era redundante y, en modo nube, escribía sin necesidad la foto de
+                // TODOS los músicos (el estado completo) en el almacenamiento local cada vez que
+                // alguien subía una foto de perfil — la causa más probable de que dispositivos con
+                // meses de uso acaben llenando su cuota de localStorage.
                 dbSaveMusician(musician);
 
                 // Actualizar imagen en el modal en tiempo real
@@ -21118,7 +21131,16 @@ function dispatchSessionNotification(sessionKey, sessionData, isSilent = false, 
                 return tB - tA;
             });
 
-            localStorage.setItem(key, JSON.stringify(notifs));
+            // Este bucle escribe la bandeja de CADA músico convocado (no solo la propia) en el
+            // localStorage de quien tenga la app abierta en ese momento, así que en un dispositivo
+            // con mucho uso (el de la directiva, sobre todo) puede acumularse bastante. Si el
+            // almacenamiento está lleno, se ignora esta escritura puntual en vez de romper el resto
+            // de la sincronización de ensayos/actuaciones para todos los músicos restantes del bucle.
+            try {
+                localStorage.setItem(key, JSON.stringify(notifs));
+            } catch (err) {
+                console.error("No se pudo guardar la notificación local para " + m.id + " (almacenamiento lleno):", err);
+            }
         }
     });
 
