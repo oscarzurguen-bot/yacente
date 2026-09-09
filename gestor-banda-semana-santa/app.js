@@ -744,9 +744,31 @@ function isSectionRehearsal(sessionInfo) {
     return sub === "voces" || sub === "trompetas1" || sub === "bajos" || sub === "trompetas2y3" || sub === "cornetas" || sub === "percusion" || sub === "primeras";
 }
 
+// Quita un campo (p.ej. una imagen en base64) de una copia superficial del objeto, sin tocar el original.
+function omitField(item, field) {
+    if (!item || !item[field]) return item;
+    const copy = { ...item };
+    delete copy[field];
+    return copy;
+}
+
 function saveStateToLocalStorage() {
   try {
-    localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+    // Con la nube activa, Firestore ya es la copia autorizada de estas imágenes en base64 (fotos
+    // de músicos, uniformes, lugares de ensayo, opciones de encuesta) — son, con diferencia, lo que
+    // más rápido llena el almacenamiento local en dispositivos reales tras meses de uso. El caché
+    // local solo necesita servir de respaldo instantáneo mientras se reconecta, así que en modo
+    // nube lo guardamos SIN esas imágenes; en modo local (sin nube) es la única copia que existe,
+    // así que ahí se guarda completo como siempre.
+    const cloudActive = isCloudActive();
+    const musiciansToCache = cloudActive ? (state.musicians || []).map(m => omitField(m, "photo")) : state.musicians;
+    const rehearsalLocationsToCache = cloudActive ? (state.rehearsalLocations || []).map(l => omitField(l, "image")) : (state.rehearsalLocations || []);
+    const uniformsToCache = cloudActive ? (state.uniforms || []).map(u => omitField(u, "image")) : (state.uniforms || []);
+    const pollOptionsToCache = cloudActive
+        ? Object.fromEntries(Object.entries(state.pollOptions || {}).map(([pollId, opts]) => [pollId, (opts || []).map(o => omitField(o, "image"))]))
+        : (state.pollOptions || {});
+
+    localStorage.setItem("harmonia_musicians", JSON.stringify(musiciansToCache));
     localStorage.setItem("harmonia_attendance", JSON.stringify(state.attendance));
     localStorage.setItem("harmonia_session_types", JSON.stringify(state.sessionTypes));
     localStorage.setItem("harmonia_marchas", JSON.stringify(state.marchas || []));
@@ -763,11 +785,11 @@ function saveStateToLocalStorage() {
     localStorage.setItem("harmonia_weekly_goals", JSON.stringify(state.weeklyGoals || {}));
     localStorage.setItem("harmonia_suggestions", JSON.stringify(state.suggestions || []));
     localStorage.setItem("harmonia_polls", JSON.stringify(state.polls || []));
-    localStorage.setItem("harmonia_poll_options", JSON.stringify(state.pollOptions || {}));
+    localStorage.setItem("harmonia_poll_options", JSON.stringify(pollOptionsToCache));
     localStorage.setItem("harmonia_poll_votes", JSON.stringify(state.pollVotes || {}));
     localStorage.setItem("harmonia_repertoire_links", JSON.stringify(state.repertoireLinks || { youtube: "", spotify: "" }));
-    localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(state.rehearsalLocations || []));
-    localStorage.setItem("harmonia_uniforms", JSON.stringify(state.uniforms || []));
+    localStorage.setItem("harmonia_rehearsal_locations", JSON.stringify(rehearsalLocationsToCache));
+    localStorage.setItem("harmonia_uniforms", JSON.stringify(uniformsToCache));
     localStorage.setItem("harmonia_wordle_bank", JSON.stringify(state.wordleBank || []));
     localStorage.setItem("harmonia_wordle_enabled_for_musicians", state.wordleEnabledForMusicians ? "true" : "false");
 
@@ -19848,7 +19870,14 @@ function wordleEvaluarIntento(guessNorm, targetNorm) {
 function dbSaveWordleProgress() {
     const musicianId = getAuthMusicianId();
     if (!musicianId) return;
-    localStorage.setItem("harmonia_wordle_progress_" + musicianId, JSON.stringify(state.wordleProgress || {}));
+    try {
+        localStorage.setItem("harmonia_wordle_progress_" + musicianId, JSON.stringify(state.wordleProgress || {}));
+    } catch (err) {
+        // Igual que en saveStateToLocalStorage: un QuotaExceededError aquí no debe abortar a quien
+        // nos llamó (p.ej. iniciarWordleJuegoState dejaría wordleGameState a medio actualizar y
+        // el tablero seguiría mostrando el día anterior en vez del que se acaba de abrir).
+        console.error("Error al guardar progreso Wordle en almacenamiento local (puede estar lleno):", err);
+    }
     if (isCloudActive()) {
         const db = firebase.firestore();
         db.collection("wordleProgress").doc(String(musicianId)).set({ days: state.wordleProgress || {} }, { merge: true })
@@ -19874,7 +19903,11 @@ function cargarWordleProgress(callback) {
         db.collection("wordleProgress").doc(String(musicianId)).get().then(doc => {
             if (doc.exists && doc.data() && doc.data().days) {
                 state.wordleProgress = doc.data().days;
-                localStorage.setItem("harmonia_wordle_progress_" + musicianId, JSON.stringify(state.wordleProgress));
+                try {
+                    localStorage.setItem("harmonia_wordle_progress_" + musicianId, JSON.stringify(state.wordleProgress));
+                } catch (err) {
+                    console.error("Error al cachear progreso Wordle en almacenamiento local (puede estar lleno):", err);
+                }
             }
             if (callback) callback();
         }).catch(err => {
@@ -20035,12 +20068,15 @@ function iniciarWordleJuegoState(fechaISO) {
         return;
     }
 
-    if (!progreso) {
+    const esNuevo = !progreso;
+    if (esNuevo) {
         progreso = { entry: entry, guesses: [], gameOver: false, won: false };
         state.wordleProgress[fechaISO] = progreso;
-        dbSaveWordleProgress();
     }
 
+    // Actualizar wordleGameState ANTES de guardar: si el guardado falla (p.ej. almacenamiento
+    // local lleno), el tablero debe mostrar igualmente el día que se acaba de abrir en vez de
+    // quedarse a medias con los datos del día anterior.
     wordleGameState.entry = entry;
     wordleGameState.palabraNorm = normalizeWordleWord(entry.palabra);
     wordleGameState.longitud = wordleGameState.palabraNorm.length;
@@ -20052,6 +20088,10 @@ function iniciarWordleJuegoState(fechaISO) {
     wordleGameState.current = "";
     wordleGameState.pistaActivada = wordleGameState.gameOver ? true : !!progreso.pistaActivada;
     wordleUltimaFilaAnimada = wordleGameState.guesses.length - 1;
+
+    if (esNuevo) {
+        dbSaveWordleProgress();
+    }
 }
 
 function wordleActivarPista() {
@@ -20305,11 +20345,14 @@ function wordleConfirmarIntento() {
         entry: wordleGameState.entry,
         guesses: wordleGameState.guesses,
         gameOver: wordleGameState.gameOver,
-        won: wordleGameState.won
+        won: wordleGameState.won,
+        pistaActivada: wordleGameState.pistaActivada
     };
-    dbSaveWordleProgress();
 
+    // Pintar primero: si el guardado falla (almacenamiento local lleno), el jugador debe ver
+    // igualmente el resultado de su intento en pantalla.
     renderWordleJuego();
+    dbSaveWordleProgress();
 
     if (wordleGameState.gameOver) {
         setTimeout(() => wordleMostrarFinDePartida(), 550);

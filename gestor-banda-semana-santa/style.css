@@ -5202,7 +5202,7 @@ body.component-portal .content-header {
 .wordle-tile {
     width: 44px;
     height: 44px;
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--border-active);
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -5211,7 +5211,7 @@ body.component-portal .content-header {
     font-weight: 700;
     text-transform: uppercase;
     color: var(--text-primary);
-    background: transparent;
+    background: var(--bg-compact-card);
     transition: transform 0.12s ease;
 }
 
