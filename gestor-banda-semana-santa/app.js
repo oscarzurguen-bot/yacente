@@ -180,6 +180,10 @@ let state = {
 };
 
 let preavisoSelectedStatus = null;
+// true cuando el preaviso se abre el mismo día del ensayo: ese día solo se admite avisar
+// ausencia por motivo de salud (algo que no se puede prever con antelación), no otros motivos
+// ni confirmar asistencia.
+let preavisoRestrictedToHealth = false;
 
 // IDs de encuestas ya votadas por el músico actual en esta sesión (evita repetir lecturas a
 // Firestore); no se persiste, se recalcula bajo demanda con checkUnvotedPollsAndMaybePopup().
@@ -17231,22 +17235,35 @@ function openPreavisoModal(date) {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    const eventDateObj = new Date(date + "T00:00:00");
+    // date puede llevar sufijo de subtipo (sesiones múltiples/especiales el mismo día, p.ej.
+    // "2026-09-10_voces"); quitarlo antes de parsear o new Date(...) da Invalid Date y el
+    // chequeo de antelación de abajo queda anulado (NaN < 1 es false).
+    const rawDate = date.split("_")[0];
+    const eventDateObj = new Date(rawDate + "T00:00:00");
     const todayDateObj = new Date(todayStr + "T00:00:00");
     const diffTime = eventDateObj.getTime() - todayDateObj.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 1) {
+
+    if (diffDays < 0) {
         showToast("Es demasiado tarde para avisar. Por favor, póngase en contacto con la dirección.", "error");
         return;
     }
 
+    // El mismo día del ensayo ya no da tiempo a un preaviso normal, pero se permite avisar una
+    // ausencia por motivo de salud, ya que es algo que no se puede prever con antelación.
+    preavisoRestrictedToHealth = diffDays === 0;
+
     state.currentPreavisoDate = date;
     const dateText = document.getElementById("preaviso-date-text");
     if (dateText) {
-        dateText.innerText = formatDateSpanish(date);
+        dateText.innerText = formatDateSpanish(rawDate);
     }
-    
+
+    const healthOnlyNote = document.getElementById("preaviso-health-only-note");
+    if (healthOnlyNote) {
+        healthOnlyNote.classList.toggle("hidden", !preavisoRestrictedToHealth);
+    }
+
     const musicianId = getAuthMusicianId();
     const record = (state.attendance[date] && musicianId) ? state.attendance[date][musicianId] : null;
     
@@ -17287,7 +17304,24 @@ function openPreavisoModal(date) {
     } else {
         setActiveRsvpButton(null);
     }
-    
+
+    // Modo restringido a salud (ensayo de hoy): no se puede confirmar asistencia de última
+    // hora ni elegir otro motivo de ausencia distinto de salud.
+    const btnPresentLock = document.getElementById("btn-rsvp-presente");
+    if (btnPresentLock) {
+        btnPresentLock.disabled = preavisoRestrictedToHealth;
+        btnPresentLock.style.opacity = preavisoRestrictedToHealth ? "0.4" : "";
+        btnPresentLock.style.cursor = preavisoRestrictedToHealth ? "not-allowed" : "";
+    }
+    pills.forEach(p => {
+        const isLocked = preavisoRestrictedToHealth && p.getAttribute("data-value") !== "Salud";
+        p.style.pointerEvents = isLocked ? "none" : "";
+        p.style.opacity = isLocked ? "0.35" : "";
+    });
+    if (reasonInput) {
+        reasonInput.disabled = preavisoRestrictedToHealth;
+    }
+
     const modal = document.getElementById("modal-componente-preaviso");
     if (modal) {
         modal.classList.add("active");
@@ -17375,18 +17409,32 @@ function setupPreavisoEvents() {
     
     if (btnPresent) {
         btnPresent.addEventListener("click", () => {
+            if (preavisoRestrictedToHealth) {
+                showToast("Hoy ya no da tiempo a confirmar asistencia, solo a avisar una ausencia por motivo de salud.", "error");
+                return;
+            }
             setActiveRsvpButton("present");
         });
     }
-    
+
     if (btnAbsent) {
         btnAbsent.addEventListener("click", () => {
             setActiveRsvpButton("absent");
+            if (preavisoRestrictedToHealth) {
+                if (reasonInput) reasonInput.value = "Salud";
+                const justifiedCheckbox = document.getElementById("preaviso-justified-checkbox");
+                if (justifiedCheckbox) justifiedCheckbox.checked = true;
+                highlightQuickReasonPill("Salud");
+            }
         });
     }
-    
+
     pills.forEach(pill => {
         pill.addEventListener("click", () => {
+            if (preavisoRestrictedToHealth && pill.getAttribute("data-value") !== "Salud") {
+                showToast("Hoy solo puedes registrar una ausencia por motivo de salud.", "error");
+                return;
+            }
             if (reasonInput) {
                 reasonInput.value = pill.getAttribute("data-value");
             }
@@ -17420,7 +17468,12 @@ function setupPreavisoEvents() {
                 showToast("Por favor, selecciona una opción de asistencia.", "error");
                 return;
             }
-            
+
+            if (preavisoRestrictedToHealth && preavisoSelectedStatus !== "absent") {
+                showToast("Hoy solo puedes registrar una ausencia por motivo de salud.", "error");
+                return;
+            }
+
             const musicianId = getAuthMusicianId();
             if (!musicianId) {
                 showToast("Sesión de músico no válida.", "error");
@@ -17447,8 +17500,8 @@ function setupPreavisoEvents() {
             } else {
                 const justifiedCheckbox = document.getElementById("preaviso-justified-checkbox");
                 const isJustified = justifiedCheckbox ? justifiedCheckbox.checked : true;
-                const reason = reasonInput ? reasonInput.value.trim() : "";
-                
+                const reason = preavisoRestrictedToHealth ? "Salud" : (reasonInput ? reasonInput.value.trim() : "");
+
                 if (isJustified && reason === "") {
                     showToast("Por favor, introduce el motivo de tu ausencia.", "error");
                     return;
