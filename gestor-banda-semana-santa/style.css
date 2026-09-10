@@ -4973,13 +4973,6 @@ body.component-portal .content-header {
     font-weight: 700;
 }
 
-.wordle-cal-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    display: block;
-}
-
 .wordle-cal-badge {
     position: absolute;
     top: -4px;
@@ -4991,6 +4984,7 @@ body.component-portal .content-header {
     align-items: center;
     justify-content: center;
     font-size: 0.6rem;
+    font-weight: 800;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
 }
@@ -5033,13 +5027,15 @@ body.component-portal .content-header {
 }
 
 .wordle-cal-cell.won .wordle-cal-badge {
-    color: var(--color-present);
+    background: var(--color-present);
     border-color: var(--color-present);
+    color: var(--bg-primary);
 }
 
 .wordle-cal-cell.lost .wordle-cal-badge {
-    color: var(--color-absent);
+    background: var(--color-absent);
     border-color: var(--color-absent);
+    color: var(--bg-primary);
 }
 
 .wordle-cal-cell:hover:not(.locked):not(.future):not(.empty) {

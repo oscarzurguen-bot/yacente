@@ -23,6 +23,79 @@ const SECCIONES_ORDEN = [
     "Platos"
 ];
 
+// Historial de novedades mostrado a los músicos en Menú > Novedades (más reciente primero).
+// Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
+const NOVEDADES = [
+    {
+        version: 572,
+        fecha: "2026-09-10",
+        titulo: "Nueva sección: Novedades",
+        cambios: [
+            "Ahora puedes consultar aquí un resumen de las últimas mejoras y correcciones de la app."
+        ]
+    },
+    {
+        version: 570,
+        fecha: "2026-09-10",
+        titulo: "Aviso de ausencia por salud el mismo día",
+        cambios: [
+            "Si tienes que avisar de una ausencia el mismo día del ensayo, ahora puedes hacerlo si el motivo es de salud."
+        ]
+    },
+    {
+        version: 569,
+        fecha: "2026-09-09",
+        titulo: "Mejoras de estabilidad y sincronización",
+        cambios: [
+            "Corregido un fallo que hacía que ensayos ya borrados volvieran a aparecer en algunos móviles.",
+            "Solucionados varios errores que podían bloquear la app por falta de espacio de almacenamiento."
+        ]
+    },
+    {
+        version: 562,
+        fecha: "2026-09-09",
+        titulo: "Nueva funcionalidad: Encuestas",
+        cambios: [
+            "La directiva ya puede lanzar encuestas con imágenes desde el menú.",
+            "Te avisaremos con un aviso emergente si tienes alguna encuesta pendiente de votar."
+        ]
+    },
+    {
+        version: 557,
+        fecha: "2026-09-08",
+        titulo: "Papelera de ensayos y actuaciones",
+        cambios: [
+            "Los ensayos y actuaciones eliminados ya no se borran para siempre: se guardan 30 días por si hay que recuperarlos.",
+            "Corregido un fallo que podía duplicar un ensayo al editar su responsable, hora o lugar."
+        ]
+    },
+    {
+        version: 543,
+        fecha: "2026-09-01",
+        titulo: "Estadísticas por voces y margen para corregir asistencia",
+        cambios: [
+            "Los ensayos por voces (secciones) ahora tienen su propia gráfica de estadísticas.",
+            "Ahora hay 2 días de margen para corregir una asistencia después del ensayo."
+        ]
+    },
+    {
+        version: 530,
+        fecha: "2026-08-27",
+        titulo: "App más estable tras actualizar",
+        cambios: [
+            "Corregido un fallo que a veces dejaba la app bloqueada en el logo tras una actualización."
+        ]
+    },
+    {
+        version: 527,
+        fecha: "2026-08-26",
+        titulo: "Corregido el calendario en días con varios ensayos",
+        cambios: [
+            "Solucionado un error que mostraba mal el color o abría el ensayo equivocado en días con más de un ensayo."
+        ]
+    }
+];
+
 const DEFAULT_MUSICIANS = [
     { id: "mus-1", name: "Carlos Ruiz Serna", instrument: "Dirección", role: "Director Musical", badgeSangreNueva: true, badgeFielAtril: true, badgeCorazonYacente: true, badgeRaicesProfundas: true, badgeLeyendaViva: true },
     { id: "mus-2", name: "Daniel Benítez Caro", instrument: "Trompetas 1ª", role: "Voz Principal", badgeSangreNueva: true, badgeFielAtril: true, badgeCorazonYacente: true },
@@ -628,6 +701,7 @@ function initApp() {
         renderMarchasList();
         renderRehearsalMarchasWidget();
         updateSuggestionsBadge();
+        updateNovedadesBadge();
         renderRepertoireLinksUI();
         renderTrashList();
     } catch (err) {
@@ -2409,6 +2483,67 @@ function getPollResultsTally(pollId, callback) {
     } else {
         callback([]);
     }
+}
+
+// Última versión de NOVEDADES vista por el músico actual, persistida por dispositivo (no por nube:
+// es solo un marcador de "ya lo he leído", no un dato que deba sincronizarse entre dispositivos).
+function getNovedadesLastSeenVersion() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId) return 0;
+    const stored = localStorage.getItem(`harmonia_novedades_last_seen_${musicianId}`);
+    return stored ? parseInt(stored, 10) : 0;
+}
+
+function markNovedadesAsSeen() {
+    const musicianId = getAuthMusicianId();
+    if (!musicianId || NOVEDADES.length === 0) return;
+    localStorage.setItem(`harmonia_novedades_last_seen_${musicianId}`, String(NOVEDADES[0].version));
+    updateNovedadesBadge();
+}
+
+function updateNovedadesBadge() {
+    let pending = 0;
+    if (getAuthRole() === "component" && NOVEDADES.length > 0) {
+        const lastSeen = getNovedadesLastSeenVersion();
+        pending = NOVEDADES.filter(n => n.version > lastSeen).length;
+    }
+    document.querySelectorAll(".novedades-unread-badge").forEach(badge => {
+        if (pending > 0) {
+            badge.innerText = pending > 9 ? "9+" : String(pending);
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
+    });
+}
+
+function renderNovedades() {
+    const container = document.getElementById("novedades-lista");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const monthsAbbr = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+
+    NOVEDADES.forEach(entry => {
+        const [yr, mo, dy] = entry.fecha.split("-");
+        const moAbbr = monthsAbbr[parseInt(mo, 10) - 1] || "";
+
+        const card = document.createElement("div");
+        card.className = "card novedad-card";
+        card.style.cssText = "padding: 16px; margin-bottom: 12px; border-left: 3px solid var(--color-gold);";
+        card.innerHTML = `
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-color);">${entry.titulo}</h4>
+                <span style="font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0;">${parseInt(dy, 10)} ${moAbbr} ${yr}</span>
+            </div>
+            <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px;">
+                ${entry.cambios.map(c => `<li style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">${c}</li>`).join("")}
+            </ul>
+        `;
+        container.appendChild(card);
+    });
+
+    markNovedadesAsSeen();
 }
 
 function updatePollsBadge() {
@@ -4923,6 +5058,12 @@ function renderActiveSection(sectionId, forcedDirection) {
             dateContainer.classList.add("hidden");
             iniciarWordleJuegoState(wordleFechaActual);
             renderWordleJuego();
+            break;
+        case "section-componente-novedades":
+            pageTitle.innerText = "Novedades";
+            pageSubtitle.innerText = "Últimas mejoras y correcciones de la app";
+            dateContainer.classList.add("hidden");
+            renderNovedades();
             break;
         case "section-otros":
             pageTitle.innerText = "Otros";
@@ -10679,6 +10820,7 @@ function setupFirebaseListeners() {
 
                 renderActiveSection("section-componente-ficha");
                 if (!isCloudActive()) checkUnvotedPollsAndMaybePopup();
+                updateNovedadesBadge();
                 showToast(`Bienvenido/a, ${musician.name}`, "success");
             };
             
@@ -20068,16 +20210,11 @@ function renderWordleCalendar() {
             estadoClass = "locked";
         }
 
-        const entry = wordlePalabraParaFecha(fechaISO);
-        const dificultadColor = entry ? (WORDLE_DIFICULTAD_COLOR[entry.palabra.length] || "transparent") : "transparent";
-        const yaCompletado = !!(progreso && progreso.gameOver);
-        const dotHtml = (!esFuturo && entry && !yaCompletado) ? `<span class="wordle-cal-dot" style="background:${dificultadColor};"></span>` : "";
         const lockHtml = (estadoClass === "locked") ? `<span class="wordle-cal-badge">🔒</span>` : (badge ? `<span class="wordle-cal-badge">${badge}</span>` : "");
 
         html += `
             <button type="button" class="wordle-cal-cell ${estadoClass}" data-fecha="${fechaISO}" ${clickable ? "" : "disabled"}>
                 <span class="wordle-cal-daynum">${dia}</span>
-                ${dotHtml}
                 ${lockHtml}
             </button>
         `;
