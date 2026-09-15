@@ -27,6 +27,15 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 573,
+        fecha: "2026-09-15",
+        titulo: "Ajuste de convocatorias en ensayos por secciones",
+        cambios: [
+            "La directiva ya puede quitar una voz concreta de la convocatoria de un ensayo por secciones, por si no coincide con quién quiere convocar ese día.",
+            "Si tu voz se retira de un ensayo así, dejará de aparecer en tus próximos eventos y en tu historial."
+        ]
+    },
+    {
         version: 572,
         fecha: "2026-09-10",
         titulo: "Nueva sección: Novedades",
@@ -5252,17 +5261,33 @@ function renderAttendance() {
                     `}
                 </button>
                 <span class="section-attendance-ratio">${sectionRatio}% Asistencia</span>
+                ${isSpecialRehearsal ? `
+                    <button type="button" class="btn-remove-section-voice" title="Quitar a ${sectionName} de la convocatoria de este ensayo">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                ` : ''}
                 <svg class="chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>
             </div>
         `;
-        
+
         const btnMarkSection = headerDiv.querySelector(".btn-mark-section-present");
         if (btnMarkSection) {
             btnMarkSection.addEventListener("click", (e) => {
                 e.stopPropagation();
                 toggleVoiceAttendance(musiciansInSection, sectionName, !allPresent);
+            });
+        }
+
+        const btnRemoveVoice = headerDiv.querySelector(".btn-remove-section-voice");
+        if (btnRemoveVoice) {
+            btnRemoveVoice.addEventListener("click", (e) => {
+                e.stopPropagation();
+                removeVoiceFromSession(sectionName);
             });
         }
 
@@ -5513,6 +5538,74 @@ function toggleVoiceAttendance(musiciansInSection, sectionName, shouldMarkPresen
     } else {
         showToast(`Músicos de ${sectionName || 'la voz'} desmarcados`, "info");
     }
+}
+
+// Quita una voz de la convocatoria de ESTE ensayo concreto (no toca el preset del tipo de
+// ensayo). Se usa cuando la agrupación de voces de un ensayo por secciones no coincide con lo
+// que se quiere convocar ese día en particular (p.ej. un ensayo de "Trompetas 1ª" que arrastra
+// también a Fliscornos por el preset, y ese día no se quiere convocar a Fliscornos).
+function removeVoiceFromSession(sectionName) {
+    const date = state.currentDate;
+    if (!date) return;
+    if (isPastLockBlocked(date)) {
+        showToast("Bloqueo de pasado, no se pueden modificar eventos pasados.", "warning");
+        return;
+    }
+
+    const sessionInfo = state.sessionTypes[date];
+    if (!sessionInfo || !isSectionRehearsal(sessionInfo)) return;
+
+    const convocated = sessionInfo.convocatedVoices || [];
+    if (!convocated.includes(sectionName)) return;
+
+    // Un ensayo por secciones sin ninguna voz convocada deja de considerarse "especial" en el
+    // resto de la app (ver isMusicianConvocated y los chequeos equivalentes repartidos por el
+    // código), lo que lo convertiría en un ensayo "general" abierto a todos los músicos: justo
+    // lo contrario de lo que se busca al quitar una voz de la convocatoria.
+    if (convocated.length <= 1) {
+        showToast("No se puede quitar la última voz convocada de un ensayo por secciones. Si ya no hace falta, elimina el ensayo entero desde Ensayos.", "warning");
+        return;
+    }
+
+    if (!confirm(`¿Quitar a ${sectionName} de la convocatoria de este ensayo?\n\nDejarán de estar convocados solo para esta sesión: no la verán en sus próximos eventos ni en su historial, y no afecta a sus estadísticas ni al resto de ensayos.`)) {
+        return;
+    }
+
+    sessionInfo.convocatedVoices = convocated.filter(v => v !== sectionName);
+
+    // Los músicos de esa voz ya podían tener un registro de asistencia (p.ej. creado al abrir el
+    // ensayo, o marcado antes de darse cuenta del error de convocatoria). Se retira también para
+    // que no quede huella de este ensayo ni en su historial ni en ninguna estadística.
+    const affectedMusicians = state.musicians.filter(m => m.instrument === sectionName);
+    const attendanceForDate = state.attendance[date];
+    const deletedIds = [];
+    if (attendanceForDate) {
+        affectedMusicians.forEach(m => {
+            if (attendanceForDate[m.id]) {
+                delete attendanceForDate[m.id];
+                deletedIds.push(m.id);
+            }
+        });
+    }
+
+    dbSaveSessionType(date, sessionInfo);
+    if (isCloudActive()) {
+        if (deletedIds.length > 0) {
+            const db = firebase.firestore();
+            const fieldDeletes = {};
+            deletedIds.forEach(id => { fieldDeletes[id] = firebase.firestore.FieldValue.delete(); });
+            db.collection("attendance").doc(date).set(fieldDeletes, { merge: true })
+                .catch(err => console.error("Error al quitar la asistencia de la voz retirada de la convocatoria en la nube:", err));
+        }
+    } else {
+        saveStateToLocalStorage();
+    }
+
+    updateAttendanceStatsRibbon();
+    renderAttendance();
+    renderStatistics();
+    renderCalendar();
+    showToast(`${sectionName} ya no está convocada para este ensayo`, "info");
 }
 
 function ensureAttendanceRecord(date, id) {
