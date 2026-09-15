@@ -22021,10 +22021,15 @@ function renderDayHeatmap(filteredDates) {
 // ==========================================================================
 // GRÁFICO DE BARRAS DE ASISTENCIA POR ENSAYOS DE VOCES (ESTILO DÍAS DE LA SEMANA)
 // ==========================================================================
-// Una barra por cada subtipo de ensayo seccional (Trompetas 1ª, Bajos, Cornetas...)
-// presente en los datos, con el % de asistencia de los músicos convocados a esa
-// sección. El denominador solo cuenta a quien fue convocado (y tiene ficha de
-// asistencia ese día), así que no se penaliza a quien no pertenece a la sección.
+// Una barra por cada voz/instrumento realmente convocado (Trompetas 1ª, Fliscornos,
+// Cornetas...), con el % de asistencia de los músicos de esa voz. Se agrupa por
+// sessionInfo.convocatedVoices (la convocatoria real de cada sesión concreta) y NO
+// por el subtipo del ensayo: un ensayo "Trompetas 1ª" convoca en realidad a dos voces
+// (Trompetas 1ª y Fliscornos), y desde que se puede quitar una voz de la convocatoria
+// de una sesión suelta (ver removeVoiceFromSession) dos sesiones del mismo subtipo
+// pueden convocar a voces distintas. Agrupar por subtipo mezclaba esas voces bajo una
+// sola etiqueta y diluía el % (p.ej. una sola ausencia de Fliscornos podía hacer bajar
+// muchísimo la barra etiquetada "Trompetas 1ª" aunque esa voz hubiera asistido al 100%).
 function renderStatsVocesChart(filteredDates) {
     const container = document.getElementById("stats-voces-chart-container");
     if (!container) return;
@@ -22035,34 +22040,36 @@ function renderStatsVocesChart(filteredDates) {
         const sessionInfo = state.sessionTypes[dateStr];
         if (!isSectionRehearsal(sessionInfo)) return;
 
-        const subtype = sessionInfo.subtype;
-        if (!voiceStats[subtype]) {
-            voiceStats[subtype] = { subtype, sessionsCount: 0, totalPossible: 0, totalPresents: 0 };
-        }
-
+        const convocated = sessionInfo.convocatedVoices || [];
         const dayRecord = state.attendance[dateStr] || {};
-        let dayPresents = 0;
-        let dayPossible = 0;
-        state.musicians.forEach(m => {
-            if (isMusicianOnLeaveOnDate(m, dateStr)) return;
-            const r = dayRecord[m.id];
-            if (r) {
-                dayPossible++;
-                if (r.status === "present") dayPresents++;
+
+        convocated.forEach(voiceName => {
+            let dayPresents = 0;
+            let dayPossible = 0;
+            state.musicians.forEach(m => {
+                if (m.instrument !== voiceName) return;
+                if (isMusicianOnLeaveOnDate(m, dateStr)) return;
+                const r = dayRecord[m.id];
+                if (r) {
+                    dayPossible++;
+                    if (r.status === "present") dayPresents++;
+                }
+            });
+
+            if (dayPossible > 0) {
+                if (!voiceStats[voiceName]) {
+                    voiceStats[voiceName] = { label: voiceName, sessionsCount: 0, totalPossible: 0, totalPresents: 0 };
+                }
+                voiceStats[voiceName].sessionsCount++;
+                voiceStats[voiceName].totalPossible += dayPossible;
+                voiceStats[voiceName].totalPresents += dayPresents;
             }
         });
-
-        if (dayPossible > 0) {
-            voiceStats[subtype].sessionsCount++;
-            voiceStats[subtype].totalPossible += dayPossible;
-            voiceStats[subtype].totalPresents += dayPresents;
-        }
     });
 
     const stats = Object.values(voiceStats)
         .map(v => ({
             ...v,
-            label: getRehearsalSubtypeText(v.subtype),
             avgPct: v.totalPossible > 0 ? Math.round((v.totalPresents / v.totalPossible) * 100) : 0
         }))
         .sort((a, b) => b.avgPct - a.avgPct);
