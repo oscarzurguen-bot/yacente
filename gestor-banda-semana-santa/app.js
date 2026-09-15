@@ -734,9 +734,9 @@ function initializeAttendanceForDate(date, convocatedVoices = []) {
     if (!state.attendance[date]) {
         state.attendance[date] = {};
     }
-    
+
     const isSpecialRehearsal = convocatedVoices && convocatedVoices.length > 0;
-    
+
     state.musicians.forEach(musician => {
         // Si el ensayo es por voces y el músico no está convocado, omitimos
         if (isSpecialRehearsal && !convocatedVoices.includes(musician.instrument)) {
@@ -750,6 +750,26 @@ function initializeAttendanceForDate(date, convocatedVoices = []) {
             };
         }
     });
+}
+
+// Al cambiar el tipo/subtipo de un ensayo YA CREADO (p.ej. de "General" a "Trompetas 1ª", o de
+// una voz a otra), las fichas de asistencia de músicos que ya no están convocados se quedaban
+// huérfanas: initializeAttendanceForDate solo AÑADE fichas que faltan, nunca quita las que sobran.
+// Esas fichas fantasma (normalmente "ausente" por defecto) seguían contando en las estadísticas
+// por voces (renderStatsVocesChart) y diluían el % real de la sección realmente convocada. Esta
+// función poda primero las fichas de quien ya no está convocado y luego rellena las que falten,
+// dejando el registro de asistencia consistente con la convocatoria final de la sesión.
+function reconcileAttendanceWithConvocatedVoices(date, convocatedVoices) {
+    const isSpecialRehearsal = convocatedVoices && convocatedVoices.length > 0;
+    if (isSpecialRehearsal && state.attendance[date]) {
+        Object.keys(state.attendance[date]).forEach(musicianId => {
+            const musician = state.musicians.find(m => String(m.id) === String(musicianId));
+            if (musician && !convocatedVoices.includes(musician.instrument)) {
+                delete state.attendance[date][musicianId];
+            }
+        });
+    }
+    initializeAttendanceForDate(date, convocatedVoices);
 }
 
 function updateSessionBadge() {
@@ -3822,6 +3842,11 @@ function setupEventListeners() {
                 };
             }
 
+            // El tipo/voces convocadas puede haber cambiado en esta edición (p.ej. de "General" a
+            // "Trompetas 1ª"): reconciliar la asistencia con la convocatoria final antes de guardar,
+            // o quedan fichas fantasma de músicos ya no convocados que diluyen las estadísticas.
+            reconcileAttendanceWithConvocatedVoices(targetKey, convocatedVoices);
+
             dbSaveSessionType(targetKey, state.sessionTypes[targetKey]);
             if (isCloudActive()) {
                 const db = firebase.firestore();
@@ -4565,9 +4590,11 @@ function setupEventListeners() {
         newSession.createdAt = new Date().toISOString();
         state.sessionTypes[sessionKey] = newSession;
         
-        // Initialize attendance records for the new configuration
-        initializeAttendanceForDate(sessionKey, convocatedVoices);
-        
+        // Reconcilia la asistencia con la convocatoria final: si esta sesión ya existía (p.ej. se
+        // reconfigura de "General" a "Trompetas 1ª" desde aquí), poda fichas de quien ya no está
+        // convocado y crea la de quien falte; en una sesión nueva simplemente crea todas.
+        reconcileAttendanceWithConvocatedVoices(sessionKey, convocatedVoices);
+
         // Save to Database and Local Storage
         dbSaveSessionType(sessionKey, newSession);
         dispatchSessionNotification(sessionKey, newSession);
@@ -22021,15 +22048,13 @@ function renderDayHeatmap(filteredDates) {
 // ==========================================================================
 // GRÁFICO DE BARRAS DE ASISTENCIA POR ENSAYOS DE VOCES (ESTILO DÍAS DE LA SEMANA)
 // ==========================================================================
-// Una barra por cada voz/instrumento realmente convocado (Trompetas 1ª, Fliscornos,
-// Cornetas...), con el % de asistencia de los músicos de esa voz. Se agrupa por
-// sessionInfo.convocatedVoices (la convocatoria real de cada sesión concreta) y NO
-// por el subtipo del ensayo: un ensayo "Trompetas 1ª" convoca en realidad a dos voces
-// (Trompetas 1ª y Fliscornos), y desde que se puede quitar una voz de la convocatoria
-// de una sesión suelta (ver removeVoiceFromSession) dos sesiones del mismo subtipo
-// pueden convocar a voces distintas. Agrupar por subtipo mezclaba esas voces bajo una
-// sola etiqueta y diluía el % (p.ej. una sola ausencia de Fliscornos podía hacer bajar
-// muchísimo la barra etiquetada "Trompetas 1ª" aunque esa voz hubiera asistido al 100%).
+// Una barra por cada subtipo de ensayo seccional (Trompetas 1ª, Bajos, Cornetas...),
+// sumando la asistencia de TODOS los músicos convocados a esa sesión (aunque el
+// subtipo agrupe más de una voz real, p.ej. "Trompetas 1ª" convoca también a
+// Fliscornos por defecto). El denominador solo cuenta a quien tiene ficha de
+// asistencia ese día, así que si se quita una voz de la convocatoria de una sesión
+// suelta (ver removeVoiceFromSession, que borra también su ficha de asistencia ahí)
+// esa voz deja de contar en el % de esa sesión sin más cambios aquí.
 function renderStatsVocesChart(filteredDates) {
     const container = document.getElementById("stats-voces-chart-container");
     if (!container) return;
@@ -22040,36 +22065,34 @@ function renderStatsVocesChart(filteredDates) {
         const sessionInfo = state.sessionTypes[dateStr];
         if (!isSectionRehearsal(sessionInfo)) return;
 
-        const convocated = sessionInfo.convocatedVoices || [];
+        const subtype = sessionInfo.subtype;
+        if (!voiceStats[subtype]) {
+            voiceStats[subtype] = { subtype, sessionsCount: 0, totalPossible: 0, totalPresents: 0 };
+        }
+
         const dayRecord = state.attendance[dateStr] || {};
-
-        convocated.forEach(voiceName => {
-            let dayPresents = 0;
-            let dayPossible = 0;
-            state.musicians.forEach(m => {
-                if (m.instrument !== voiceName) return;
-                if (isMusicianOnLeaveOnDate(m, dateStr)) return;
-                const r = dayRecord[m.id];
-                if (r) {
-                    dayPossible++;
-                    if (r.status === "present") dayPresents++;
-                }
-            });
-
-            if (dayPossible > 0) {
-                if (!voiceStats[voiceName]) {
-                    voiceStats[voiceName] = { label: voiceName, sessionsCount: 0, totalPossible: 0, totalPresents: 0 };
-                }
-                voiceStats[voiceName].sessionsCount++;
-                voiceStats[voiceName].totalPossible += dayPossible;
-                voiceStats[voiceName].totalPresents += dayPresents;
+        let dayPresents = 0;
+        let dayPossible = 0;
+        state.musicians.forEach(m => {
+            if (isMusicianOnLeaveOnDate(m, dateStr)) return;
+            const r = dayRecord[m.id];
+            if (r) {
+                dayPossible++;
+                if (r.status === "present") dayPresents++;
             }
         });
+
+        if (dayPossible > 0) {
+            voiceStats[subtype].sessionsCount++;
+            voiceStats[subtype].totalPossible += dayPossible;
+            voiceStats[subtype].totalPresents += dayPresents;
+        }
     });
 
     const stats = Object.values(voiceStats)
         .map(v => ({
             ...v,
+            label: getRehearsalSubtypeText(v.subtype),
             avgPct: v.totalPossible > 0 ? Math.round((v.totalPresents / v.totalPossible) * 100) : 0
         }))
         .sort((a, b) => b.avgPct - a.avgPct);
