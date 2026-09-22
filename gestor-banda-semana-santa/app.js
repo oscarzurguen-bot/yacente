@@ -22051,10 +22051,11 @@ function renderDayHeatmap(filteredDates) {
 // Una barra por cada subtipo de ensayo seccional (Trompetas 1ª, Bajos, Cornetas...),
 // sumando la asistencia de TODOS los músicos convocados a esa sesión (aunque el
 // subtipo agrupe más de una voz real, p.ej. "Trompetas 1ª" convoca también a
-// Fliscornos por defecto). El denominador solo cuenta a quien tiene ficha de
-// asistencia ese día, así que si se quita una voz de la convocatoria de una sesión
-// suelta (ver removeVoiceFromSession, que borra también su ficha de asistencia ahí)
-// esa voz deja de contar en el % de esa sesión sin más cambios aquí.
+// Fliscornos por defecto). El denominador se calcula igual que en renderEnsayosList:
+// solo cuenta a quien pertenece a una voz de sessionInfo.convocatedVoices, NO a
+// "quien tenga ficha de asistencia ese día" — así una ficha de asistencia residual de
+// un músico ajeno a la convocatoria (p.ej. de antes de un cambio de tipo de ensayo, o
+// de cualquier otro origen) nunca puede diluir el % de esta sección.
 function renderStatsVocesChart(filteredDates) {
     const container = document.getElementById("stats-voces-chart-container");
     if (!container) return;
@@ -22066,6 +22067,7 @@ function renderStatsVocesChart(filteredDates) {
         if (!isSectionRehearsal(sessionInfo)) return;
 
         const subtype = sessionInfo.subtype;
+        const convocated = sessionInfo.convocatedVoices || [];
         if (!voiceStats[subtype]) {
             voiceStats[subtype] = { subtype, sessionsCount: 0, totalPossible: 0, totalPresents: 0 };
         }
@@ -22074,6 +22076,7 @@ function renderStatsVocesChart(filteredDates) {
         let dayPresents = 0;
         let dayPossible = 0;
         state.musicians.forEach(m => {
+            if (!convocated.includes(m.instrument)) return;
             if (isMusicianOnLeaveOnDate(m, dateStr)) return;
             const r = dayRecord[m.id];
             if (r) {
