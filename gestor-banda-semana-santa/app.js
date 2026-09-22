@@ -27,6 +27,14 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 578,
+        fecha: "2026-09-23",
+        titulo: "Corregido el Top 25 de asistencia",
+        cambios: [
+            "Los músicos que actualmente están de baja ya no aparecen en el Top 25 de asistencia de Mi Ficha: antes, al no tener ningún ensayo convocado, se les asignaba un 100% por defecto que los colaba en el ranking sin haber asistido a nada."
+        ]
+    },
+    {
         version: 573,
         fecha: "2026-09-15",
         titulo: "Ajuste de convocatorias en ensayos por secciones",
@@ -14659,7 +14667,13 @@ function getMusicianAttendanceRank(musicianId) {
     // un mismo ciclo de datos, así que se calcula una única vez y se reutiliza (en vez de
     // recorrer y ordenar TODA la plantilla por cada músico que pide su posición).
     if (!_musicianStatsCache.rankList) {
-        const ranked = (state.musicians || []).map(m => {
+        const dNowRank = new Date();
+        const todayStrRank = `${dNowRank.getFullYear()}-${String(dNowRank.getMonth() + 1).padStart(2, '0')}-${String(dNowRank.getDate()).padStart(2, '0')}`;
+
+        // Un músico actualmente de baja (isBaja, o con un permiso sin fecha de fin) no debe
+        // competir en el ranking de asistencia: no está convocado a nada, así que su % por
+        // defecto (100, ver computeMusicianAttendanceMetrics) lo colaría artificialmente alto.
+        const ranked = (state.musicians || []).filter(m => !isMusicianOnLeaveOnDate(m, todayStrRank)).map(m => {
             const metrics = getMusicianAttendanceMetrics(m.id);
             return {
                 id: m.id,
@@ -15814,8 +15828,11 @@ function renderComponenteRanking() {
     const dNow = new Date();
     const todayStr = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}-${String(dNow.getDate()).padStart(2, '0')}`;
 
-    // Calcular estadísticas para todos los músicos
-    const rankingData = state.musicians.map(musician => {
+    // Calcular estadísticas para todos los músicos, excluyendo a quien esté de baja
+    // actualmente (isBaja, o un permiso sin fecha de fin): no está convocado a nada, así
+    // que su % por defecto (100, ver computeMusicianAttendanceMetrics) lo colaría
+    // artificialmente alto en un ranking del que en la práctica no participa.
+    const rankingData = state.musicians.filter(musician => !isMusicianOnLeaveOnDate(musician, todayStr)).map(musician => {
         const musicianId = musician.id;
         
         const metrics = getMusicianAttendanceMetrics(musicianId);
