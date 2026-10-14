@@ -27,12 +27,19 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 580,
+        fecha: "2026-10-14",
+        titulo: "Ajustes de dirección en el móvil",
+        cambios: [
+            "La dirección ya puede entrar en Ajustes desde el móvil, a través del menú (☰): ahí puede cambiar la contraseña de directiva y activar o desactivar el bloqueo de pasado."
+        ]
+    },
+    {
         version: 579,
         fecha: "2026-10-14",
         titulo: "Bloqueo de pasado sincronizado en todos los dispositivos",
         cambios: [
-            "Al activar o desactivar el bloqueo de pasado, el cambio se aplica al momento en todos los dispositivos: desde el móvil ya se pueden corregir pases de lista antiguos mientras el bloqueo esté desactivado.",
-            "La dirección ya puede activar o desactivar el bloqueo de pasado desde el móvil, en Pasar Lista."
+            "Al activar o desactivar el bloqueo de pasado, el cambio se aplica al momento en todos los dispositivos: desde el móvil ya se pueden corregir pases de lista antiguos mientras el bloqueo esté desactivado."
         ]
     },
     {
@@ -989,7 +996,7 @@ function isPastLockBlocked(dateStr) {
 }
 
 function getPastLockToggles() {
-    return ["toggle-past-lock", "toggle-past-lock-mobile"]
+    return ["toggle-past-lock"]
         .map(id => document.getElementById(id))
         .filter(Boolean);
 }
@@ -4268,8 +4275,7 @@ function setupEventListeners() {
         });
     }
 
-    // Bloqueo de Pasado (Interruptores y Modal de Seguridad). Hay uno en Ajustes (escritorio) y otro
-    // en Pasar Lista solo visible en móvil, ya que en móvil la sección de Ajustes no es accesible.
+    // Bloqueo de Pasado (Interruptor en Ajustes y Modal de Seguridad)
     const modalPastLock = document.getElementById("modal-past-lock-auth");
     const formPastLock = document.getElementById("form-past-lock-auth");
     const closePastLockBtn = document.getElementById("btn-close-past-lock-modal");
@@ -4940,10 +4946,8 @@ function renderActiveSection(sectionId, forcedDirection) {
         if (mobNav) mobNav.classList.add("hidden");
     }
 
-    // En móvil, la sección de Ajustes no es accesible y se redirige a Pasar Lista
-    if (window.innerWidth <= 768 && sectionId === "section-ajustes") {
-        sectionId = "section-pasar-lista";
-    }
+    // En móvil, Ajustes es accesible desde el menú hamburguesa, pero el CSS solo muestra
+    // la tarjeta de Contraseña de Directiva / Bloqueo de pasado (.settings-card-mobile).
 
     const previousActive = document.querySelector(".app-section.active");
     const sectionsOrder = [
