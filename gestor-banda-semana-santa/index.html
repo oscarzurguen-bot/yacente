@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=578">
+    <link rel="stylesheet" href="style.css?v=579">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -432,6 +432,14 @@
                         <button id="btn-collapse-all" class="btn btn-secondary btn-sm">Colapsar todo</button>
                         <button id="btn-expand-all" class="btn btn-secondary btn-sm">Expandir todo</button>
                         <button id="btn-reset-attendance" class="btn btn-secondary btn-sm" style="color: var(--color-absent);">Resetear Lista</button>
+                        <!-- Interruptor del Bloqueo de Pasado solo para móvil (allí Ajustes no es accesible) -->
+                        <div class="past-lock-mobile-row">
+                            <span>🔒 Bloqueo de pasado</span>
+                            <label class="switch" title="Activar/Desactivar Bloqueo de Pasado">
+                                <input type="checkbox" id="toggle-past-lock-mobile">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
 
                     </div>
                 </div>
@@ -4822,10 +4830,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=578"></script>
-    <script src="app.js?v=578"></script>
+    <script src="dictionary-es.js?v=579"></script>
+    <script src="app.js?v=579"></script>
     <script>
-        // Registro del Service Worker v=578.
+        // Registro del Service Worker v=579.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4854,9 +4862,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=578")
+                navigator.serviceWorker.register("sw.js?v=579")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v578 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v579 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);

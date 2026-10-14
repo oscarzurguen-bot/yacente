@@ -576,6 +576,17 @@ input:checked + .slider:before {
     gap: 10px;
 }
 
+/* Interruptor del Bloqueo de Pasado en Pasar Lista: solo visible en móvil (ver media query) */
+.past-lock-mobile-row {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
 /* ==========================================================================
    STATS RIBBON & CHARTS
    ========================================================================== */
@@ -1882,6 +1893,11 @@ svg.chevron {
     body.mobile-simplified-active .nav-item[data-target="section-marchas"],
     body.mobile-simplified-active .nav-item[data-target="section-estadisticas"] {
         display: none !important;
+    }
+
+    /* Como Ajustes no está en móvil, el Bloqueo de Pasado se muestra en Pasar Lista */
+    .past-lock-mobile-row {
+        display: flex;
     }
 
     /* Ocultar la sección de Ajustes y el botón Más en la versión móvil */

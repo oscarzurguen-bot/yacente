@@ -27,6 +27,15 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 579,
+        fecha: "2026-10-14",
+        titulo: "Bloqueo de pasado sincronizado en todos los dispositivos",
+        cambios: [
+            "Al activar o desactivar el bloqueo de pasado, el cambio se aplica al momento en todos los dispositivos: desde el móvil ya se pueden corregir pases de lista antiguos mientras el bloqueo esté desactivado.",
+            "La dirección ya puede activar o desactivar el bloqueo de pasado desde el móvil, en Pasar Lista."
+        ]
+    },
+    {
         version: 578,
         fecha: "2026-09-23",
         titulo: "Corregido el Top 25 de asistencia",
@@ -979,6 +988,28 @@ function isPastLockBlocked(dateStr) {
     return diffDays >= 2;
 }
 
+function getPastLockToggles() {
+    return ["toggle-past-lock", "toggle-past-lock-mobile"]
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+}
+
+function syncPastLockToggles() {
+    getPastLockToggles().forEach(t => { t.checked = !!state.pastLockEnabled; });
+}
+
+// Aplica un nuevo estado del bloqueo (local + nube) y refresca todos los interruptores.
+function setPastLockEnabled(enabled) {
+    state.pastLockEnabled = !!enabled;
+    localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+    syncPastLockToggles();
+    if (isCloudActive()) {
+        firebase.firestore().collection("config").doc("security").set({
+            pastLockEnabled: state.pastLockEnabled
+        }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
+    }
+}
+
 function isSessionConcluded(dateKey, sessionInfo = null) {
     if (!dateKey) return false;
     const rawDate = dateKey.split("_")[0];
@@ -1038,6 +1069,7 @@ let unsubUniforms = null;
 let unsubWordleBank = null;
 let unsubMarchaSeasonRemovals = null;
 let unsubNotificationsClearedAt = null;
+let unsubPastLock = null;
 let unsubTrash = null;
 
 function getDeletedNotificationIds(musicianId) {
@@ -1587,6 +1619,19 @@ function startCloudSync() {
         console.error("Error sync vaciado de notificaciones:", err);
     });
 
+    // Escucha del Bloqueo de Pasado: antes solo se leía al iniciar sesión, así que un dispositivo con la
+    // sesión ya abierta (típicamente el móvil) seguía con el valor viejo de localStorage y no dejaba
+    // editar pases de lista antiguos aunque el bloqueo se hubiera desactivado desde otro equipo.
+    unsubPastLock = db.collection("config").doc("security").onSnapshot(doc => {
+        const data = doc.exists ? doc.data() : null;
+        if (!data || typeof data.pastLockEnabled !== "boolean") return;
+        state.pastLockEnabled = data.pastLockEnabled;
+        localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
+        syncPastLockToggles();
+    }, err => {
+        console.error("Error sync bloqueo de pasado:", err);
+    });
+
     // Escucha de comunicados de la directiva
     unsubAnnouncements = db.collection("announcements").orderBy("date", "desc").limit(30).onSnapshot(snapshot => {
         const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -1845,6 +1890,7 @@ function stopCloudSync() {
     if (unsubWordleBank) { unsubWordleBank(); unsubWordleBank = null; }
     if (unsubMarchaSeasonRemovals) { unsubMarchaSeasonRemovals(); unsubMarchaSeasonRemovals = null; }
     if (unsubNotificationsClearedAt) { unsubNotificationsClearedAt(); unsubNotificationsClearedAt = null; }
+    if (unsubPastLock) { unsubPastLock(); unsubPastLock = null; }
     if (unsubTrash) { unsubTrash(); unsubTrash = null; }
 }
 
@@ -4222,30 +4268,19 @@ function setupEventListeners() {
         });
     }
 
-    // Bloqueo de Pasado (Interruptor y Modal de Seguridad)
-    const togglePastLock = document.getElementById("toggle-past-lock");
+    // Bloqueo de Pasado (Interruptores y Modal de Seguridad). Hay uno en Ajustes (escritorio) y otro
+    // en Pasar Lista solo visible en móvil, ya que en móvil la sección de Ajustes no es accesible.
     const modalPastLock = document.getElementById("modal-past-lock-auth");
     const formPastLock = document.getElementById("form-past-lock-auth");
     const closePastLockBtn = document.getElementById("btn-close-past-lock-modal");
     const cancelPastLockBtn = document.getElementById("btn-cancel-past-lock-modal");
 
-    if (togglePastLock) {
-        togglePastLock.checked = !!state.pastLockEnabled;
-
-        togglePastLock.addEventListener("click", (e) => {
+    syncPastLockToggles();
+    getPastLockToggles().forEach(toggle => {
+        toggle.addEventListener("click", (e) => {
             if (!state.pastLockEnabled) {
                 // ACTIVAR directamente sin pedir contraseña
-                state.pastLockEnabled = true;
-                togglePastLock.checked = true;
-                localStorage.setItem("yacente_past_lock_enabled", "true");
-
-                if (isCloudActive()) {
-                    const db = firebase.firestore();
-                    db.collection("config").doc("security").set({
-                        pastLockEnabled: true
-                    }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
-                }
-
+                setPastLockEnabled(true);
                 showToast("Bloqueo de pasado activado.", "success");
             } else {
                 // DESACTIVAR requiere contraseña
@@ -4255,7 +4290,7 @@ function setupEventListeners() {
                 if (modalPastLock) modalPastLock.classList.add("active");
             }
         });
-    }
+    });
 
     const closePastLockModal = () => {
         if (modalPastLock) modalPastLock.classList.remove("active");
@@ -4270,20 +4305,7 @@ function setupEventListeners() {
             const passInput = document.getElementById("past-lock-password").value.trim();
 
             if (passInput === PAST_LOCK_MASTER_PASS) {
-                state.pastLockEnabled = false;
-                localStorage.setItem("yacente_past_lock_enabled", "false");
-
-                if (togglePastLock) {
-                    togglePastLock.checked = false;
-                }
-
-                if (isCloudActive()) {
-                    const db = firebase.firestore();
-                    db.collection("config").doc("security").set({
-                        pastLockEnabled: false
-                    }, { merge: true }).catch(err => console.error("Error al guardar bloqueo de pasado en Firestore:", err));
-                }
-
+                setPastLockEnabled(false);
                 showToast("Bloqueo de pasado desactivado.", "success");
                 closePastLockModal();
             } else {
@@ -10682,8 +10704,7 @@ function setupFirebaseListeners() {
                         if (typeof secDoc.data().pastLockEnabled === "boolean") {
                             state.pastLockEnabled = secDoc.data().pastLockEnabled;
                             localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
-                            const togglePastLock = document.getElementById("toggle-past-lock");
-                            if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
+                            syncPastLockToggles();
                         }
 
                         if (password.length > 0) {
@@ -10842,8 +10863,7 @@ function setupFirebaseListeners() {
                             if (typeof doc.data().pastLockEnabled === "boolean") {
                                 state.pastLockEnabled = doc.data().pastLockEnabled;
                                 localStorage.setItem("yacente_past_lock_enabled", state.pastLockEnabled ? "true" : "false");
-                                const togglePastLock = document.getElementById("toggle-past-lock");
-                                if (togglePastLock) togglePastLock.checked = state.pastLockEnabled;
+                                syncPastLockToggles();
                             }
                         }
 
