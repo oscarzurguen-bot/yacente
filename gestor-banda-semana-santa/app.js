@@ -27,6 +27,30 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 583,
+        fecha: "2026-10-14",
+        titulo: "Retirado el botón de configuración rápida de Pasar Lista",
+        cambios: [
+            "Se ha quitado el botón del lápiz junto al tipo de sesión en Pasar Lista: al guardar desde ahí se perdían datos como el responsable del ensayo o el lugar y uniforme de la actuación. Los ensayos y actuaciones se editan desde sus páginas."
+        ]
+    },
+    {
+        version: 582,
+        fecha: "2026-10-14",
+        titulo: "Seguir en el calendario tras crear un evento",
+        cambios: [
+            "Al crear un ensayo o una actuación desde el calendario de la dirección, la app se queda en el calendario en lugar de saltar a Pasar Lista."
+        ]
+    },
+    {
+        version: 581,
+        fecha: "2026-10-14",
+        titulo: "Creación de eventos desde el calendario",
+        cambios: [
+            "Al crear un ensayo o una actuación desde el calendario de la dirección, ahora se usa el mismo formulario completo que en las páginas de Ensayos y Actuaciones (responsable del ensayo, lugar y uniforme de la actuación, etc.)."
+        ]
+    },
+    {
         version: 580,
         fecha: "2026-10-14",
         titulo: "Ajustes de dirección en el móvil",
@@ -3789,19 +3813,7 @@ function setupEventListeners() {
     // ==========================================
     const modalRehearsal = document.getElementById("modal-rehearsal");
     
-    document.getElementById("btn-add-rehearsal").addEventListener("click", () => {
-        renderRehearsalLocationOptions();
-        if (document.getElementById("rehearsal-editing-key")) document.getElementById("rehearsal-editing-key").value = "";
-        if (document.getElementById("modal-rehearsal-title")) document.getElementById("modal-rehearsal-title").innerText = "Nuevo Ensayo";
-        if (document.getElementById("btn-submit-rehearsal-modal")) document.getElementById("btn-submit-rehearsal-modal").innerText = "Crear Ensayo";
-
-        document.getElementById("rehearsal-date-input").value = new Date().toISOString().split("T")[0];
-        document.getElementById("rehearsal-type-input").value = "general";
-        if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = "";
-        updateResponsableQuickButtonsState();
-        setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", "");
-        modalRehearsal.classList.add("active");
-    });
+    document.getElementById("btn-add-rehearsal").addEventListener("click", () => openNewRehearsalModal());
 
     const closeModalRehearsal = () => modalRehearsal.classList.remove("active");
     document.getElementById("btn-close-rehearsal-modal").addEventListener("click", closeModalRehearsal);
@@ -3965,7 +3977,14 @@ function setupEventListeners() {
             renderEnsayosList();
             renderStatistics();
             renderCalendar();
-            
+
+            // Creado desde el Calendario: la dirección prefiere seguir en el calendario.
+            if (state.newSessionFromCalendar) {
+                state.newSessionFromCalendar = false;
+                showToast(`Ensayo creado para el ${formatDateSpanish(selectedDate)}`, "success");
+                return;
+            }
+
             state.currentDate = sessionKey;
             document.getElementById("attendance-date").value = selectedDate;
             
@@ -3988,25 +4007,7 @@ function setupEventListeners() {
     // ==========================================
     const modalActuacion = document.getElementById("modal-actuacion");
     
-    document.getElementById("btn-add-actuacion").addEventListener("click", () => {
-        if (document.getElementById("actuacion-editing-key")) document.getElementById("actuacion-editing-key").value = "";
-        if (document.getElementById("modal-actuacion-title")) document.getElementById("modal-actuacion-title").innerText = "Nueva Actuación";
-        if (document.getElementById("btn-submit-actuacion-modal")) document.getElementById("btn-submit-actuacion-modal").innerText = "Crear Actuación";
-
-        document.getElementById("actuacion-date-input").value = new Date().toISOString().split("T")[0];
-        document.getElementById("actuacion-name-input").value = "";
-        if (document.getElementById("actuacion-location-input")) {
-            document.getElementById("actuacion-location-input").value = "";
-        }
-        if (document.getElementById("actuacion-trip-input")) {
-            document.getElementById("actuacion-trip-input").checked = false;
-        }
-        renderUniformeOptions();
-        if (document.getElementById("actuacion-uniforme-input")) {
-            document.getElementById("actuacion-uniforme-input").value = "";
-        }
-        modalActuacion.classList.add("active");
-    });
+    document.getElementById("btn-add-actuacion").addEventListener("click", () => openNewActuacionModal());
 
     const closeModalActuacion = () => modalActuacion.classList.remove("active");
     document.getElementById("btn-close-actuacion-modal").addEventListener("click", closeModalActuacion);
@@ -4115,7 +4116,14 @@ function setupEventListeners() {
             renderActuacionesList();
             renderStatistics();
             renderCalendar();
-            
+
+            // Creada desde el Calendario: la dirección prefiere seguir en el calendario.
+            if (state.newSessionFromCalendar) {
+                state.newSessionFromCalendar = false;
+                showToast(`Actuación "${actuacionName}" creada para el ${formatDateSpanish(selectedDate)}`, "success");
+                return;
+            }
+
             state.currentDate = sessionKey;
             document.getElementById("attendance-date").value = selectedDate;
             
@@ -4452,207 +4460,6 @@ function setupEventListeners() {
             renderCalendar();
             showToast(`Ensayo del ${formatDateSpanish(date)} eliminado`, "error");
         }
-    });
-
-    // ==========================================
-    // MODAL DE CONFIGURACIÓN RÁPIDA DE SESIÓN
-    // ==========================================
-    const modalQuickSession = document.getElementById("modal-quick-session");
-    
-    document.getElementById("btn-configure-session").addEventListener("click", () => {
-        const date = state.currentDate;
-        if (!date) return;
-
-        // Pasar Lista no debe poder crear un ensayo: este botón solo reconfigura uno ya existente.
-        if (!state.sessionTypes[date]) {
-            showToast("No hay ningún ensayo creado para este día. Créalo primero desde 'Ensayos'.", "warning");
-            return;
-        }
-
-        state.isAddingNewSession = false;
-
-        document.getElementById("quick-session-title").innerText = `Configurar Sesión - ${formatDateSpanish(date)}`;
-        
-        // Reset defaults
-        document.getElementById("quick-session-actuacion-name").value = "";
-        if (document.getElementById("quick-session-trip-input")) document.getElementById("quick-session-trip-input").checked = false;
-        setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
-
-        const sessionInfo = state.sessionTypes[date];
-        if (sessionInfo) {
-            if (sessionInfo.type === "actuacion") {
-                document.getElementById("quick-session-type").value = "actuacion";
-                document.getElementById("quick-session-actuacion-name").value = sessionInfo.name || "";
-                if (document.getElementById("quick-session-trip-input")) document.getElementById("quick-session-trip-input").checked = !!sessionInfo.isTrip;
-            } else if (sessionInfo.type === "ensayo") {
-                const sub = sessionInfo.subtype;
-                if (sub === "trompetas1") {
-                    document.getElementById("quick-session-type").value = "ensayo-trompetas1";
-                } else if (sub === "bajos") {
-                    document.getElementById("quick-session-type").value = "ensayo-bajos";
-                } else if (sub === "trompetas2y3") {
-                    document.getElementById("quick-session-type").value = "ensayo-trompetas2y3";
-                } else if (sub === "cornetas") {
-                    document.getElementById("quick-session-type").value = "ensayo-cornetas";
-                } else if (sub === "percusion") {
-                    document.getElementById("quick-session-type").value = "ensayo-percusion";
-                } else if (sub === "primeras") {
-                    document.getElementById("quick-session-type").value = "ensayo-primeras";
-                } else {
-                    document.getElementById("quick-session-type").value = "ensayo-general";
-                }
-                if (document.getElementById("quick-session-location")) {
-                    document.getElementById("quick-session-location").value = sessionInfo.location || "Parking";
-                }
-                setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", sessionInfo.time || "");
-            }
-        } else {
-            // Default when not created
-            document.getElementById("quick-session-type").value = "ensayo-general";
-            if (document.getElementById("quick-session-location")) {
-                document.getElementById("quick-session-location").value = "Parking";
-            }
-            setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
-        }
-        
-        // Trigger visibility update
-        updateQuickSessionFieldsVisibility();
-        
-        modalQuickSession.classList.add("active");
-    });
-
-    const closeQuickSession = () => modalQuickSession.classList.remove("active");
-    document.getElementById("btn-close-quick-session").addEventListener("click", closeQuickSession);
-    document.getElementById("btn-cancel-quick-session").addEventListener("click", closeQuickSession);
-
-    const quickSessionTypeSelect = document.getElementById("quick-session-type");
-    
-    function updateQuickSessionFieldsVisibility() {
-        const type = quickSessionTypeSelect.value;
-        const actuacionGroup = document.getElementById("quick-session-actuacion-group");
-        const locationGroup = document.getElementById("quick-session-location-group");
-        const timeGroup = document.getElementById("quick-session-time-group");
-        
-        if (type === "actuacion") {
-            actuacionGroup.classList.remove("hidden");
-            if (locationGroup) locationGroup.classList.add("hidden");
-            if (timeGroup) timeGroup.classList.add("hidden");
-        } else {
-            actuacionGroup.classList.add("hidden");
-            if (locationGroup) locationGroup.classList.remove("hidden");
-            if (timeGroup) timeGroup.classList.remove("hidden");
-        }
-    }
-    
-    quickSessionTypeSelect.addEventListener("change", updateQuickSessionFieldsVisibility);
-
-    document.getElementById("form-quick-session").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const date = state.currentDate;
-        if (!date) return;
-        
-        const type = quickSessionTypeSelect.value;
-        let newSession = null;
-        let convocatedVoices = [];
-        
-        if (type.startsWith("ensayo-")) {
-            const locationVal = document.getElementById("quick-session-location") ? document.getElementById("quick-session-location").value : "Parking";
-            const timeVal = getFormattedTimeFromInputs("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min");
-            
-            if (type === "ensayo-general") {
-                newSession = { type: "ensayo", subtype: "general", name: "", location: locationVal, time: timeVal };
-            } else if (type === "ensayo-trompetas1") {
-                convocatedVoices = ["Trompetas 1ª", "Fliscornos"];
-                newSession = { type: "ensayo", subtype: "trompetas1", name: "", convocatedVoices, location: locationVal, time: timeVal };
-            } else if (type === "ensayo-bajos") {
-                convocatedVoices = ["Trompas", "Trombones", "Bombardinos", "Tubas"];
-                newSession = { type: "ensayo", subtype: "bajos", name: "", convocatedVoices, location: locationVal, time: timeVal };
-            } else if (type === "ensayo-trompetas2y3") {
-                convocatedVoices = ["Trompetas 2ª", "Trompetas 3ª"];
-                newSession = { type: "ensayo", subtype: "trompetas2y3", name: "", convocatedVoices, location: locationVal, time: timeVal };
-            } else if (type === "ensayo-cornetas") {
-                convocatedVoices = ["Cornetas"];
-                newSession = { type: "ensayo", subtype: "cornetas", name: "", convocatedVoices, location: locationVal, time: timeVal };
-            } else if (type === "ensayo-percusion") {
-                convocatedVoices = ["Tambores", "Bombos", "Platos"];
-                newSession = { type: "ensayo", subtype: "percusion", name: "", convocatedVoices, location: locationVal, time: timeVal };
-            } else if (type === "ensayo-primeras") {
-                convocatedVoices = ["Trompetas 1ª", "Cornetas"];
-                newSession = { type: "ensayo", subtype: "primeras", name: "", convocatedVoices, location: locationVal, time: timeVal }; // Fallback
-            }
-        } else if (type === "actuacion") {
-            const actuacionName = document.getElementById("quick-session-actuacion-name").value.trim();
-            if (!actuacionName) {
-                showToast("Por favor, introduce el nombre de la actuación", "error");
-                return;
-            }
-            const isTrip = document.getElementById("quick-session-trip-input") ? document.getElementById("quick-session-trip-input").checked : false;
-            newSession = { type: "actuacion", name: actuacionName, isTrip: isTrip };
-        }
-        
-        // Determine the actual session key to use
-        let sessionKey = date;
-        if (state.isAddingNewSession) {
-            const rawDate = date.split("_")[0];
-
-            // Si ya existe una sesión del mismo tipo (y subtipo, si aplica) ese día, avisamos en
-            // vez de crear un duplicado silencioso con una clave sufijada al azar: esto era lo que
-            // generaba ensayos generales repetidos el mismo día sin que la dirección se diera cuenta.
-            const duplicateKey = Object.keys(state.sessionTypes)
-                .filter(k => k.startsWith(rawDate))
-                .find(k => {
-                    const existing = state.sessionTypes[k];
-                    if (existing.type !== newSession.type) return false;
-                    if (newSession.type === "ensayo") return existing.subtype === newSession.subtype;
-                    return true;
-                });
-            if (duplicateKey) {
-                showToast("Ya existe una sesión de este tipo registrada para esta fecha", "error");
-                return;
-            }
-
-            sessionKey = rawDate;
-            if (state.sessionTypes[sessionKey]) {
-                let counter = 1;
-                while (state.sessionTypes[`${rawDate}_${counter}`]) {
-                    counter++;
-                }
-                sessionKey = `${rawDate}_${counter}`;
-            }
-            state.currentDate = sessionKey;
-        }
-
-        // Save to state with createdAt timestamp
-        newSession.createdAt = new Date().toISOString();
-        state.sessionTypes[sessionKey] = newSession;
-        
-        // Reconcilia la asistencia con la convocatoria final: si esta sesión ya existía (p.ej. se
-        // reconfigura de "General" a "Trompetas 1ª" desde aquí), poda fichas de quien ya no está
-        // convocado y crea la de quien falte; en una sesión nueva simplemente crea todas.
-        reconcileAttendanceWithConvocatedVoices(sessionKey, convocatedVoices);
-
-        // Save to Database and Local Storage
-        dbSaveSessionType(sessionKey, newSession);
-        dispatchSessionNotification(sessionKey, newSession);
-        if (isCloudActive()) {
-            const db = firebase.firestore();
-            if (state.attendance[sessionKey]) {
-                db.collection("attendance").doc(sessionKey).set(state.attendance[sessionKey]);
-            }
-        } else {
-            saveStateToLocalStorage();
-        }
-        
-        // Update UI
-        closeQuickSession();
-        updateSessionBadge();
-        renderAttendance();
-        renderRehearsalMarchasWidget();
-        renderEnsayosList();
-        renderActuacionesList();
-        renderStatistics();
-        renderCalendar();
-        showToast("Sesión configurada correctamente", "success");
     });
 
     // Listener para el huevo de pascua de la vela en Ajustes
@@ -4995,11 +4802,9 @@ function renderActiveSection(sectionId, forcedDirection) {
     const pageSubtitle = document.getElementById("page-subtitle");
     const dateContainer = document.getElementById("header-date-container");
     const sessionBadge = document.getElementById("attendance-session-badge");
-    const configBtn = document.getElementById("btn-configure-session");
     const announcementBtn = document.getElementById("btn-open-announcement-modal");
 
     if (sessionBadge) sessionBadge.style.display = "none";
-    if (configBtn) configBtn.style.display = "none";
 
     // Visibilidad del botón de comunicado (Solo Director y NO en la sección de Ajustes)
     if (announcementBtn) {
@@ -5026,7 +4831,6 @@ function renderActiveSection(sectionId, forcedDirection) {
             pageSubtitle.innerText = "Control diario de músicos por sección";
             dateContainer.classList.remove("hidden");
             if (sessionBadge) sessionBadge.style.display = "inline-flex";
-            if (configBtn) configBtn.style.display = "inline-flex";
             renderAttendance();
             renderRehearsalMarchasWidget();
             break;
@@ -11588,58 +11392,67 @@ function renderMarchaHistoryActuacionesSection(marchaId) {
 // ==========================================================================
 // SECCIÓN: CALENDARIO MENSUAL Y OBJETIVOS
 // ==========================================================================
-function openQuickSessionModalForDate(dateKey) {
-    if (!dateKey) return;
-    state.isAddingNewSession = true;
-    state.currentDate = dateKey;
-
-    const attendanceDateEl = document.getElementById("attendance-date");
-    if (attendanceDateEl) {
-        attendanceDateEl.value = dateKey;
-    }
-
-    const modalQuickSession = document.getElementById("modal-quick-session");
-    if (!modalQuickSession) return;
-
-    const titleEl = document.getElementById("quick-session-title");
-    if (titleEl) {
-        titleEl.innerText = `Configurar Sesión - ${formatDateSpanish(dateKey)}`;
-    }
-
-    const actuacionNameEl = document.getElementById("quick-session-actuacion-name");
-    if (actuacionNameEl) {
-        actuacionNameEl.value = "";
-    }
-
-    const tripInputEl = document.getElementById("quick-session-trip-input");
-    if (tripInputEl) {
-        tripInputEl.checked = false;
-    }
-
-    const typeEl = document.getElementById("quick-session-type");
-    if (typeEl) {
-        typeEl.value = "ensayo-general";
-    }
-
+// Abre el formulario completo de "Nuevo Ensayo" (el mismo de la página Ensayos), con la fecha
+// indicada o la de hoy por defecto.
+function openNewRehearsalModal(dateStr, fromCalendar = false) {
+    const modal = document.getElementById("modal-rehearsal");
+    if (!modal) return;
+    state.newSessionFromCalendar = fromCalendar;
     renderRehearsalLocationOptions();
-    setTimeInputsFromValue("quick-session-start-hour", "quick-session-start-min", "quick-session-end-hour", "quick-session-end-min", "");
+    if (document.getElementById("rehearsal-editing-key")) document.getElementById("rehearsal-editing-key").value = "";
+    if (document.getElementById("modal-rehearsal-title")) document.getElementById("modal-rehearsal-title").innerText = "Nuevo Ensayo";
+    if (document.getElementById("btn-submit-rehearsal-modal")) document.getElementById("btn-submit-rehearsal-modal").innerText = "Crear Ensayo";
 
-    const actuacionGroup = document.getElementById("quick-session-actuacion-group");
-    if (actuacionGroup) {
-        actuacionGroup.classList.add("hidden");
+    document.getElementById("rehearsal-date-input").value = dateStr || new Date().toISOString().split("T")[0];
+    document.getElementById("rehearsal-type-input").value = "general";
+    if (document.getElementById("rehearsal-responsable-input")) document.getElementById("rehearsal-responsable-input").value = "";
+    updateResponsableQuickButtonsState();
+    setTimeInputsFromValue("rehearsal-start-hour-input", "rehearsal-start-min-input", "rehearsal-end-hour-input", "rehearsal-end-min-input", "");
+    modal.classList.add("active");
+}
+
+// Abre el formulario completo de "Nueva Actuación" (el mismo de la página Actuaciones).
+function openNewActuacionModal(dateStr, fromCalendar = false) {
+    const modal = document.getElementById("modal-actuacion");
+    if (!modal) return;
+    state.newSessionFromCalendar = fromCalendar;
+    if (document.getElementById("actuacion-editing-key")) document.getElementById("actuacion-editing-key").value = "";
+    if (document.getElementById("modal-actuacion-title")) document.getElementById("modal-actuacion-title").innerText = "Nueva Actuación";
+    if (document.getElementById("btn-submit-actuacion-modal")) document.getElementById("btn-submit-actuacion-modal").innerText = "Crear Actuación";
+
+    document.getElementById("actuacion-date-input").value = dateStr || new Date().toISOString().split("T")[0];
+    document.getElementById("actuacion-name-input").value = "";
+    if (document.getElementById("actuacion-location-input")) {
+        document.getElementById("actuacion-location-input").value = "";
     }
-
-    const locationGroup = document.getElementById("quick-session-location-group");
-    if (locationGroup) {
-        locationGroup.classList.remove("hidden");
+    if (document.getElementById("actuacion-trip-input")) {
+        document.getElementById("actuacion-trip-input").checked = false;
     }
-
-    const timeGroup = document.getElementById("quick-session-time-group");
-    if (timeGroup) {
-        timeGroup.classList.remove("hidden");
+    renderUniformeOptions();
+    if (document.getElementById("actuacion-uniforme-input")) {
+        document.getElementById("actuacion-uniforme-input").value = "";
     }
+    modal.classList.add("active");
+}
 
-    modalQuickSession.classList.add("active");
+// Al pulsar un día del calendario se elige qué crear y se abre el MISMO formulario completo que
+// en las páginas Ensayos / Actuaciones. Antes se usaba una ventana rápida propia con menos campos
+// (sin responsable en ensayos, ni lugar ni uniforme en actuaciones).
+function openCalendarNewSessionChooser(dateKey) {
+    if (!dateKey) return;
+    const rawDate = String(dateKey).split("_")[0];
+    const modal = document.getElementById("modal-calendar-new-session");
+    if (!modal) return;
+
+    const titleEl = document.getElementById("calendar-new-session-title");
+    if (titleEl) titleEl.innerText = `Nueva sesión - ${formatDateSpanish(rawDate)}`;
+
+    const close = () => modal.classList.remove("active");
+    document.getElementById("btn-close-calendar-new-session").onclick = close;
+    document.getElementById("btn-calendar-new-ensayo").onclick = () => { close(); openNewRehearsalModal(rawDate, true); };
+    document.getElementById("btn-calendar-new-actuacion").onclick = () => { close(); openNewActuacionModal(rawDate, true); };
+
+    modal.classList.add("active");
 }
 
 function renderCalendar() {
@@ -11765,7 +11578,7 @@ function renderCalendar() {
         const prevDateKey = `${prevYear}-${prevMonthStr}-${prevDayStr}`;
         dayCell.setAttribute("data-date", prevDateKey);
         attachCalendarDaySessionTags(dayCell, prevDateKey);
-        dayCell.addEventListener("click", () => openQuickSessionModalForDate(prevDateKey));
+        dayCell.addEventListener("click", () => openCalendarNewSessionChooser(prevDateKey));
         cells.push(dayCell);
     }
 
@@ -11789,7 +11602,7 @@ function renderCalendar() {
         attachCalendarDaySessionTags(dayCell, dateKey);
 
         // Evento click para planificar sesión (Añadir nueva sesión)
-        dayCell.addEventListener("click", () => openQuickSessionModalForDate(dateKey));
+        dayCell.addEventListener("click", () => openCalendarNewSessionChooser(dateKey));
 
         cells.push(dayCell);
     }
@@ -11812,7 +11625,7 @@ function renderCalendar() {
         const nextDateKey = `${nextYear}-${nextMonthStr}-${nextDayStr}`;
         dayCell.setAttribute("data-date", nextDateKey);
         attachCalendarDaySessionTags(dayCell, nextDateKey);
-        dayCell.addEventListener("click", () => openQuickSessionModalForDate(nextDateKey));
+        dayCell.addEventListener("click", () => openCalendarNewSessionChooser(nextDateKey));
         cells.push(dayCell);
     }
 
@@ -18488,7 +18301,6 @@ function dbSaveRehearsalLocations() {
 
 function renderRehearsalLocationOptions() {
     const rehearsalSelect = document.getElementById("rehearsal-location-input");
-    const quickSelect = document.getElementById("quick-session-location");
 
     const locations = (state.rehearsalLocations && state.rehearsalLocations.length > 0)
         ? state.rehearsalLocations
@@ -18502,9 +18314,6 @@ function renderRehearsalLocationOptions() {
 
     if (rehearsalSelect) {
         rehearsalSelect.innerHTML = optionsHtml;
-    }
-    if (quickSelect) {
-        quickSelect.innerHTML = optionsHtml;
     }
 }
 

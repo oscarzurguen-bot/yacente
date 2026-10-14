@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=580">
+    <link rel="stylesheet" href="style.css?v=583">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -351,12 +351,6 @@
                     <span id="attendance-session-badge" style="padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; height: 38px; border: 1px solid var(--border-color); background-color: var(--bg-secondary); color: var(--text-primary); box-sizing: border-box; transition: all 0.2s ease;">
                         Cargando...
                     </span>
-                    <button id="btn-configure-session" class="btn btn-secondary btn-sm" style="width: 38px; height: 38px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; padding: 0; margin: 0; border-color: rgba(212, 175, 55, 0.25); color: var(--color-gold);" title="Configurar Sesión">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0;">
-                            <path d="M12 20h9"></path>
-                            <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                        </svg>
-                    </button>
                     <button id="btn-open-announcement-modal" class="btn btn-primary btn-sm admin-only-element" style="width: 38px; height: 38px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; padding: 0; margin: 0; background: linear-gradient(135deg, var(--color-gold) 0%, #b8860b 100%); color: #000; border: none; font-weight: 700; box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3); transition: all 0.2s ease;" title="Enviar aviso o comunicado a los músicos">
                         <span style="font-size: 1.1rem; line-height: 1;">📢</span>
                     </button>
@@ -3518,127 +3512,23 @@
         </div>
     </div>
 
-    <!-- Modal: Configuración Rápida de Sesión -->
-    <div id="modal-quick-session" class="modal-overlay">
-        <div class="modal-card" style="max-width: 380px;">
+    <!-- Modal: Elegir qué crear al pulsar un día del Calendario -->
+    <div id="modal-calendar-new-session" class="modal-overlay">
+        <div class="modal-card" style="max-width: 360px;">
             <div class="modal-header">
-                <h3 id="quick-session-title">Configurar Sesión</h3>
-                <button class="modal-close" id="btn-close-quick-session">
+                <h3 id="calendar-new-session-title">Nueva sesión</h3>
+                <button class="modal-close" id="btn-close-calendar-new-session">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
             </div>
-            <form id="form-quick-session">
-                <div class="form-group">
-                    <label for="quick-session-type">Tipo de Sesión</label>
-                    <select id="quick-session-type" style="width: 100%;">
-                        <option value="ensayo-general">Ensayo General</option>
-                        <option value="ensayo-trompetas1">Ensayo Trompetas 1ª</option>
-                        <option value="ensayo-bajos">Ensayo Bajos</option>
-                        <option value="ensayo-trompetas2y3">Ensayo Trompetas 2ª y 3ª</option>
-                        <option value="ensayo-cornetas">Ensayo Cornetas</option>
-                        <option value="ensayo-percusion">Ensayo Percusión</option>
-                        <option value="actuacion">Actuación</option>
-                    </select>
-                </div>
-                
-                <!-- Group: Rehearsal Location -->
-                <div class="form-group" id="quick-session-location-group" style="margin-top: 15px;">
-                    <label for="quick-session-location">Lugar del Ensayo</label>
-                    <select id="quick-session-location" style="width: 100%;">
-                        <option value="Parking" selected>Parking</option>
-                        <option value="Arrabal">Arrabal</option>
-                        <option value="San Blas">San Blas</option>
-                    </select>
-                </div>
-                
-                <!-- Group: Rehearsal Time -->
-                <div class="form-group" id="quick-session-time-group" style="margin-top: 15px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Inicio</label>
-                            <div style="display: flex; gap: 4px; align-items: center;">
-                                <select id="quick-session-start-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
-                                    <option value="">--</option>
-                                    <option value="08">08</option>
-                                    <option value="09">09</option>
-                                    <option value="10">10</option>
-                                    <option value="11">11</option>
-                                    <option value="12">12</option>
-                                    <option value="13">13</option>
-                                    <option value="14">14</option>
-                                    <option value="15">15</option>
-                                    <option value="16">16</option>
-                                    <option value="17">17</option>
-                                    <option value="18">18</option>
-                                    <option value="19">19</option>
-                                    <option value="20">20</option>
-                                    <option value="21">21</option>
-                                    <option value="22">22</option>
-                                    <option value="23">23</option>
-                                    <option value="24">24</option>
-                                </select>
-                                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
-                                <select id="quick-session-start-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
-                                    <option value="00" selected>00</option>
-                                    <option value="15">15</option>
-                                    <option value="30">30</option>
-                                    <option value="45">45</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label style="font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block;">Hora Fin</label>
-                            <div style="display: flex; gap: 4px; align-items: center;">
-                                <select id="quick-session-end-hour" class="form-control" style="flex: 1; padding: 6px 6px; font-size: 0.88rem;">
-                                    <option value="">--</option>
-                                    <option value="08">08</option>
-                                    <option value="09">09</option>
-                                    <option value="10">10</option>
-                                    <option value="11">11</option>
-                                    <option value="12">12</option>
-                                    <option value="13">13</option>
-                                    <option value="14">14</option>
-                                    <option value="15">15</option>
-                                    <option value="16">16</option>
-                                    <option value="17">17</option>
-                                    <option value="18">18</option>
-                                    <option value="19">19</option>
-                                    <option value="20">20</option>
-                                    <option value="21">21</option>
-                                    <option value="22">22</option>
-                                    <option value="23">23</option>
-                                    <option value="24">24</option>
-                                </select>
-                                <span style="font-weight: bold; color: var(--text-secondary);">:</span>
-                                <select id="quick-session-end-min" class="form-control" style="width: 58px; padding: 6px 4px; font-size: 0.88rem;">
-                                    <option value="00" selected>00</option>
-                                    <option value="15">15</option>
-                                    <option value="30">30</option>
-                                    <option value="45">45</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                 
-                <!-- Group: Performance Name (hidden by default) -->
-                <div class="form-group hidden" id="quick-session-actuacion-group" style="margin-top: 15px;">
-                    <label for="quick-session-actuacion-name">Nombre de la Actuación</label>
-                    <input type="text" id="quick-session-actuacion-name" placeholder="Ej: Domingo de Ramos, Concierto..." style="width: 100%;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
-                        <input type="checkbox" id="quick-session-trip-input" style="width: auto; margin: 0;">
-                        <label for="quick-session-trip-input" style="margin: 0; font-weight: normal; cursor: pointer;">Fuera de la ciudad/provincia (Viaje)</label>
-                    </div>
-                </div>
-
-                <div class="modal-actions" style="margin-top: 20px;">
-                    <button type="button" class="btn btn-secondary" id="btn-cancel-quick-session">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Configuración</button>
-                </div>
-            </form>
+            <p class="text-muted" style="margin-bottom: 16px;">¿Qué quieres crear este día?</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-primary" id="btn-calendar-new-ensayo">Nuevo Ensayo</button>
+                <button type="button" class="btn btn-secondary" id="btn-calendar-new-actuacion">Nueva Actuación</button>
+            </div>
         </div>
     </div>
 
@@ -4822,10 +4712,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=580"></script>
-    <script src="app.js?v=580"></script>
+    <script src="dictionary-es.js?v=583"></script>
+    <script src="app.js?v=583"></script>
     <script>
-        // Registro del Service Worker v=580.
+        // Registro del Service Worker v=583.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4854,9 +4744,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=580")
+                navigator.serviceWorker.register("sw.js?v=583")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v580 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v583 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
