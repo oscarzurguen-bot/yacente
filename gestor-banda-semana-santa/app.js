@@ -4,6 +4,40 @@
  * Versión 1.2.0: Con soporte para agrupación por voces en Plantilla y orden oficial definitivo.
  */
 
+// Red de seguridad para el almacenamiento local: hay ~80 llamadas a localStorage.setItem repartidas
+// por la app (muchas dentro de listeners de Firestore), y en un móvil con el almacenamiento lleno
+// cualquiera de ellas lanzaba un QuotaExceededError sin capturar que cortaba el listener o el
+// arranque entero (banner rojo, o la app que ni abre). Como en modo nube localStorage es solo una
+// caché, un fallo al escribir nunca debe ser fatal: se intenta liberar espacio quitando las fotos
+// en base64 que versiones antiguas dejaron en la caché de músicos, se reintenta una vez, y si aun
+// así no cabe se ignora.
+(function hardenLocalStorageSetItem() {
+    try {
+        const originalSetItem = Storage.prototype.setItem;
+        Storage.prototype.setItem = function (key, value) {
+            try {
+                return originalSetItem.call(this, key, value);
+            } catch (err) {
+                const isQuota = err && (err.name === "QuotaExceededError" || err.code === 22 || err.code === 1014);
+                if (!isQuota) throw err;
+                // Solo en modo nube: en modo local la caché de músicos es la única copia de las fotos.
+                const cloudConfigured = !!this.getItem("yacente_firebase_config");
+                if (cloudConfigured && this === window.localStorage) {
+                    try {
+                        const cached = JSON.parse(this.getItem("harmonia_musicians") || "[]");
+                        if (Array.isArray(cached) && cached.some(m => m && m.photo)) {
+                            const stripped = cached.map(m => { if (!m || !m.photo) return m; const c = { ...m }; delete c.photo; return c; });
+                            originalSetItem.call(this, "harmonia_musicians", JSON.stringify(stripped));
+                            return originalSetItem.call(this, key, value);
+                        }
+                    } catch (_) { /* si no se pudo liberar espacio, se ignora abajo */ }
+                }
+                console.warn("Almacenamiento local lleno; no se guardó en caché la clave:", key, err);
+            }
+        };
+    } catch (_) { /* navegadores sin Storage.prototype: se deja como está */ }
+})();
+
 // ==========================================================================
 // CONSTANTES Y DATOS DE PRUEBA (DEMO)
 // ==========================================================================
@@ -26,6 +60,14 @@ const SECCIONES_ORDEN = [
 // Historial de novedades mostrado a los músicos en Menú > Novedades (más reciente primero).
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
+    {
+        version: 584,
+        fecha: "2026-10-18",
+        titulo: "Arreglado el error de almacenamiento lleno al abrir la app",
+        cambios: [
+            "En algunos móviles salía un aviso rojo de error (QuotaExceededError) o la app ni siquiera llegaba a abrirse porque el almacenamiento del navegador estaba lleno. Ahora la app libera ese espacio sola y sigue funcionando con normalidad."
+        ]
+    },
     {
         version: 583,
         fecha: "2026-10-14",
@@ -1188,7 +1230,7 @@ async function initFirebase() {
                     });
                     if (musicians.length > 0) {
                         state.musicians = musicians;
-                        localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+                        localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians.map(m => omitField(m, "photo"))));
                         populateLoginMusicians();
                     }
                 })
@@ -1293,7 +1335,7 @@ function startCloudSync() {
         // Si hay datos en la nube, sobreescribimos state
         if (snapshot.size > 0) {
             state.musicians = musicians;
-            localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians));
+            localStorage.setItem("harmonia_musicians", JSON.stringify(state.musicians.map(m => omitField(m, "photo"))));
             invalidateMusicianStatsCache();
             renderPlantillaTable();
             populateLoginMusicians();
