@@ -1466,6 +1466,10 @@ svg.chevron {
     width: 100%;
 }
 
+.nav-item.nav-item-drawer-only {
+    display: none;
+}
+
 .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -1889,8 +1893,9 @@ svg.chevron {
         display: none !important;
     }
 
-    /* Ocultar Ajustes de la barra inferior (se accede desde el menú hamburguesa) y el botón Más */
+    /* Ocultar Ajustes y Novedades de la barra inferior (se accede desde el menú hamburguesa) y el botón Más */
     .nav-item[data-target="section-ajustes"],
+    .nav-item.nav-item-drawer-only,
     .nav-item-more-mobile {
         display: none !important;
     }
@@ -1951,6 +1956,7 @@ svg.chevron {
     /* Mostrar EXCLUSIVAMENTE Plantilla, Estadísticas y Ajustes en el Drawer móvil */
     .sidebar.open .sidebar-nav .nav-item[data-target="section-plantilla"],
     .sidebar.open .sidebar-nav .nav-item[data-target="section-estadisticas"],
+    .sidebar.open .sidebar-nav .nav-item.nav-item-drawer-only,
     .sidebar.open .sidebar-nav .nav-item[data-target="section-ajustes"] {
         display: flex !important;
         flex-direction: row !important;

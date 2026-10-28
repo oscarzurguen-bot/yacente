@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=592">
+    <link rel="stylesheet" href="style.css?v=593">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -227,6 +227,15 @@
                         <line x1="6" y1="20" x2="6" y2="14"></line>
                     </svg>
                     <span>Estadísticas</span>
+                </a>
+                <!-- Solo en el menú ☰ del móvil (style.css): en escritorio y en la barra inferior no se muestra -->
+                <a href="#" class="nav-item nav-item-drawer-only" data-target="section-componente-novedades">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path>
+                        <path d="M19 15v4"></path>
+                        <path d="M17 17h4"></path>
+                    </svg>
+                    <span>Novedades</span>
                 </a>
                 <a href="#" class="nav-item" data-target="section-ajustes">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -4712,10 +4721,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=592"></script>
-    <script src="app.js?v=592"></script>
+    <script src="dictionary-es.js?v=593"></script>
+    <script src="app.js?v=593"></script>
     <script>
-        // Registro del Service Worker v=592.
+        // Registro del Service Worker v=593.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4744,9 +4753,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=592")
+                navigator.serviceWorker.register("sw.js?v=593")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v592 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v593 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
