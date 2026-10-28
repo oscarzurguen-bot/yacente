@@ -61,6 +61,22 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 588,
+        fecha: "2026-10-29",
+        titulo: "Repertorio de actuación compacto en el móvil",
+        cambios: [
+            "En el móvil de la dirección, el panel para añadir repertorio a una actuación vuelve a su diseño compacto de siempre, pero ahora se lee el nombre completo de cada marcha añadida en lugar de verse cortado."
+        ]
+    },
+    {
+        version: 587,
+        fecha: "2026-10-28",
+        titulo: "Ensayos y actuaciones en tarjetas en el móvil",
+        cambios: [
+            "En el móvil de la dirección, las páginas de Ensayos y Actuaciones ya no obligan a desplazarse de lado: cada ensayo o actuación se muestra como una tarjeta con fecha, hora, lugar, tipo, responsable y asistencia, y botones grandes para pasar lista, editar o borrar."
+        ]
+    },
+    {
         version: 586,
         fecha: "2026-10-28",
         titulo: "Las bajas ya no cuentan en el ranking de la dirección",
@@ -5870,6 +5886,7 @@ function renderEnsayosList() {
             currentYearStr = yyyy;
             currentMonthStr = ""; // reset month when year changes
             const yearHeaderTr = document.createElement("tr");
+            yearHeaderTr.className = "session-group-row session-group-year";
             yearHeaderTr.innerHTML = `
                 <td colspan="8" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
                     Año ${yyyy}
@@ -5882,6 +5899,7 @@ function renderEnsayosList() {
         if (monthName !== currentMonthStr) {
             currentMonthStr = monthName;
             const monthHeaderTr = document.createElement("tr");
+            monthHeaderTr.className = "session-group-row";
             monthHeaderTr.innerHTML = `
                 <td colspan="8" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
                     ${monthName}
@@ -5978,35 +5996,48 @@ function renderEnsayosList() {
             presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
         }
 
+        // Las celdas llevan clases sc-* para que en móvil (style.css, "Tarjetas de sesión") la fila
+        // se vea como una tarjeta apilada sin scroll lateral; en escritorio sigue siendo tabla.
+        const responsableVal = sessionInfo && sessionInfo.responsable ? sessionInfo.responsable : "";
         const tr = document.createElement("tr");
-        tr.classList.add("clickable-row");
+        tr.classList.add("clickable-row", "session-row");
         tr.innerHTML = `
-            <td style="white-space: nowrap;">
+            <td class="sc-date" style="white-space: nowrap;">
                 <strong>${formatDateShortSpanish(date)}</strong>
             </td>
-            <td>
+            <td class="sc-time${sessionInfo && sessionInfo.time ? "" : " sc-no-value"}">
                 <span>${sessionInfo && sessionInfo.time ? sessionInfo.time : "-"}</span>
             </td>
-            <td>
+            <td class="sc-place">
                 <span>${locationVal}</span>
             </td>
-            <td style="white-space: nowrap;">
+            <td class="sc-type" style="white-space: nowrap;">
                 ${typeLabel}
             </td>
-            <td>
+            <td class="sc-resp sc-mobile-only">${responsableVal ? `<span>${responsableVal}</span>` : ""}</td>
+            <td class="sc-present">
                 ${presentsCellHTML}
             </td>
-            <td style="white-space: nowrap;">
+            <td class="sc-absences" style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
                 <div style="color: var(--color-absent); font-weight: 500;">${absentUnjustified} sin justificar</div>
             </td>
-            <td>
+            <td class="sc-ratio">
                 <span class="musician-count-badge" style="background-color: var(--color-purple-dark); border-color: var(--border-active); font-size: 0.85rem; padding: 4px 10px;">
                     ${ratio}%
                 </span>
             </td>
-            <td>
-                <div style="display: flex; gap: 6px; align-items: center;">
+            <td class="sc-break sc-break-a" aria-hidden="true"></td>
+            <td class="sc-break sc-break-b" aria-hidden="true"></td>
+            <td class="sc-actions">
+                <div class="sc-actions-inner" style="display: flex; gap: 6px; align-items: center;">
+                    <button class="btn btn-secondary btn-sm session-pasarlista-btn" data-date="${date}" title="Pasar lista">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        <span>Pasar lista</span>
+                    </button>
                     <button class="btn btn-secondary btn-sm edit-rehearsal-btn" data-date="${date}" title="Editar Ensayo" style="padding: 6px; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -6025,6 +6056,11 @@ function renderEnsayosList() {
 
         tr.addEventListener("click", () => {
             openRehearsalDetailModal(date);
+        });
+
+        tr.querySelector(".session-pasarlista-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            goToPasarLista(date);
         });
 
         tr.querySelector(".edit-rehearsal-btn").addEventListener("click", (e) => {
@@ -6415,6 +6451,7 @@ function renderActuacionesList() {
             currentYearStr = yyyy;
             currentMonthStr = ""; // reset month when year changes
             const yearHeaderTr = document.createElement("tr");
+            yearHeaderTr.className = "session-group-row session-group-year";
             yearHeaderTr.innerHTML = `
                 <td colspan="6" style="background-color: rgba(212, 175, 55, 0.12); font-weight: 800; color: var(--color-gold); font-size: 0.95rem; padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif;">
                     Año ${yyyy}
@@ -6427,6 +6464,7 @@ function renderActuacionesList() {
         if (monthName !== currentMonthStr) {
             currentMonthStr = monthName;
             const monthHeaderTr = document.createElement("tr");
+            monthHeaderTr.className = "session-group-row";
             monthHeaderTr.innerHTML = `
                 <td colspan="6" style="background-color: rgba(255, 255, 255, 0.02); font-weight: 700; color: var(--color-gold); font-size: 0.82rem; padding: 6px 12px; border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px;">
                     ${monthName}
@@ -6486,29 +6524,41 @@ function renderActuacionesList() {
             presentsCellHTML = `<span class="badge" style="background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeColor}; font-size: 0.78rem; padding: 2px 8px; border-radius: 10px; font-weight: 600;" title="${prev.preavisoAbsences} preavisos registrados">${badgeIcon} Prev. ${prev.estimatedCount}/${prev.totalConvocated}</span>`;
         }
 
+        // Mismas clases sc-* que en renderEnsayosList: en móvil la fila se ve como tarjeta apilada.
         const tr = document.createElement("tr");
-        tr.classList.add("clickable-row");
+        tr.classList.add("clickable-row", "session-row", "session-row-actuacion");
         tr.innerHTML = `
-            <td style="white-space: nowrap;">
+            <td class="sc-date" style="white-space: nowrap;">
                 <strong>${formatDateShortSpanish(date)}</strong>
             </td>
-            <td>
+            <td class="sc-name">
                 <span style="font-weight: 600; color: var(--color-gold);">${sessionInfo.name || "Sin nombre"}</span>
             </td>
-            <td>
+            <td class="sc-time sc-mobile-only">${sessionInfo.time ? `<span>${sessionInfo.time}</span>` : ""}</td>
+            <td class="sc-place sc-mobile-only">${sessionInfo.location ? `<span>${sessionInfo.location}</span>` : ""}</td>
+            <td class="sc-present">
                 ${presentsCellHTML}
             </td>
-            <td style="white-space: nowrap;">
+            <td class="sc-absences" style="white-space: nowrap;">
                 <div style="color: var(--color-justified); font-weight: 500;">${absentJustified} justificadas</div>
                 <div style="color: var(--color-absent); font-weight: 500;">${absentUnjustified} sin justificar</div>
             </td>
-            <td>
+            <td class="sc-ratio">
                 <span class="musician-count-badge" style="background-color: var(--color-purple-dark); border-color: var(--border-active); font-size: 0.85rem; padding: 4px 10px;">
                     ${ratio}%
                 </span>
             </td>
-            <td>
-                <div style="display: flex; gap: 6px; align-items: center;">
+            <td class="sc-break sc-break-a" aria-hidden="true"></td>
+            <td class="sc-break sc-break-b" aria-hidden="true"></td>
+            <td class="sc-actions">
+                <div class="sc-actions-inner" style="display: flex; gap: 6px; align-items: center;">
+                    <button class="btn btn-secondary btn-sm session-pasarlista-btn" data-date="${date}" title="Pasar lista">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"></path>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        <span>Pasar lista</span>
+                    </button>
                     <button class="btn btn-secondary btn-sm edit-actuacion-btn" data-date="${date}" title="Editar Actuación" style="padding: 6px; font-size: 0.8rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -6527,6 +6577,11 @@ function renderActuacionesList() {
 
         tr.addEventListener("click", () => {
             openActuacionDetailModal(date);
+        });
+
+        tr.querySelector(".session-pasarlista-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            goToPasarLista(date);
         });
 
         tr.querySelector(".edit-actuacion-btn").addEventListener("click", (e) => {
@@ -6777,13 +6832,14 @@ function renderActuacionRepertoireSearchList() {
 
     available.forEach(m => {
         const card = document.createElement("div");
+        card.className = "repertoire-bank-item";
         card.setAttribute("draggable", "true");
         card.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary); transition: opacity 0.15s;";
         card.innerHTML = `
             <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1;">
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(m.title)}</span>
+                <span class="repertoire-item-title" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(m.title)}</span>
             </div>
-            <button type="button" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
+            <button type="button" class="repertoire-bank-add" title="Añadir al repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-gold); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </button>
         `;
@@ -6822,16 +6878,17 @@ function buildRepertoireOrderRow(mId, idx, marchasArray) {
     }
 
     const row = document.createElement("div");
+    row.className = "repertoire-order-row";
     row.setAttribute("draggable", "true");
     row.style.cssText = "display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 4px; background: rgba(212, 175, 55, 0.06); border: 1px solid rgba(212, 175, 55, 0.2); cursor: grab; font-size: 0.72rem; line-height: 1.2; color: var(--text-primary);";
     row.innerHTML = `
-        <span style="flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
-        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px;">${escapeHtml(mTitle)}</span>
-        <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;">
+        <span class="repertoire-row-num" style="flex-shrink: 0; width: 15px; height: 15px; border-radius: 50%; background: var(--color-gold); color: #1a1a1a; font-weight: 700; font-size: 0.6rem; display: flex; align-items: center; justify-content: center;">${idx + 1}</span>
+        <span class="repertoire-item-title" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px;">${escapeHtml(mTitle)}</span>
+        <div class="repertoire-row-badges" style="display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;">
             ${statusCircle}
             ${diffBadge}
         </div>
-        <button type="button" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
+        <button type="button" class="repertoire-row-remove" title="Quitar del repertorio" style="flex-shrink: 0; background: none; border: none; cursor: pointer; color: var(--color-absent); display: inline-flex; align-items: center; justify-content: center; padding: 1px;">
             <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
     `;
@@ -6864,7 +6921,7 @@ function buildRepertoireOrderRow(mId, idx, marchasArray) {
         handleActuacionRepertoireDrop(e, isAbove ? idx : idx + 1);
     });
 
-    row.querySelector("button").addEventListener("click", () => {
+    row.querySelector(".repertoire-row-remove").addEventListener("click", () => {
         removeMarchaFromActuacionRepertoire(idx);
     });
 

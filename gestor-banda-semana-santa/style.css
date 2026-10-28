@@ -5390,3 +5390,284 @@ body.component-portal .content-header {
     background: var(--color-gold);
     box-shadow: 0 0 4px var(--color-gold);
 }
+
+/* ==========================================================================
+   TARJETAS DE SESIÓN (Ensayos / Actuaciones de la dirección en móvil)
+   En escritorio la tabla queda igual; por debajo de 768px cada fila se apila
+   como una tarjeta para que se lea entera sin scroll horizontal.
+   ========================================================================== */
+.session-table .sc-mobile-only,
+.session-table .sc-break,
+.session-table .session-pasarlista-btn {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .card-table:has(> .table-responsive > .session-table) {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        overflow: visible;
+    }
+    .card-table:has(> .table-responsive > .session-table) .table-responsive {
+        overflow-x: visible;
+    }
+
+    .session-table,
+    .session-table tbody {
+        display: block;
+        width: 100%;
+    }
+    .session-table thead {
+        display: none;
+    }
+
+    /* Separadores de año y mes */
+    .session-table tbody tr.session-group-row {
+        display: block;
+        background: transparent;
+    }
+    .session-table tbody tr.session-group-row:hover {
+        background: transparent;
+    }
+    .session-table tbody tr.session-group-row td {
+        display: block;
+        background: transparent !important;
+        border: none !important;
+        padding: 14px 4px 4px !important;
+    }
+    .session-table tbody tr.session-group-year td {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-top: 18px !important;
+    }
+    .session-table tbody tr.session-group-year td::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, var(--border-active), transparent);
+    }
+    .session-table tbody tr.session-group-row + tr.session-group-row td {
+        padding-top: 4px !important;
+    }
+
+    /* La tarjeta */
+    .session-table tbody tr.session-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 8px;
+        position: relative;
+        margin: 8px 0;
+        padding: 14px 14px 12px 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .session-table tbody tr.session-row::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(180deg, var(--color-gold), var(--color-purple-light));
+        opacity: 0.85;
+    }
+    .session-table tbody tr.session-row:hover {
+        transform: none;
+        box-shadow: var(--shadow-sm);
+        background: var(--bg-secondary);
+    }
+    .session-table tbody tr.session-row:active {
+        transform: scale(0.985);
+        border-color: var(--border-active);
+    }
+    .session-table tbody tr.session-row td {
+        display: block;
+        padding: 0;
+        border: none;
+        min-width: 0;
+    }
+    /* Saltos de fila forzados entre cabecera, chips y asistencia */
+    .session-table tbody tr.session-row td.sc-break {
+        display: block;
+        flex: 0 0 100%;
+        height: 0;
+        margin: -4px 0;
+    }
+    .session-table .sc-break-a { order: 4; }
+    .session-table .sc-break-b { order: 6; }
+    .session-table tbody tr.session-row td.sc-no-value,
+    .session-table .sc-mobile-only:empty {
+        display: none !important;
+    }
+
+    /* Fila 1: fecha + % */
+    .session-table .sc-date {
+        order: 1;
+        flex: 1 1 auto;
+        font-size: 1rem;
+        color: var(--text-primary);
+    }
+    .session-table .sc-date::after {
+        content: "Ver detalle ›";
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 500;
+        letter-spacing: 0.3px;
+        color: var(--text-muted);
+        margin-top: 1px;
+    }
+    .session-table .sc-ratio {
+        order: 2;
+        flex: 0 0 auto;
+    }
+    .session-table .sc-ratio .musician-count-badge {
+        font-size: 0.95rem !important;
+        font-weight: 700;
+        color: var(--color-gold);
+    }
+
+    /* Nombre de la actuación */
+    .session-table .sc-name {
+        order: 3;
+        flex: 1 1 100%;
+        font-size: 1.02rem;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    /* Fila de "chips": hora, lugar, tipo, responsable */
+    .session-table .sc-time,
+    .session-table .sc-place,
+    .session-table .sc-resp {
+        display: inline-flex !important;
+        align-items: center;
+        gap: 4px;
+        order: 5;
+        flex: 0 1 auto;
+        max-width: 100%;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        background: var(--bg-compact-card);
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        padding: 3px 9px !important;
+        overflow-wrap: anywhere;
+    }
+    .session-table .sc-time::before { content: "🕒"; font-size: 0.75rem; }
+    .session-table .sc-place::before { content: "📍"; font-size: 0.75rem; }
+    .session-table .sc-resp::before { content: "👤"; font-size: 0.75rem; }
+    .session-table .sc-type {
+        order: 5;
+        flex: 0 1 auto;
+        white-space: normal !important;
+    }
+    .session-table .sc-type .musician-count-badge {
+        max-width: 100% !important;
+        white-space: normal !important;
+    }
+
+    /* Fila de asistencia */
+    .session-table .sc-present {
+        order: 7;
+        flex: 0 0 auto;
+        font-size: 0.85rem;
+        padding-top: 10px !important;
+        margin-top: 2px;
+        border-top: 1px dashed var(--border-color) !important;
+    }
+    .session-table .sc-absences {
+        order: 8;
+        flex: 1 1 0;
+        display: flex !important;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 2px 10px;
+        font-size: 0.78rem;
+        white-space: normal !important;
+        text-align: right;
+        padding-top: 10px !important;
+        margin-top: 2px;
+        border-top: 1px dashed var(--border-color) !important;
+    }
+
+    /* Acciones: botones grandes para el dedo */
+    .session-table .sc-actions {
+        order: 9;
+        flex: 1 1 100%;
+    }
+    .session-table .sc-actions-inner {
+        gap: 8px !important;
+    }
+    .session-table .session-pasarlista-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex: 1 1 auto;
+        min-height: 40px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: var(--radius-sm);
+    }
+    .session-table .sc-actions .edit-rehearsal-btn,
+    .session-table .sc-actions .edit-actuacion-btn,
+    .session-table .sc-actions .btn-action.delete {
+        flex: 0 0 auto;
+        width: 44px;
+        min-height: 40px;
+        border-radius: var(--radius-sm) !important;
+    }
+    .session-table .sc-actions .btn-action.delete {
+        border: 1px solid rgba(231, 76, 60, 0.3);
+        background: rgba(231, 76, 60, 0.08);
+    }
+    .session-table .sc-actions svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+/* ==========================================================================
+   PANEL DE REPERTORIO DE ACTUACIÓN EN MÓVIL
+   Mismo diseño compacto que en escritorio (banco + orden lado a lado), pero
+   el orden pasa a una sola columna y el nombre de cada marcha salta de línea
+   en vez de recortarse con "…"; estado, nivel y quitar van en una 2ª línea.
+   ========================================================================== */
+@media (max-width: 768px) {
+    .repertoire-order-scroll {
+        flex-direction: column;
+        gap: 3px !important;
+    }
+    #actuacion-repertoire-ordered-list-col1,
+    #actuacion-repertoire-ordered-list-col2 {
+        flex: 0 0 auto !important;
+    }
+    .repertoire-order-row {
+        flex-wrap: wrap;
+        row-gap: 2px !important;
+    }
+    .repertoire-order-row .repertoire-row-num {
+        align-self: flex-start;
+    }
+    .repertoire-order-row .repertoire-item-title {
+        flex: 1 1 calc(100% - 20px) !important;
+        margin-right: 0 !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere;
+    }
+    .repertoire-order-row .repertoire-row-badges {
+        margin-left: 19px !important;
+        margin-right: auto;
+    }
+}

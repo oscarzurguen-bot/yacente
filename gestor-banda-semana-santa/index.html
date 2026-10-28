@@ -95,7 +95,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=586">
+    <link rel="stylesheet" href="style.css?v=588">
     
     <!-- Firebase SDK Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js" crossorigin="anonymous"></script>
@@ -516,7 +516,7 @@
 
                 <div class="card card-table">
                     <div class="table-responsive">
-                        <table class="data-table">
+                        <table class="data-table session-table">
                             <thead>
                                 <tr>
                                     <th style="white-space: nowrap;">Fecha</th>
@@ -591,7 +591,7 @@
 
                 <div class="card card-table">
                     <div class="table-responsive">
-                        <table class="data-table">
+                        <table class="data-table session-table">
                             <thead>
                                 <tr>
                                     <th style="white-space: nowrap;">Fecha</th>
@@ -3674,7 +3674,7 @@
 
     <!-- Modal: Repertorio de Actuación -->
     <div id="modal-actuacion-repertoire" class="modal-overlay">
-        <div class="modal-card" style="max-width: 780px; width: 94vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+        <div class="modal-card repertoire-modal-card" style="max-width: 780px; width: 94vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
             <div class="modal-header" style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
                 <div>
                     <h3 id="actuacion-repertoire-title" style="margin: 0; font-size: 1.05rem;">Repertorio de la Actuación</h3>
@@ -3687,9 +3687,9 @@
                     </svg>
                 </button>
             </div>
-            <div class="modal-body" style="padding: 12px 16px; overflow: hidden; flex: 1; min-height: 0; display: flex; gap: 10px; box-sizing: border-box;">
+            <div class="modal-body repertoire-modal-body" style="padding: 12px 16px; overflow: hidden; flex: 1; min-height: 0; display: flex; gap: 10px; box-sizing: border-box;">
                 <!-- Columna 1: banco de marchas -->
-                <div style="flex: 0 0 170px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div class="repertoire-bank-col" style="flex: 0 0 170px; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
                     <h4 style="margin: 0; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Banco de Marchas</h4>
                     <input type="text" id="actuacion-repertoire-search" placeholder="Buscar..." style="width: 100%; box-sizing: border-box; padding: 5px 7px; font-size: 0.75rem; border-radius: 5px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary);">
                     <div id="actuacion-repertoire-search-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 3px;">
@@ -3697,9 +3697,9 @@
                     </div>
                 </div>
                 <!-- Columnas 2 y 3: repertorio ordenado, con scroll vertical compartido -->
-                <div style="flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div class="repertoire-order-col" style="flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px;">
                     <h4 style="margin: 0; font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px;">Orden del Repertorio</h4>
-                    <div style="flex: 1; min-height: 0; overflow-y: auto; display: flex; gap: 8px; border: 1px dashed var(--border-color); border-radius: 6px; padding: 6px; box-sizing: border-box;">
+                    <div class="repertoire-order-scroll" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; gap: 8px; border: 1px dashed var(--border-color); border-radius: 6px; padding: 6px; box-sizing: border-box;">
                         <div id="actuacion-repertoire-ordered-list-col1" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;"></div>
                         <div id="actuacion-repertoire-ordered-list-col2" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;"></div>
                     </div>
@@ -4712,10 +4712,10 @@
         </svg>
     </button>
 
-    <script src="dictionary-es.js?v=586"></script>
-    <script src="app.js?v=586"></script>
+    <script src="dictionary-es.js?v=588"></script>
+    <script src="app.js?v=588"></script>
     <script>
-        // Registro del Service Worker v=586.
+        // Registro del Service Worker v=588.
         // OJO: aquí solía haber también una purga de cachés antiguas (caches.delete de todo lo
         // que no fuera la versión actual), pero se ejecutaba en el hilo principal de FORMA
         // INMEDIATA en cada carga -- antes incluso de que el Service Worker nuevo hubiera
@@ -4744,9 +4744,9 @@
                 window.location.reload();
             });
             window.addEventListener("load", () => {
-                navigator.serviceWorker.register("sw.js?v=586")
+                navigator.serviceWorker.register("sw.js?v=588")
                     .then((registration) => {
-                        console.log("[PWA] Service Worker v586 registrado correctamente:", registration);
+                        console.log("[PWA] Service Worker v588 registrado correctamente:", registration);
                     })
                     .catch((err) => {
                         console.error("[PWA] Error al registrar Service Worker:", err);
