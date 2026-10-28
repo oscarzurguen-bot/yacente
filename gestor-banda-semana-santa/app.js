@@ -61,6 +61,22 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 586,
+        fecha: "2026-10-28",
+        titulo: "Las bajas ya no cuentan en el ranking de la dirección",
+        cambios: [
+            "En el ranking de asistencia de Estadísticas ya no aparecen los músicos que estuvieron de baja durante todo el periodo seleccionado. Antes, al no tener nada convocado, salían con un 100%."
+        ]
+    },
+    {
+        version: 585,
+        fecha: "2026-10-28",
+        titulo: "Ranking de asistencia unificado",
+        cambios: [
+            "El ranking de asistencia de la dirección (Estadísticas e informe PDF) ya ordena igual que el Top 25 de Mi Ficha: si dos músicos empatan en porcentaje, queda por delante quien tenga más insignias."
+        ]
+    },
+    {
         version: 584,
         fecha: "2026-10-18",
         titulo: "Arreglado el error de almacenamiento lleno al abrir la app",
@@ -7997,7 +8013,11 @@ function renderStatsRanking(filteredDates) {
         return !session || session.type === "ensayo";
     }).sort((a, b) => b.localeCompare(a));
 
-    const rankingData = state.musicians.map(m => {
+    // Excluir a quien estuvo de baja durante TODO el período filtrado: no está convocado a
+    // nada, así que su % por defecto (100, ver computeMusicianAttendanceMetrics) lo colaría
+    // artificialmente alto (mismo motivo que el filtro de renderComponenteRanking). Quien
+    // tuvo una baja parcial sigue apareciendo con su % real.
+    const rankingData = state.musicians.filter(m => !filteredDates.every(date => isMusicianOnLeaveOnDate(m, date))).map(m => {
         const musicianId = m.id;
 
         // 1. Asistencia en el período filtrado
@@ -8022,9 +8042,9 @@ function renderStatsRanking(filteredDates) {
             }
         }
 
-        // 3. Insignias obtenidas
-        const medals = getMusicianMedalsData(musicianId);
-        const badgesCount = medals.filter(med => med.unlocked && !med.isNegative).reduce((acc, med) => acc + (med.stars || 1), 0);
+        // 3. Insignias obtenidas: mismo recuento que el ranking de Mi Ficha
+        // (renderComponenteRanking / getMusicianAttendanceRank), sin contar "Top".
+        const badgesCount = countUnlockedBadgeStars(getMusicianBaseMedalsData(musicianId));
 
         return {
             id: m.id,
@@ -8037,22 +8057,22 @@ function renderStatsRanking(filteredDates) {
         };
     });
 
-    // Criterio de ordenación:
+    // Criterio de ordenación (el mismo que el ranking de Mi Ficha de los músicos):
     // 1. Mayor porcentaje de asistencia (redondeado a entero)
-    // 2. En caso de empate en el %, priorizar el que tenga mayor racha de asistencia
-    // 3. En caso de empate en racha, mayor número de insignias
-    // 4. Porcentaje decimal exacto
+    // 2. En caso de empate en el %, mayor número de insignias
+    // 3. Porcentaje decimal exacto
+    // 4. Mayor racha de asistencia
     // 5. Orden alfabético
     rankingData.sort((a, b) => {
         const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
         if (roundDiff !== 0) return roundDiff;
 
-        if (b.streak !== a.streak) return b.streak - a.streak;
-
         if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
 
         const exactDiff = b.attendancePct - a.attendancePct;
         if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+
+        if (b.streak !== a.streak) return b.streak - a.streak;
 
         return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
     });
@@ -9859,8 +9879,8 @@ function downloadSeasonPDFReport(selectedSeason) {
             }
         }
 
-        const medals = getMusicianMedalsData(musicianId);
-        const badgesCount = medals.filter(med => med.unlocked && !med.isNegative).reduce((acc, med) => acc + (med.stars || 1), 0);
+        // Mismo recuento de insignias que el ranking de Mi Ficha (sin contar "Top").
+        const badgesCount = countUnlockedBadgeStars(getMusicianBaseMedalsData(musicianId));
 
         return {
             id: m.id,
@@ -9876,10 +9896,10 @@ function downloadSeasonPDFReport(selectedSeason) {
     }).sort((a, b) => {
         const roundDiff = Math.round(b.attendancePct) - Math.round(a.attendancePct);
         if (roundDiff !== 0) return roundDiff;
-        if (b.streak !== a.streak) return b.streak - a.streak;
         if (b.badgesCount !== a.badgesCount) return b.badgesCount - a.badgesCount;
         const exactDiff = b.attendancePct - a.attendancePct;
         if (Math.abs(exactDiff) > 0.0001) return exactDiff;
+        if (b.streak !== a.streak) return b.streak - a.streak;
         return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
     });
 
