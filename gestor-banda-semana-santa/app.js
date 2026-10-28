@@ -61,44 +61,11 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
-        version: 591,
+        version: 592,
         fecha: "2026-10-29",
-        titulo: "Filtros y detalle de ensayos más cómodos en el móvil",
+        titulo: "Mejoras de diseño en el móvil",
         cambios: [
-            "En el móvil de la dirección, los filtros de temporada y mes de Ensayos y Actuaciones van en la misma línea.",
-            "En el detalle de un ensayo o una actuación, en el móvil, se ha quitado el indicador de previsión del resumen de asistencia, que no cabía y se solapaba con los demás datos."
-        ]
-    },
-    {
-        version: 590,
-        fecha: "2026-10-29",
-        titulo: "Tarjetas de ensayo más compactas en el móvil",
-        cambios: [
-            "En el móvil de la dirección, las etiquetas de hora, lugar, tipo y responsable de cada ensayo son algo más pequeñas y van todas en la misma fila, para que las tarjetas ocupen menos."
-        ]
-    },
-    {
-        version: 589,
-        fecha: "2026-10-29",
-        titulo: "Repertorio de actuación más limpio en el móvil",
-        cambios: [
-            "En el móvil de la dirección, las marchas añadidas al repertorio de una actuación muestran solo el número y el nombre, sin el indicador de estado ni de dificultad, para que cada una ocupe una sola línea."
-        ]
-    },
-    {
-        version: 588,
-        fecha: "2026-10-29",
-        titulo: "Repertorio de actuación compacto en el móvil",
-        cambios: [
-            "En el móvil de la dirección, el panel para añadir repertorio a una actuación vuelve a su diseño compacto de siempre, pero ahora se lee el nombre completo de cada marcha añadida en lugar de verse cortado."
-        ]
-    },
-    {
-        version: 587,
-        fecha: "2026-10-28",
-        titulo: "Ensayos y actuaciones en tarjetas en el móvil",
-        cambios: [
-            "En el móvil de la dirección, las páginas de Ensayos y Actuaciones ya no obligan a desplazarse de lado: cada ensayo o actuación se muestra como una tarjeta con fecha, hora, lugar, tipo, responsable y asistencia, y botones grandes para pasar lista, editar o borrar."
+            "La versión móvil de la dirección se ha rediseñado para que se lea mejor sin hacer zoom ni desplazarse de lado: ensayos y actuaciones se muestran en tarjetas compactas, los filtros ocupan una sola línea, el detalle de cada sesión ya no tiene datos solapados y el repertorio de las actuaciones muestra el nombre completo de cada marcha."
         ]
     },
     {
