@@ -5459,7 +5459,7 @@ body.component-portal .content-header {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 8px 8px;
+        gap: 8px 5px;
         position: relative;
         margin: 8px 0;
         padding: 14px 14px 12px 16px;
@@ -5544,35 +5544,61 @@ body.component-portal .content-header {
         overflow-wrap: anywhere;
     }
 
-    /* Fila de "chips": hora, lugar, tipo, responsable */
+    /* Fila de "chips": hora, lugar, tipo y responsable, siempre en una sola fila.
+       Con flex-basis 0 + max-width: max-content cada chip mide lo que su texto, y
+       solo si no caben todos se reparten el hueco y se recortan con "…". */
+    .session-table .sc-time,
+    .session-table .sc-place,
+    .session-table .sc-resp,
+    .session-table .sc-type {
+        order: 5;
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: max-content;
+    }
+    /* La hora nunca se recorta: las demás se reparten el hueco que quede */
+    .session-table .sc-time {
+        flex: 0 0 auto;
+    }
     .session-table .sc-time,
     .session-table .sc-place,
     .session-table .sc-resp {
         display: inline-flex !important;
         align-items: center;
-        gap: 4px;
-        order: 5;
-        flex: 0 1 auto;
-        max-width: 100%;
-        font-size: 0.8rem;
+        gap: 2px;
+        font-size: 0.72rem;
+        line-height: 1.3;
         color: var(--text-secondary);
         background: var(--bg-compact-card);
         border: 1px solid var(--border-color);
         border-radius: 999px;
-        padding: 3px 9px !important;
-        overflow-wrap: anywhere;
+        padding: 2px 6px !important;
+        white-space: nowrap;
+        overflow: hidden;
     }
-    .session-table .sc-time::before { content: "🕒"; font-size: 0.75rem; }
-    .session-table .sc-place::before { content: "📍"; font-size: 0.75rem; }
-    .session-table .sc-resp::before { content: "👤"; font-size: 0.75rem; }
+    .session-table .sc-time span,
+    .session-table .sc-place span,
+    .session-table .sc-resp span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .session-table .sc-time::before { content: "🕒"; font-size: 0.62rem; flex-shrink: 0; }
+    .session-table .sc-place::before { content: "📍"; font-size: 0.62rem; flex-shrink: 0; }
+    .session-table .sc-resp::before { content: "👤"; font-size: 0.62rem; flex-shrink: 0; }
     .session-table .sc-type {
-        order: 5;
-        flex: 0 1 auto;
-        white-space: normal !important;
+        display: block !important;
+        white-space: nowrap !important;
     }
     .session-table .sc-type .musician-count-badge {
+        display: block !important;
         max-width: 100% !important;
-        white-space: normal !important;
+        font-size: 0.72rem !important;
+        line-height: 1.3;
+        padding: 1px 6px !important;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     /* Fila de asistencia */
@@ -5639,10 +5665,15 @@ body.component-portal .content-header {
 /* ==========================================================================
    PANEL DE REPERTORIO DE ACTUACIÓN EN MÓVIL
    Mismo diseño compacto que en escritorio (banco + orden lado a lado), pero
-   el orden pasa a una sola columna y el nombre de cada marcha salta de línea
-   en vez de recortarse con "…"; estado, nivel y quitar van en una 2ª línea.
+   el banco es algo más estrecho, el orden pasa a una sola columna y cada fila es
+   solo número + nombre + quitar (sin estado ni nivel). Los nombres muy largos
+   saltan de línea en vez de recortarse con "…".
    ========================================================================== */
 @media (max-width: 768px) {
+    /* Banco algo más estrecho para que el nombre de cada marcha quepa en una línea */
+    .repertoire-bank-col {
+        flex-basis: 120px !important;
+    }
     .repertoire-order-scroll {
         flex-direction: column;
         gap: 3px !important;
@@ -5651,23 +5682,14 @@ body.component-portal .content-header {
     #actuacion-repertoire-ordered-list-col2 {
         flex: 0 0 auto !important;
     }
-    .repertoire-order-row {
-        flex-wrap: wrap;
-        row-gap: 2px !important;
-    }
-    .repertoire-order-row .repertoire-row-num {
-        align-self: flex-start;
+    .repertoire-order-row .repertoire-row-badges {
+        display: none !important;
     }
     .repertoire-order-row .repertoire-item-title {
-        flex: 1 1 calc(100% - 20px) !important;
         margin-right: 0 !important;
         white-space: normal !important;
         overflow: visible !important;
         text-overflow: clip !important;
-        overflow-wrap: anywhere;
-    }
-    .repertoire-order-row .repertoire-row-badges {
-        margin-left: 19px !important;
-        margin-right: auto;
+        overflow-wrap: break-word;
     }
 }

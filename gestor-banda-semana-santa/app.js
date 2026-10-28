@@ -61,6 +61,22 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 590,
+        fecha: "2026-10-29",
+        titulo: "Tarjetas de ensayo más compactas en el móvil",
+        cambios: [
+            "En el móvil de la dirección, las etiquetas de hora, lugar, tipo y responsable de cada ensayo son algo más pequeñas y van todas en la misma fila, para que las tarjetas ocupen menos."
+        ]
+    },
+    {
+        version: 589,
+        fecha: "2026-10-29",
+        titulo: "Repertorio de actuación más limpio en el móvil",
+        cambios: [
+            "En el móvil de la dirección, las marchas añadidas al repertorio de una actuación muestran solo el número y el nombre, sin el indicador de estado ni de dificultad, para que cada una ocupe una sola línea."
+        ]
+    },
+    {
         version: 588,
         fecha: "2026-10-29",
         titulo: "Repertorio de actuación compacto en el móvil",
