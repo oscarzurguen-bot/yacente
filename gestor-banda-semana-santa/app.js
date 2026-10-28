@@ -61,6 +61,15 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 591,
+        fecha: "2026-10-29",
+        titulo: "Filtros y detalle de ensayos más cómodos en el móvil",
+        cambios: [
+            "En el móvil de la dirección, los filtros de temporada y mes de Ensayos y Actuaciones van en la misma línea.",
+            "En el detalle de un ensayo o una actuación, en el móvil, se ha quitado el indicador de previsión del resumen de asistencia, que no cabía y se solapaba con los demás datos."
+        ]
+    },
+    {
         version: 590,
         fecha: "2026-10-29",
         titulo: "Tarjetas de ensayo más compactas en el móvil",

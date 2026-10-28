@@ -5693,3 +5693,62 @@ body.component-portal .content-header {
         overflow-wrap: break-word;
     }
 }
+
+/* ==========================================================================
+   ENSAYOS / ACTUACIONES EN MÓVIL: filtros en una línea y detalle sin "Previsión"
+   ========================================================================== */
+@media (max-width: 768px) {
+    /* Temporada y Mes uno al lado del otro */
+    #section-ensayos .period-filter-card,
+    #section-actuaciones .period-filter-card {
+        padding: 12px;
+        gap: 10px;
+    }
+    #section-ensayos .filter-controls,
+    #section-actuaciones .filter-controls {
+        flex-wrap: nowrap;
+        gap: 8px;
+        width: 100%;
+    }
+    #section-ensayos .filter-control-group,
+    #section-actuaciones .filter-control-group {
+        flex: 1 1 0;
+        min-width: 0;
+        gap: 6px;
+    }
+    /* "Temporada" es una etiqueta más larga y sus valores (2025-2026) también */
+    #section-ensayos .filter-control-group:first-child,
+    #section-actuaciones .filter-control-group:first-child {
+        flex-grow: 1.3;
+    }
+    #section-ensayos .filter-control-group label,
+    #section-actuaciones .filter-control-group label {
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+    #section-ensayos .filter-select,
+    #section-actuaciones .filter-select {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+        padding: 7px 2px 7px 6px;
+        font-size: 0.8rem;
+    }
+
+    /* La métrica "Previsión" del detalle no cabe y solapa las demás: se oculta en móvil */
+    #modal-rehearsal-detail .detail-metric-prevision,
+    #modal-actuacion-detail .detail-metric-prevision {
+        display: none !important;
+    }
+    .detail-metrics-row {
+        padding: 10px 6px !important;
+        gap: 4px;
+    }
+    .detail-metrics-row > div > div:first-child {
+        font-size: 1.15rem !important;
+    }
+    .detail-metrics-row > div > div:last-child {
+        font-size: 0.62rem !important;
+        letter-spacing: 0 !important;
+    }
+}
