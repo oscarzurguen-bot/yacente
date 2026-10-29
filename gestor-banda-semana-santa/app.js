@@ -61,11 +61,11 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
-        version: 593,
+        version: 594,
         fecha: "2026-10-29",
         titulo: "Mejoras de diseño en el móvil",
         cambios: [
-            "La versión móvil de la dirección se ha rediseñado para que se lea mejor sin hacer zoom ni desplazarse de lado: ensayos y actuaciones se muestran en tarjetas compactas, los filtros ocupan una sola línea, el detalle de cada sesión ya no tiene datos solapados y el repertorio de las actuaciones muestra el nombre completo de cada marcha. Además, la dirección ya puede consultar esta página de Novedades desde su menú."
+            "La versión móvil de la dirección se ha rediseñado para que se lea mejor sin hacer zoom ni desplazarse de lado: ensayos, actuaciones y las estadísticas de Pasar Lista se muestran en tarjetas compactas, los filtros ocupan una sola línea, el detalle de cada sesión ya no tiene datos solapados y el repertorio de las actuaciones muestra el nombre completo de cada marcha. Además, la dirección ya puede consultar esta página de Novedades desde su menú."
         ]
     },
     {
