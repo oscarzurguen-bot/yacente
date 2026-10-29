@@ -61,6 +61,14 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
+        version: 596,
+        fecha: "2026-10-29",
+        titulo: "Repertorio más limpio en el historial",
+        cambios: [
+            "Al abrir un ensayo o una actuación desde tu historial, el repertorio de ese día muestra ahora solo el título de cada marcha, sin el indicador de estado ni el nivel de dificultad."
+        ]
+    },
+    {
         version: 595,
         fecha: "2026-10-29",
         titulo: "Mejoras de diseño en el móvil",
@@ -16216,28 +16224,9 @@ function openCompRehearsalDetailModal(date) {
                 itemDiv.style.display = "flex";
                 itemDiv.style.alignItems = "center";
 
-                let statusCircle = "";
-                let diffBadge = "";
-                if (m) {
-                    let statusTitle = "Por trabajar";
-                    let circleSymbol = "🔴";
-                    if (m.status === "green") { circleSymbol = "🟢"; statusTitle = "Bien trabajada"; }
-                    else if (m.status === "yellow") { circleSymbol = "🟡"; statusTitle = "En proceso"; }
-                    statusCircle = `<span title="${statusTitle}" style="font-size: 0.65rem; line-height: 1; flex-shrink: 0;">${circleSymbol}</span>`;
-
-                    const diffNum = m.difficulty || 1;
-                    diffBadge = `<span style="background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.6rem; font-weight: 600; padding: 1px 3px; border-radius: 3px; line-height: 1; flex-shrink: 0;">N${diffNum}</span>`;
-                }
-
                 const titleText = m ? m.title : `Marcha (${mId})`;
                 itemDiv.innerHTML = `
-                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">🎵 ${escapeHtml(titleText)}</span>
-                        <div style="display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                            ${statusCircle}
-                            ${diffBadge}
-                        </div>
-                    </div>
+                    <div style="min-width: 0; flex: 1; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🎵 ${escapeHtml(titleText)}</div>
                 `;
                 marchasContainer.appendChild(itemDiv);
             });
