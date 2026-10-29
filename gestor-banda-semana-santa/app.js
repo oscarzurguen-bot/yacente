@@ -61,7 +61,7 @@ const SECCIONES_ORDEN = [
 // Al añadir un cambio, insertar una entrada nueva aquí en el mismo turno en que se sube la versión.
 const NOVEDADES = [
     {
-        version: 594,
+        version: 595,
         fecha: "2026-10-29",
         titulo: "Mejoras de diseño en el móvil",
         cambios: [

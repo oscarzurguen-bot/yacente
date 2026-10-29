@@ -5765,36 +5765,33 @@ body.component-portal .content-header {
 @media (max-width: 768px) {
     #section-pasar-lista .stats-ribbon {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-        margin-bottom: 16px;
+        gap: 10px;
+        margin-bottom: 18px;
     }
     #section-pasar-lista .stat-card {
-        padding: 8px 10px;
-        gap: 8px;
+        padding: 11px 12px;
+        gap: 10px;
         border-radius: var(--radius-sm);
         min-width: 0;
     }
     #section-pasar-lista .stat-icon {
-        width: 28px;
-        height: 28px;
+        width: 36px;
+        height: 36px;
         flex-shrink: 0;
     }
     #section-pasar-lista .stat-icon svg {
-        width: 15px;
-        height: 15px;
+        width: 19px;
+        height: 19px;
     }
     #section-pasar-lista .stat-info {
         min-width: 0;
     }
     #section-pasar-lista .stat-value {
-        font-size: 1.05rem;
+        font-size: 1.3rem;
         line-height: 1.15;
     }
     #section-pasar-lista .stat-label {
-        font-size: 0.68rem;
-        line-height: 1.15;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 0.76rem;
+        line-height: 1.2;
     }
 }
